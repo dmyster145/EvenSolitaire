@@ -1,0 +1,12 @@
+---
+description: Prevent wheel-spinning and unrelated changes.
+---
+
+# Safety and Scope
+
+- **No unrelated refactors** during bug fixes or small features.
+- **Preserve public interfaces** (exports, function signatures) unless the task explicitly requires a change.
+- **Ask or flag** when a change is migration-like or data-destructive (e.g. schema, storage format).
+- **Do not edit generated files** (`dist/`, `.vite/`, build outputs) unless the task is "regenerate" or "fix build."
+- **Max retries:** After 2 failed attempts at the same fix, stop and switch to diagnosis (gather evidence, summarize, suggest next step).
+- **State assumptions and risks** when they affect behavior or compatibility (e.g. G2 vs simulator).

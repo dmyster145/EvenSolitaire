@@ -1,0 +1,16 @@
+---
+description: Verifiable finish lines—commands and escalation order.
+---
+
+# Test and Validation
+
+- **Primary commands (see package.json):**
+  - Install: `npm ci` or `npm install`
+  - Typecheck: `npm run typecheck` or `npx tsc --noEmit`
+  - Test: `npm test` or `npx vitest run`
+  - Build: `npm run build` or `npx vite build`
+  - Lint: add `npm run lint` when ESLint is configured
+- **Preference:** Run smallest useful check first (e.g. typecheck for type-only changes, single test file for one fix).
+- **Escalation:** Single file/test → full test run → typecheck → build. Report failures with command + last 5–10 lines of output (no full log dumps).
+- **Requirement:** Include a one-line validation summary in the final response (e.g. "Lint: 0 errors. Tests: 12 passed. Build: ok.").
+- **If commands missing:** Add scripts to `package.json` and/or document in this file with TODO.

@@ -1,0 +1,13 @@
+---
+description: TypeScript / Vite conventions for EvenSolitaire.
+globs: ["**/*.ts", "**/*.tsx"]
+---
+
+# Code Style (TS / EvenSolitaire)
+
+- **Source of truth:** TypeScript strict; format/lint per existing `tsconfig.json` and any ESLint config in repo.
+- **Naming:** camelCase for functions/variables; PascalCase for types/classes; UPPER_SNAKE for action constants.
+- **Architecture (from build plan):** Keep **game logic pure** (no SDK in `src/game/`). **Renderers stateless** (input = render model, output = image/text). Route all user input through a single `dispatch(action)`.
+- **Imports:** Prefer path aliases if defined in tsconfig; avoid deep relative chains (e.g. `../../../`).
+- **Testing:** Vitest; prefer small, focused tests; engine and reducer are primary targets.
+- **G2 / Even Hub:** Do not add SDK calls inside `game/`; keep evenhub bridge and event normalization in `evenhub/` and `input/`.

@@ -1,0 +1,11 @@
+---
+description: Structured troubleshooting loop.
+---
+
+# Debug Playbook
+
+- **Loop:** Reproduce → isolate (narrow to file/code path) → patch → validate.
+- **Evidence first:** Prefer stack traces, targeted logs, and call-site inspection over broad file reads. Check config (vite, tsconfig, env) when build/runtime behavior is wrong.
+- **Narrowing:** Use targeted tests or minimal repro steps before changing many files.
+- **Same error after 2 attempts:** Stop patching; summarize what was tried, what evidence was gathered, and what the next diagnostic step should be.
+- **Bug report summary:** Root cause (1–2 sentences), changed files, validation result.

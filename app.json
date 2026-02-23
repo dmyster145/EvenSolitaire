@@ -1,0 +1,7 @@
+{
+  "name": "EvenSolitaire",
+  "version": "0.1.0",
+  "description": "Klondike Solitaire for Even G2 glasses — pile layout, scroll/tap/double-tap",
+  "author": "EvenSolitaire",
+  "entry": "index.html"
+}

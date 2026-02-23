@@ -1,0 +1,15 @@
+---
+description: Reusable task framing—reference docs/agent-workflow/task-templates.md for copy-paste.
+---
+
+# Task Templates
+
+Use the templates in `docs/agent-workflow/task-templates.md` for:
+
+- **Investigate + Fix** — repro, isolate, patch, validate, summarize.
+- **Feature Implementation** — goal, success criteria, constraints, plan → inspect → implement → validate → summarize.
+- **Refactor (behavior-preserving)** — scope, tests as safety net, small steps.
+- **Upgrade/Migration** — compatibility, rollback, validation steps.
+- **Test Failure Triage** — reproduce, identify cause, fix or document.
+
+Each template includes: goal, success criteria, constraints, workflow (plan → inspect → implement → validate → summarize). Prefer referencing the doc over inlining long text here.

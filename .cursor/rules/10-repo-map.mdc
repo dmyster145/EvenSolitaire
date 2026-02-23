@@ -1,0 +1,19 @@
+---
+alwaysApply: true
+description: Token-efficient navigation—where to look first.
+---
+
+# Repo Map (EvenSolitaire)
+
+- **Entry:** `src/main.ts` → `src/app/bootstrap.ts`, `src/app/lifecycle.ts`
+- **SDK / device:** `src/evenhub/` — bridge, types; events normalized here. See `docs/SDKandDevResources.md`.
+- **Game logic (pure, no SDK):** `src/game/` — cards, deal, klondike-engine, moves, validation, win, types
+- **Input:** `src/input/` — action-map, debounce, gestures (scroll/tap/double-tap → app actions)
+- **State:** `src/state/` — actions, reducer, selectors, store, types, ui-mode, constants
+- **Render:** `src/render/` — composer, hud-text, board-image-top, board-image-tableau, card-glyphs, layout, bmp
+- **Features:** `src/features/` — undo, etc.
+- **Storage:** `src/storage/` — local, save-game (if present)
+- **Config:** `package.json`, `tsconfig.json`, `vite.config.ts` at repo root. No `app.json` in list—check root or docs.
+- **Tests:** `tests/` — add Vitest specs here; engine and state are primary test targets.
+- **Generated / do not edit:** `dist/`, `node_modules/`, `.vite/`, `tsconfig.tsbuildinfo`
+- **Spec / plan:** `docs/even_solitaire_cursor_build_plan.md` — phases, state model, input map, pile layout.

@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+description: Behavior contract for Agent execution—minimal, high-signal rules.
+---
+
+# Agent Operating Mode
+
+- **Plan briefly** before coding; state approach in 2–4 bullets when non-trivial.
+- **Make minimal, scoped edits**; avoid refactors outside the task.
+- **Investigate before patching** when root cause is unclear (repro → isolate → patch).
+- **Validate before claiming success**: run the relevant lint/test/typecheck/build; include a one-line result summary.
+- **Summarize** at finish: root cause or approach, changed files, validation outcome.
+- **Stop after repeated failures**: after 2 failed attempts at the same fix, switch to evidence gathering and report findings instead of more blind edits.
