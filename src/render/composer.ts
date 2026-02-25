@@ -19,12 +19,19 @@ import {
   IMAGE_TILE_TR,
   IMAGE_TILE_BL,
   IMAGE_TILE_BR,
+  IMAGE_TILE_TOP,
+  IMAGE_TILE_BOTTOM_LEFT,
+  IMAGE_TILE_BOTTOM_RIGHT,
+  SWAP_MODE_EVENT_CAPTURE,
   VIRTUAL_IMAGE_WIN_OVERLAY,
   assertG2ContainerBudget,
   assertG2ImageContainer,
   FULL_SCREEN_CENTER_Y,
   CARD_TOP_W,
   CARD_TOP_H,
+  TOP_TILE_CROP_X,
+  TOP_TILE_CROP_W,
+  TILE_CROP_SPLIT_Y,
   type ImageContainerRect,
 } from "./layout";
 import { renderBoardTop, type TopRowViewModel } from "./board-image-top";
@@ -62,6 +69,159 @@ const SCREEN_PLACEHOLDER_CONTENT = "Even Solitaire loading...";
 const FULLSCREEN_TEXT_GAMEPLAY_MODE = false;
 const EXPERIMENTAL_2X2_TILE_MODE = false;
 
+/**
+ * Dynamic Container Swapping: toggle between display mode (4 tiles, max visual)
+ * and input mode (3 tiles + text event capture) for turn-based gameplay.
+ * 
+ * When enabled, replaces the default 2×(200×50) mini display with 4×(200×100) tiles.
+ * The swap cycle shows all 4 tiles briefly, then swaps to 3 tiles + event capture.
+ */
+export const DYNAMIC_SWAP_MODE = true;
+
+/**
+ * Skip the display-mode swap for rapid state changes (blinks, menu navigation).
+ * When true, only input mode is used (3 tiles), avoiding flicker during rapid updates.
+ */
+const SKIP_DISPLAY_SWAP_FOR_RAPID_CHANGES = true;
+
+/**
+ * SDK requires exactly one container with isEventCapture: 1 per page.
+ * Display mode (4 image tiles, 0 text) is therefore invalid and rebuild fails.
+ * We must always use input mode (3 image tiles + 1 event-capture text); BR quadrant cannot show.
+ */
+const DISABLE_SWAP_CYCLE_FOR_DEBUG = true;
+
+/**
+ * When true, use "full board in 3 tiles" layout: top half, bottom-left quad, bottom-right quad.
+ * Entire board is visible (no missing quadrant); 4th container remains event capture.
+ */
+export const USE_FULL_BOARD_3_TILE_LAYOUT = true;
+export type ContainerMode = "display" | "input";
+let currentContainerMode: ContainerMode = "input";
+
+export function getContainerMode(): ContainerMode {
+  return currentContainerMode;
+}
+
+export function setContainerMode(mode: ContainerMode): void {
+  currentContainerMode = mode;
+}
+
+/** Display mode: 4 image tiles (400×200 board), no event capture. Maximum visual fidelity. */
+export function composeDisplayModePage(): RebuildPageContainer {
+  assertG2ContainerBudget(4, 0);
+  const imageTl = createImageContainer(IMAGE_TILE_TL);
+  const imageTr = createImageContainer(IMAGE_TILE_TR);
+  const imageBl = createImageContainer(IMAGE_TILE_BL);
+  const imageBr = createImageContainer(IMAGE_TILE_BR);
+  return new RebuildPageContainer({
+    containerTotalNum: 4,
+    imageObject: [imageTl, imageTr, imageBl, imageBr],
+  });
+}
+
+/** Input mode: 3 image tiles + 1 text event capture. Enables scroll/tap input. */
+export function composeInputModePage(): RebuildPageContainer {
+  assertG2ContainerBudget(3, 1);
+  const textContainer = createSwapModeEventCaptureContainer();
+  const [tile1, tile2, tile3] = USE_FULL_BOARD_3_TILE_LAYOUT
+    ? [IMAGE_TILE_TOP, IMAGE_TILE_BOTTOM_LEFT, IMAGE_TILE_BOTTOM_RIGHT]
+    : [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL];
+  return new RebuildPageContainer({
+    containerTotalNum: 4,
+    imageObject: [createImageContainer(tile1), createImageContainer(tile2), createImageContainer(tile3)],
+    textObject: [textContainer],
+  });
+}
+
+/** Startup page for dynamic swap mode: starts in input mode to receive initial events. */
+export function composeSwapModeStartupPage(): CreateStartUpPageContainer {
+  assertG2ContainerBudget(3, 1);
+  const textContainer = createSwapModeEventCaptureContainer();
+  const [tile1, tile2, tile3] = USE_FULL_BOARD_3_TILE_LAYOUT
+    ? [IMAGE_TILE_TOP, IMAGE_TILE_BOTTOM_LEFT, IMAGE_TILE_BOTTOM_RIGHT]
+    : [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL];
+  return new CreateStartUpPageContainer({
+    containerTotalNum: 4,
+    imageObject: [createImageContainer(tile1), createImageContainer(tile2), createImageContainer(tile3)],
+    textObject: [textContainer],
+  });
+}
+
+/**
+ * Swap to display mode (4 image tiles, maximum visual fidelity, no event capture).
+ * Call this before sending all 4 tile images for best display quality.
+ * Returns true if swap succeeded.
+ */
+export async function swapToDisplayMode(hub: EvenHubBridge): Promise<boolean> {
+  if (currentContainerMode === "display") return true;
+  const page = composeDisplayModePage();
+  const success = await hub.rebuildPage(page);
+  if (success) {
+    currentContainerMode = "display";
+  }
+  return success;
+}
+
+/**
+ * Swap to input mode (3 image tiles + event capture text).
+ * Call this after display update is complete to re-enable scroll/tap events.
+ * Returns true if swap succeeded.
+ */
+export async function swapToInputMode(hub: EvenHubBridge): Promise<boolean> {
+  if (currentContainerMode === "input") return true;
+  const page = composeInputModePage();
+  const success = await hub.rebuildPage(page);
+  if (success) {
+    currentContainerMode = "input";
+  }
+  return success;
+}
+
+/**
+ * Perform a full display-then-input swap cycle:
+ * 1. Swap to display mode (4 tiles)
+ * 2. Send all 4 tile images
+ * 3. Swap back to input mode (3 tiles + text)
+ * 4. Re-send 3 visible tiles (uses cached images from step 2)
+ * 
+ * This maximizes display quality while maintaining input capability.
+ * Returns true if the full cycle succeeded.
+ */
+export async function performSwapCycle(
+  hub: EvenHubBridge,
+  images: { tileTlPng: number[]; tileTrPng: number[]; tileBlPng: number[]; tileBrPng: number[] }
+): Promise<boolean> {
+  // #region agent log
+  fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:performSwapCycle',message:'entry',data:{tileBrPngLen:images.tileBrPng?.length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
+  // Step 1: Swap to display mode
+  const displaySwapOk = await swapToDisplayMode(hub);
+  // #region agent log
+  fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:performSwapCycle',message:'after swapToDisplayMode',data:{displaySwapOk,mode:currentContainerMode},timestamp:Date.now(),hypothesisId:'H4b'})}).catch(()=>{});
+  // #endregion
+  if (!displaySwapOk) return false;
+
+  // Step 2: Send all 4 tile images
+  await sendDisplayModeTiles(hub, images);
+
+  // Step 3: Swap back to input mode
+  const inputSwapOk = await swapToInputMode(hub);
+  // #region agent log
+  fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:performSwapCycle',message:'after swapToInputMode',data:{inputSwapOk,mode:'input'},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+  // #endregion
+  if (!inputSwapOk) return false;
+
+  // Step 4: Re-send 3 visible tiles (BR is now replaced by event capture text)
+  await sendInputModeTiles(hub, {
+    tileTlPng: images.tileTlPng,
+    tileTrPng: images.tileTrPng,
+    tileBlPng: images.tileBlPng,
+  });
+
+  return true;
+}
+
 function createImageContainer(container: ImageContainerRect): ImageContainerProperty {
   assertG2ImageContainer(container);
   return new ImageContainerProperty({
@@ -85,6 +245,23 @@ function createEventCaptureTextContainer(): TextContainerProperty {
     paddingLength: 0,
     containerID: HUD_TEXT_CONTAINER.id,
     containerName: HUD_TEXT_CONTAINER.name,
+    content: EVENT_CAPTURE_CONTENT,
+    isEventCapture: 1,
+  });
+}
+
+/** Event capture text container for swap mode (uses id: 4 to avoid collision with tile TL). */
+function createSwapModeEventCaptureContainer(): TextContainerProperty {
+  return new TextContainerProperty({
+    xPosition: SWAP_MODE_EVENT_CAPTURE.x,
+    yPosition: SWAP_MODE_EVENT_CAPTURE.y,
+    width: SWAP_MODE_EVENT_CAPTURE.width,
+    height: SWAP_MODE_EVENT_CAPTURE.height,
+    borderWidth: 0,
+    borderColor: 0,
+    paddingLength: 0,
+    containerID: SWAP_MODE_EVENT_CAPTURE.id,
+    containerName: SWAP_MODE_EVENT_CAPTURE.name,
     content: EVENT_CAPTURE_CONTENT,
     isEventCapture: 1,
   });
@@ -408,6 +585,79 @@ async function renderTiledBoardImages(state: AppState): Promise<{
   return { tileTlPng, tileTrPng, tileBlPng, tileBrPng };
 }
 
+/**
+ * Full-board 3-tile layout: top tile shows row 0; bottom tiles show row 1 + tableau.
+ * Crop split at TILE_CROP_SPLIT_Y (144) so both tiles have equal vertical scale (100/144 = 0.694).
+ * Row 1 cards extend past this boundary, appearing in the bottom tiles above the tableau.
+ */
+async function renderFullBoard3Tiles(state: AppState): Promise<{
+  topPng: number[];
+  bottomLeftPng: number[];
+  bottomRightPng: number[];
+}> {
+  const [topPng, tableauPng] = await Promise.all([
+    renderBoardTop(topRowViewFromState(state)),
+    renderBoardTableau(tableauViewFromState(state)),
+  ]);
+  const fullBoardPng = await overlayPngFromBoardImages(topPng, tableauPng);
+  const srcHalfW = Math.floor(OVERLAY_W / 2);
+  const bottomCropH = OVERLAY_H - TILE_CROP_SPLIT_Y;
+  const [topTilePng, bottomLeftPng, bottomRightPng] = await Promise.all([
+    cropScalePngBytes(
+      fullBoardPng,
+      { x: TOP_TILE_CROP_X, y: 0, width: TOP_TILE_CROP_W, height: TILE_CROP_SPLIT_Y },
+      { width: IMAGE_TILE_TOP.width, height: IMAGE_TILE_TOP.height }
+    ),
+    cropScalePngBytes(
+      fullBoardPng,
+      { x: 0, y: TILE_CROP_SPLIT_Y, width: srcHalfW, height: bottomCropH },
+      { width: IMAGE_TILE_BOTTOM_LEFT.width, height: IMAGE_TILE_BOTTOM_LEFT.height }
+    ),
+    cropScalePngBytes(
+      fullBoardPng,
+      { x: srcHalfW, y: TILE_CROP_SPLIT_Y, width: srcHalfW, height: bottomCropH },
+      { width: IMAGE_TILE_BOTTOM_RIGHT.width, height: IMAGE_TILE_BOTTOM_RIGHT.height }
+    ),
+  ]);
+  return { topPng: topTilePng, bottomLeftPng, bottomRightPng };
+}
+
+async function sendFullBoard3Tiles(
+  hub: EvenHubBridge,
+  images: { topPng: number[]; bottomLeftPng: number[]; bottomRightPng: number[] }
+): Promise<void> {
+  if (images.topPng.length > 0) {
+    await hub.updateImage(
+      new ImageRawDataUpdate({
+        containerID: IMAGE_TILE_TOP.id,
+        containerName: IMAGE_TILE_TOP.name,
+        imageData: images.topPng,
+      }),
+      { priority: "high", coalesceKey: `img:${IMAGE_TILE_TOP.id}` }
+    );
+  }
+  if (images.bottomLeftPng.length > 0) {
+    await hub.updateImage(
+      new ImageRawDataUpdate({
+        containerID: IMAGE_TILE_BOTTOM_LEFT.id,
+        containerName: IMAGE_TILE_BOTTOM_LEFT.name,
+        imageData: images.bottomLeftPng,
+      }),
+      { priority: "high", coalesceKey: `img:${IMAGE_TILE_BOTTOM_LEFT.id}` }
+    );
+  }
+  if (images.bottomRightPng.length > 0) {
+    await hub.updateImage(
+      new ImageRawDataUpdate({
+        containerID: IMAGE_TILE_BOTTOM_RIGHT.id,
+        containerName: IMAGE_TILE_BOTTOM_RIGHT.name,
+        imageData: images.bottomRightPng,
+      }),
+      { priority: "high", coalesceKey: `img:${IMAGE_TILE_BOTTOM_RIGHT.id}` }
+    );
+  }
+}
+
 async function renderExperimentalTiledDisplayImages(state: AppState): Promise<{
   tileTlPng: number[];
   tileTrPng: number[];
@@ -452,6 +702,9 @@ async function sendExperimentalTiledDisplayImages(
     );
   }
   if (images.tileBrPng.length > 0) {
+    // #region agent log
+    fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:sendExperimentalTiledDisplayImages',message:'sending BR tile',data:{containerID:CONTAINER_ID_IMAGE_TILE_BR,tileBrPngLen:images.tileBrPng.length},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
     await hub.updateImage(
       new ImageRawDataUpdate({
         containerID: CONTAINER_ID_IMAGE_TILE_BR,
@@ -459,6 +712,61 @@ async function sendExperimentalTiledDisplayImages(
         imageData: images.tileBrPng,
       }),
       { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_BR}` }
+    );
+  }
+}
+
+/** Render all 4 tiles for dynamic swap mode. Returns cached PNG data for both display and input modes. */
+export async function renderSwapModeTiles(state: AppState): Promise<{
+  tileTlPng: number[];
+  tileTrPng: number[];
+  tileBlPng: number[];
+  tileBrPng: number[];
+}> {
+  return await renderTiledBoardImages(state);
+}
+
+/** Send all 4 tiles (display mode). */
+export async function sendDisplayModeTiles(
+  hub: EvenHubBridge,
+  images: { tileTlPng: number[]; tileTrPng: number[]; tileBlPng: number[]; tileBrPng: number[] }
+): Promise<void> {
+  await sendExperimentalTiledDisplayImages(hub, images);
+}
+
+/** Send 3 tiles (input mode: TL, TR, BL only - no BR since that slot is used for event capture text). */
+export async function sendInputModeTiles(
+  hub: EvenHubBridge,
+  images: { tileTlPng: number[]; tileTrPng: number[]; tileBlPng: number[] }
+): Promise<void> {
+  if (images.tileTlPng.length > 0) {
+    await hub.updateImage(
+      new ImageRawDataUpdate({
+        containerID: CONTAINER_ID_IMAGE_TILE_TL,
+        containerName: CONTAINER_NAME_IMAGE_TILE_TL,
+        imageData: images.tileTlPng,
+      }),
+      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_TL}` }
+    );
+  }
+  if (images.tileTrPng.length > 0) {
+    await hub.updateImage(
+      new ImageRawDataUpdate({
+        containerID: CONTAINER_ID_IMAGE_TILE_TR,
+        containerName: CONTAINER_NAME_IMAGE_TILE_TR,
+        imageData: images.tileTrPng,
+      }),
+      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_TR}` }
+    );
+  }
+  if (images.tileBlPng.length > 0) {
+    await hub.updateImage(
+      new ImageRawDataUpdate({
+        containerID: CONTAINER_ID_IMAGE_TILE_BL,
+        containerName: CONTAINER_NAME_IMAGE_TILE_BL,
+        imageData: images.tileBlPng,
+      }),
+      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_BL}` }
     );
   }
 }
@@ -537,6 +845,20 @@ export async function sendInitialImages(hub: EvenHubBridge, state: AppState): Pr
     await sendFullscreenTextDisplay(hub, state);
     return;
   }
+  if (DYNAMIC_SWAP_MODE) {
+    if (USE_FULL_BOARD_3_TILE_LAYOUT) {
+      const images = await renderFullBoard3Tiles(state);
+      await sendFullBoard3Tiles(hub, images);
+    } else {
+      const images = await renderSwapModeTiles(state);
+      await sendInputModeTiles(hub, {
+        tileTlPng: images.tileTlPng,
+        tileTrPng: images.tileTrPng,
+        tileBlPng: images.tileBlPng,
+      });
+    }
+    return;
+  }
   if (EXPERIMENTAL_2X2_TILE_MODE) {
     const images = await renderExperimentalTiledDisplayImages(state);
     await sendExperimentalTiledDisplayImages(hub, images);
@@ -544,15 +866,6 @@ export async function sendInitialImages(hub: EvenHubBridge, state: AppState): Pr
   }
   const images = await renderSupportedMiniDisplayImages(state);
   await sendSupportedMiniDisplayImages(hub, images);
-  // if (clearOverlayPng.length > 0) {
-  //   await hub.updateImage(
-  //     new ImageRawDataUpdate({
-  //       containerID: 99,
-  //       containerName: "winovr",
-  //       imageData: clearOverlayPng,
-  //     })
-  //   );
-  // }
 }
 
 export async function flushDisplayUpdate(
@@ -582,6 +895,8 @@ export async function flushDisplayUpdate(
     /** Per-row hashes for supported 2-image mode so unchanged rows are not re-rendered/re-sent. */
     topMiniHash?: string;
     tableauMiniHash?: string;
+    /** Combined hash for dynamic swap mode (4-tile rendering). */
+    tileHash?: string;
   }
 ): Promise<{ lastSent: typeof lastSent; didClearOverlay?: boolean }> {
   let didClearOverlay = false;
@@ -629,7 +944,36 @@ export async function flushDisplayUpdate(
     // Win animation disabled for now; may re-enable later.
     // if (winAnimationPhase === "playing") { ... } else {
     lastSent.lastOverlayPng = undefined;
-    if (EXPERIMENTAL_2X2_TILE_MODE) {
+    if (DYNAMIC_SWAP_MODE) {
+      const topView = topRowViewFromState(state);
+      const tableauView = tableauViewFromState(state);
+      const tileHash = JSON.stringify({ top: topView, tableau: tableauView });
+      const changed = tileHash !== lastSent.tileHash;
+      if (changed) {
+        if (USE_FULL_BOARD_3_TILE_LAYOUT) {
+          const images = await renderFullBoard3Tiles(state);
+          await sendFullBoard3Tiles(hub, images);
+        } else {
+          const images = await renderSwapModeTiles(state);
+          const skipSwap =
+            DISABLE_SWAP_CYCLE_FOR_DEBUG ||
+            (SKIP_DISPLAY_SWAP_FOR_RAPID_CHANGES && (selectionInvalidBlinkRemaining > 0 || menuOpen));
+          // #region agent log
+          fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:flushDisplayUpdate',message:'swap path',data:{changed,skipSwap,tileBrLen:images.tileBrPng?.length,willRunSwapCycle:!skipSwap},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
+          if (skipSwap) {
+            await sendInputModeTiles(hub, {
+              tileTlPng: images.tileTlPng,
+              tileTrPng: images.tileTrPng,
+              tileBlPng: images.tileBlPng,
+            });
+          } else {
+            await performSwapCycle(hub, images);
+          }
+        }
+        lastSent.tileHash = tileHash;
+      }
+    } else if (EXPERIMENTAL_2X2_TILE_MODE) {
       await sendExperimentalTiledDisplayImages(hub, await renderExperimentalTiledDisplayImages(state));
     } else {
       const topView = topRowViewFromState(state);

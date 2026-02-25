@@ -35,12 +35,35 @@ const suitImages: Partial<Record<Suit, HTMLImageElement>> = {};
 const cornerSuitImages: Partial<Record<Suit, HTMLImageElement>> = {};
 let stockBackImage: HTMLImageElement | null = null;
 
+let cardAssetsReadyCallback: (() => void) | null = null;
+const TOTAL_ASSETS = 4 + 4 + 1; // suits + corner suits + stock back
+let loadedCount = 0;
+
+function maybeNotifyAssetsReady(): void {
+  if (loadedCount >= TOTAL_ASSETS && cardAssetsReadyCallback) {
+    const fn = cardAssetsReadyCallback;
+    cardAssetsReadyCallback = null;
+    fn();
+  }
+}
+
+/** Register a one-shot callback to run when all suit and card-back images have loaded. */
+export function whenCardAssetsReady(cb: () => void): void {
+  if (loadedCount >= TOTAL_ASSETS) {
+    cb();
+    return;
+  }
+  cardAssetsReadyCallback = cb;
+}
+
 function loadSuitImages(): void {
   const suits: Suit[] = ["C", "S", "D", "H"];
   for (const suit of suits) {
     const img = new Image();
     img.onload = () => {
       suitImages[suit] = img;
+      loadedCount += 1;
+      maybeNotifyAssetsReady();
     };
     img.src = SUIT_IMAGE_URLS[suit];
   }
@@ -53,6 +76,8 @@ function loadCornerSuitImages(): void {
     const img = new Image();
     img.onload = () => {
       cornerSuitImages[suit] = img;
+      loadedCount += 1;
+      maybeNotifyAssetsReady();
     };
     img.src = CORNER_SUIT_IMAGE_URLS[suit];
   }
@@ -63,6 +88,8 @@ function loadStockBackImage(): void {
   const img = new Image();
   img.onload = () => {
     stockBackImage = img;
+    loadedCount += 1;
+    maybeNotifyAssetsReady();
   };
   img.src = stockBackUrl;
 }
@@ -220,7 +247,7 @@ function drawSuitGlyph(
     mask.height = d;
     const mctx = mask.getContext("2d");
     if (!mctx) return;
-    mctx.drawImage(img, 0, 0, d, d);
+    mctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, d, d);
     const id = mctx.getImageData(0, 0, d, d);
     const data = id.data;
     for (let i = 0; i < data.length; i += 4) {

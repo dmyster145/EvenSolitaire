@@ -4,7 +4,17 @@
  */
 const CANVAS_W = 576;
 const CANVAS_H = 288;
-const HALF_H = Math.floor(CANVAS_H / 2);
+
+/**
+ * Top area holds both rows of the top row (stock, waste, foundations).
+ * Row 1 extends past the tile crop boundary (y=144) so it appears in the
+ * bottom tiles, making top and bottom cards the same height on the G2.
+ */
+const TOP_AREA_H = 176;
+const BOTTOM_AREA_H = CANVAS_H - TOP_AREA_H; // 112
+
+/** Tile crop boundary — kept at 144 so top and bottom tiles have equal vertical scale (100/144). */
+export const TILE_CROP_SPLIT_Y = 144;
 
 /** G2 image container hard limits (Even Hub). */
 export const G2_IMAGE_MIN_W = 20;
@@ -33,20 +43,20 @@ export const SCREEN_TEXT_CONTAINER = {
   height: CANVAS_H,
 };
 
-/** Virtual top half: stock, waste, 4 foundations (full-width board render). */
+/** Virtual top area: stock, waste, 4 foundations in 2 rows (576×176). */
 export const VIRTUAL_IMAGE_TOP = {
   width: CANVAS_W,
-  height: HALF_H,
+  height: TOP_AREA_H,
   x: 0,
   y: 0,
 };
 
-/** Virtual bottom half: 7 tableau piles (full-width board render). */
+/** Virtual bottom area: 7 tableau piles (576×112). */
 export const VIRTUAL_IMAGE_TABLEAU = {
   width: CANVAS_W,
-  height: HALF_H,
+  height: BOTTOM_AREA_H,
   x: 0,
-  y: HALF_H,
+  y: TOP_AREA_H,
 };
 
 /** Virtual full-screen overlay for win animation (currently disabled). */
@@ -139,6 +149,69 @@ export const IMAGE_TILE_BR = {
   height: TILE_H,
 };
 
+/**
+ * Dynamic Container Swap Mode: alternates between display (4 tiles) and input (3 tiles + text) modes.
+ * 
+ * Display mode (max visual): TL, TR, BL, BR (400×200 total, no event capture)
+ * Input mode (with events): TL, TR, BL + event capture text (300×200 visible, bottom-right empty)
+ * 
+ * IMPORTANT: Event capture text uses id: 4 (not id: 1) to avoid collision with IMAGE_TILE_TL.
+ * Container IDs in input mode: 1=TL, 2=TR, 3=BL, 4=evt (text with isEventCapture=1)
+ */
+export const SWAP_MODE_DISPLAY_TILES = [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL, IMAGE_TILE_BR] as const;
+export const SWAP_MODE_INPUT_TILES = [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL] as const;
+
+/**
+ * Full-board 3-tile layout: entire board visible in 3 tiles (no missing quadrant).
+ * - Tile 1 (top): full top half (stock, waste, foundations)
+ * - Tile 2 (bottom-left): bottom-left quadrant (tableau left)
+ * - Tile 3 (bottom-right): bottom-right quadrant (tableau right)
+ * Same container limit (3 images + 1 event capture); 4th container = event capture.
+ */
+const FULL_BOARD_BOTTOM_Y = TILE_BOARD_Y + TILE_H;
+export const IMAGE_TILE_TOP = {
+  id: 1,
+  name: "tile-top",
+  x: Math.floor((CANVAS_W - TILE_W) / 2),
+  y: TILE_BOARD_Y,
+  width: TILE_W,
+  height: TILE_H,
+};
+export const IMAGE_TILE_BOTTOM_LEFT = {
+  id: 2,
+  name: "tile-bl",
+  x: TILE_BOARD_X,
+  y: FULL_BOARD_BOTTOM_Y,
+  width: TILE_W,
+  height: TILE_H,
+};
+export const IMAGE_TILE_BOTTOM_RIGHT = {
+  id: 3,
+  name: "tile-br",
+  x: TILE_BOARD_X + TILE_W,
+  y: FULL_BOARD_BOTTOM_Y,
+  width: TILE_W,
+  height: TILE_H,
+};
+
+/** Event capture text container for swap mode (id: 4 to avoid collision with tile TL which is id: 1). */
+export const SWAP_MODE_EVENT_CAPTURE = {
+  id: 4,
+  name: "swap-evt",
+  x: 0,
+  y: 0,
+  width: CANVAS_W,
+  height: CANVAS_H,
+};
+
+/** Total board area in display mode (4 tiles). */
+export const SWAP_MODE_BOARD_W = TILE_BOARD_W;
+export const SWAP_MODE_BOARD_H = TILE_BOARD_H;
+
+/** Visible board area in input mode (3 tiles, bottom-right corner empty). */
+export const SWAP_MODE_INPUT_VISIBLE_W = TILE_BOARD_W;
+export const SWAP_MODE_INPUT_VISIBLE_H = TILE_H; // Top row only, or L-shaped coverage
+
 export interface ImageContainerRect {
   id: number;
   name: string;
@@ -170,28 +243,32 @@ export function assertG2ContainerBudget(imageCount: number, textCount: number, l
   }
 }
 
-/** Card size for top row (6 slots in 576×144). */
-export const CARD_TOP_W = 92;
-export const CARD_TOP_H = 120;
+/**
+ * Card size for top row: 2x2 foundations + stock + waste in 576×176.
+ * Both rows span 176px; row 1 extends past the tile crop boundary (y=144)
+ * so it appears in the bottom tiles at the same scale as the tableau.
+ */
+export const CARD_TOP_W = 62;
+export const CARD_TOP_H = 80;
 
-/** Card size for tableau (7 slots, stacking in 576×144). */
-export const CARD_TABLEAU_W = 78;
-export const CARD_TABLEAU_H = 100;
+/** Card size for tableau (7 slots, stacking in 576×112). Matches CARD_TOP_H for uniform G2 size. */
+export const CARD_TABLEAU_W = 70;
+export const CARD_TABLEAU_H = 80;
 
-/** Vertical offset for static peek cards (smaller to fit more). */
-export const STACK_OFFSET_Y_PEEK = 12;
+/** Vertical offset for static peek cards (compact to fit in reduced 112px tableau canvas). */
+export const STACK_OFFSET_Y_PEEK = 8;
 
 /** Vertical offset for floating cards (larger to clearly show ranks when selecting). */
-export const STACK_OFFSET_Y_FLOAT = 18;
+export const STACK_OFFSET_Y_FLOAT = 14;
 
 /** Max peek items (facedown + visible) shown above the bottom card in a tableau pile. */
-export const MAX_PEEK_ITEMS = 3;
+export const MAX_PEEK_ITEMS = 2;
 
 /** Pixels to draw the elevated (floating) card above the slot. */
 export const CARD_ELEVATION_OFFSET_Y = 10;
 
-/** Menu overlay: full-screen center Y (boundary between top and tableau). */
-export const FULL_SCREEN_CENTER_Y = HALF_H;
+/** Menu overlay: full-screen center Y (boundary between top and tableau canvases). */
+export const FULL_SCREEN_CENTER_Y = TOP_AREA_H;
 /** Menu typography: title stands out, options have selected/unselected sizes. */
 export const MENU_TITLE_FONT_SIZE = 22;
 export const MENU_FONT_SIZE = 20;
@@ -202,7 +279,7 @@ export const MENU_FONT_FAMILY = '"Aptos Display", "Segoe UI Variable", "Segoe UI
 /** Extra pixels between characters in menu text. */
 export const MENU_LETTER_SPACING = 2;
 /** Menu box: width, height, corner radius, and content layout (screen Y positions). */
-export const MENU_BOX_WIDTH = 280;
+export const MENU_BOX_WIDTH = 240;
 export const MENU_PADDING_BELOW_OPTIONS = 20;
 /** Height fits title, divider, 4 options, and padding; extra 12px so first option sits above canvas seam. */
 export const MENU_BOX_HEIGHT = 108 + 2 * MENU_LINE_HEIGHT + MENU_PADDING_BELOW_OPTIONS + 12;
@@ -225,13 +302,34 @@ export const MENU_FIRST_OPTION_CENTER_Y = MENU_DIVIDER_Y + MENU_DIVIDER_HEIGHT +
 export const FULL_SCREEN_W = CANVAS_W;
 export const FULL_SCREEN_H = CANVAS_H;
 
-/** Top row has 6 slots; foundation indices 0–3 map to slot indices 2–5. Returns center (x, y) in full-screen 576×288. */
-export function foundationSpawnCenter(foundationIndex: number): { x: number; y: number } {
-  const SLOT_STEP = Math.floor(CANVAS_W / 6);
-  const CARD_X_OFFSET = Math.floor((SLOT_STEP - CARD_TOP_W) / 2);
-  const CARD_Y_OFFSET = Math.floor((VIRTUAL_IMAGE_TOP.height - CARD_TOP_H) / 2);
-  const slotIndex = foundationIndex + 2;
-  const x = slotIndex * SLOT_STEP + CARD_X_OFFSET + Math.floor(CARD_TOP_W / 2);
-  const y = CARD_Y_OFFSET + Math.floor(CARD_TOP_H / 2);
+/**
+ * Top tile crop band: 288px centered, matching each bottom tile's crop width.
+ * This ensures the horizontal scale is identical across all three tiles
+ * (200/288 = 0.694×), eliminating visual seams where row 1 cards and the
+ * menu overlay cross the tile boundary.
+ */
+export const TOP_TILE_CROP_W = 288;
+export const TOP_TILE_CROP_X = Math.floor((CANVAS_W - TOP_TILE_CROP_W) / 2);
+
+/**
+ * Top row: 4 columns (stock, waste, F0+F2, F1+F3), 2 rows within the crop band.
+ * Row step uses TOP_AREA_H/2 = 88 so row 0 centers at y=44, row 1 at y=132.
+ * Row 1 cards (y=92..172) cross the tile crop boundary (y=144), appearing in both tiles.
+ */
+export const TOP_ROW_COL_COUNT = 4;
+export const TOP_ROW_ROW_COUNT = 2;
+const TOP_ROW_COL_STEP = Math.floor(TOP_TILE_CROP_W / TOP_ROW_COL_COUNT);
+const TOP_ROW_ROW_STEP = Math.floor(TOP_AREA_H / TOP_ROW_ROW_COUNT);
+/** Center (x, y) for each top-row slot in full-screen 576×288. Columns are centered within the crop band. */
+export function topRowSlotCenter(slotIndex: number): { x: number; y: number } {
+  const col = slotIndex <= 1 ? slotIndex : slotIndex === 2 || slotIndex === 4 ? 2 : 3;
+  const row = slotIndex <= 3 ? 0 : 1;
+  const x = TOP_TILE_CROP_X + Math.floor(col * TOP_ROW_COL_STEP + TOP_ROW_COL_STEP / 2);
+  const y = Math.floor(row * TOP_ROW_ROW_STEP + TOP_ROW_ROW_STEP / 2);
   return { x, y };
+}
+
+/** Foundation indices 0–3 map to slots 2,3,4,5 (2x2: F0,F1 row0, F2,F3 row1). Returns center (x, y) in full-screen 576×288. */
+export function foundationSpawnCenter(foundationIndex: number): { x: number; y: number } {
+  return topRowSlotCenter(foundationIndex + 2);
 }

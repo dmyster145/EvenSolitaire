@@ -3,12 +3,19 @@
  */
 import { createStore } from "../state/store";
 import { initialState } from "../state/reducer";
-import { composeStartupPage, composeGameplayPage, sendInitialImages, sendBoardImages, flushDisplayUpdate } from "../render/composer";
+import {
+  composeStartupPage,
+  composeSwapModeStartupPage,
+  sendInitialImages,
+  flushDisplayUpdate,
+  DYNAMIC_SWAP_MODE,
+} from "../render/composer";
 import { EvenHubBridge } from "../evenhub/bridge";
 import { mapEvenHubEvent } from "../input/action-map";
 import { resetTapCooldown } from "../input/gestures";
 import { loadGame, saveGame } from "../storage/save-game";
 import { setStorageBridge } from "../storage/local";
+import { whenCardAssetsReady } from "../render/card-canvas";
 
 /** Set true to show the win cascade animation on app start (for testing). Win animation disabled for now. */
 // const SHOW_WIN_ANIMATION_ON_START = true;
@@ -31,7 +38,9 @@ export async function initApp(): Promise<void> {
 
   try {
     const state = store.getState();
-    const startupPage = composeStartupPage();
+    const startupPage = DYNAMIC_SWAP_MODE
+      ? composeSwapModeStartupPage()
+      : composeStartupPage();
     const setupOk = await hub.setupPage(startupPage);
     if (setupOk) {
       await sendInitialImages(hub, state);
@@ -162,4 +171,6 @@ export async function initApp(): Promise<void> {
       }, 120);
     }
   });
+
+  whenCardAssetsReady(scheduleFlush);
 }

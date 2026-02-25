@@ -371,8 +371,8 @@ export function rootReducer(
     case "WIN_ANIMATION_TICK": {
       const wa = state.ui.winAnimation;
       if (!state.game.won || wa?.phase !== "playing") return state;
-      const CARD_TOP_W = 92;
-      const CARD_TOP_H = 120;
+      const CARD_TOP_W = 62;
+      const CARD_TOP_H = 80;
       const HALF_W = CARD_TOP_W / 2;
       const BOTTOM_MARGIN = 20;
       const GRAVITY = 1.1;

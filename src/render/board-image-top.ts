@@ -28,6 +28,7 @@ import {
   MENU_DIVIDER_Y,
   MENU_DIVIDER_HEIGHT,
   MENU_FIRST_OPTION_CENTER_Y,
+  topRowSlotCenter,
 } from "./layout";
 import { BG_BOARD, FG_CARD_LIGHT, MENU_BG_FAINT } from "./palette";
 import { drawCenteredTextWithLetterSpacing, drawTitleWithCenteredDot } from "./text-utils";
@@ -37,9 +38,11 @@ import type { Card } from "../game/types";
 const W = VIRTUAL_IMAGE_TOP.width;
 const H = VIRTUAL_IMAGE_TOP.height;
 
-const SLOT_STEP = Math.floor(W / 6);
-const CARD_X_OFFSET = Math.floor((SLOT_STEP - CARD_TOP_W) / 2);
-const CARD_Y_OFFSET = Math.floor((H - CARD_TOP_H) / 2);
+/** Top row: 4 columns (stock, waste, F0+F2, F1+F3), 2 rows. Slot positions from layout. */
+function slotTopLeft(i: number): { x: number; y: number } {
+  const { x: cx, y: cy } = topRowSlotCenter(i);
+  return { x: Math.floor(cx - CARD_TOP_W / 2), y: Math.floor(cy - CARD_TOP_H / 2) };
+}
 
 export interface TopRowViewModel {
   stockCount: number;
@@ -66,9 +69,6 @@ export interface TopRowViewModel {
   flyingCard?: { card: Card; centerX: number; centerY: number };
 }
 
-function slotCenterX(i: number): number {
-  return i * SLOT_STEP + CARD_X_OFFSET;
-}
 
 /** Encode canvas to PNG bytes (for trail frame export). */
 function canvasToPngBytes(canvas: HTMLCanvasElement): Promise<number[]> {
@@ -128,8 +128,7 @@ export function renderBoardTop(view: TopRowViewModel, previousFramePng?: number[
     ctx.fillRect(0, 0, W, H);
 
     for (let i = 0; i < 6; i++) {
-      const x = slotCenterX(i);
-      const y = CARD_Y_OFFSET;
+      const { x, y } = slotTopLeft(i);
       const isFocus = view.focusIndex >= 0 && view.focusIndex === i;
       const isSource = view.sourceIndex === i;
       const highlight = isFocus ? "focus" : isSource ? "source" : "none";
@@ -181,9 +180,10 @@ export function renderBoardTop(view: TopRowViewModel, previousFramePng?: number[
       slotForFloating <= 5 &&
       (view.blinkVisible !== false)
     ) {
-      const fx = slotCenterX(slotForFloating);
-      const fy = CARD_Y_OFFSET - CARD_ELEVATION_OFFSET_Y;
-      drawFaceUpCard(ctx, fx, fy, CARD_TOP_W, CARD_TOP_H, view.floatingCard, { highlight: "focus" });
+      const { x: fx, y: fy } = slotTopLeft(slotForFloating);
+      drawFaceUpCard(ctx, fx, fy - CARD_ELEVATION_OFFSET_Y, CARD_TOP_W, CARD_TOP_H, view.floatingCard, {
+        highlight: "focus",
+      });
     }
 
     const tableauFloats = view.tableauFloatingCards ?? [];
