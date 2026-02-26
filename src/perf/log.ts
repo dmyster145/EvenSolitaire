@@ -6,10 +6,13 @@
 const STORAGE_KEY = "evensolitaire-perf-log-v1";
 const MAX_ENTRIES = 4000;
 const FLUSH_INTERVAL_MS = 1000;
+const FLUSH_IDLE_GAP_MS = 1500;
+const FLUSH_MAX_DEFER_MS = 5000;
 const DOM_MAX_LINES = 800;
+const DOM_FLUSH_BATCH_MS = 16;
 const PERF_LOG_CONSOLE_ENABLED = false;
-const PERF_LOG_CAPTURE_ENABLED = true;
-const PERF_LOG_DOM_ENABLED = true;
+const PERF_LOG_CAPTURE_ENABLED = false;
+const PERF_LOG_DOM_ENABLED = false;
 
 interface PerfLogEntry {
   ts: number;
@@ -19,9 +22,14 @@ interface PerfLogEntry {
 let entries: PerfLogEntry[] = [];
 let dirty = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let dirtySinceTs = 0;
+let lastEntryTs = 0;
 let initialized = false;
 let domInitialized = false;
 let domLineCount = 0;
+let domRenderedLines: string[] = [];
+let domPendingLines: string[] = [];
+let domFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function perfNowMs(): number {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -49,10 +57,10 @@ function loadEntries(): void {
   }
 }
 
-function flushEntries(): void {
-  flushTimer = null;
+function persistEntriesNow(): void {
   if (!dirty) return;
   dirty = false;
+  dirtySinceTs = 0;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   } catch {
@@ -60,9 +68,33 @@ function flushEntries(): void {
   }
 }
 
-function scheduleFlush(): void {
+function scheduleFlush(delayMs: number = FLUSH_INTERVAL_MS): void {
   if (flushTimer) return;
-  flushTimer = setTimeout(flushEntries, FLUSH_INTERVAL_MS);
+  flushTimer = setTimeout(flushEntries, delayMs);
+}
+
+function flushEntries(): void {
+  flushTimer = null;
+  if (!dirty) return;
+  const nowTs = safeNow();
+  const dirtyAgeMs = dirtySinceTs > 0 ? nowTs - dirtySinceTs : 0;
+  const idleAgeMs = lastEntryTs > 0 ? nowTs - lastEntryTs : Number.POSITIVE_INFINITY;
+  if (idleAgeMs < FLUSH_IDLE_GAP_MS && dirtyAgeMs < FLUSH_MAX_DEFER_MS) {
+    const untilIdleMs = Math.max(0, FLUSH_IDLE_GAP_MS - idleAgeMs);
+    const untilMaxDeferMs = Math.max(0, FLUSH_MAX_DEFER_MS - dirtyAgeMs);
+    scheduleFlush(Math.max(16, Math.min(untilIdleMs, untilMaxDeferMs)));
+    return;
+  }
+  persistEntriesNow();
+}
+
+function flushEntriesForced(): void {
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  if (!dirty) return;
+  persistEntriesNow();
 }
 
 function formatDumpLines(logEntries: PerfLogEntry[]): string {
@@ -118,30 +150,46 @@ function setDomPanelVisibility(visible: boolean): void {
 }
 
 function clearDomOutput(): void {
+  if (domFlushTimer) {
+    clearTimeout(domFlushTimer);
+    domFlushTimer = null;
+  }
+  domPendingLines = [];
+  domRenderedLines = [];
   const output = getDomOutput();
+  domLineCount = 0;
   if (!output) return;
   output.textContent = "";
-  domLineCount = 0;
 }
 
-function trimDomOutputIfNeeded(output: HTMLPreElement): void {
-  if (domLineCount <= DOM_MAX_LINES) return;
-  const text = output.textContent ?? "";
-  const lines = text.split("\n");
-  const trimmed = lines.slice(Math.max(0, lines.length - DOM_MAX_LINES));
-  output.textContent = trimmed.join("\n");
-  domLineCount = trimmed.length;
+function flushDomOutput(): void {
+  domFlushTimer = null;
+  if (!PERF_LOG_DOM_ENABLED) return;
+  if (domPendingLines.length === 0) return;
+  const output = getDomOutput();
+  if (!output) {
+    domPendingLines = [];
+    return;
+  }
+  domRenderedLines.push(...domPendingLines);
+  domPendingLines = [];
+  if (domRenderedLines.length > DOM_MAX_LINES) {
+    domRenderedLines.splice(0, domRenderedLines.length - DOM_MAX_LINES);
+  }
+  domLineCount = domRenderedLines.length;
+  output.textContent = domRenderedLines.join("\n");
+  output.scrollTop = output.scrollHeight;
+}
+
+function scheduleDomOutputFlush(): void {
+  if (domFlushTimer) return;
+  domFlushTimer = setTimeout(flushDomOutput, DOM_FLUSH_BATCH_MS);
 }
 
 function appendDomLine(line: string): void {
   if (!PERF_LOG_DOM_ENABLED) return;
-  const output = getDomOutput();
-  if (!output) return;
-  const next = output.textContent ? `${output.textContent}\n${line}` : line;
-  output.textContent = next;
-  domLineCount += 1;
-  trimDomOutputIfNeeded(output);
-  output.scrollTop = output.scrollHeight;
+  domPendingLines.push(line);
+  scheduleDomOutputFlush();
 }
 
 function wireDomControls(): void {
@@ -210,6 +258,7 @@ function ensureInitialized(): void {
     for (const line of formatDumpLines(entries).split("\n")) {
       if (line) appendDomLine(line);
     }
+    flushDomOutput();
   }
 
   const api = {
@@ -218,8 +267,9 @@ function ensureInitialized(): void {
     clear: (): void => {
       entries = [];
       dirty = true;
+      dirtySinceTs = safeNow();
       clearDomOutput();
-      flushEntries();
+      flushEntriesForced();
       console.log("[PerfLog] Cleared.");
     },
     copyAll: async (): Promise<boolean> => {
@@ -249,7 +299,7 @@ function ensureInitialized(): void {
     }
   ).__evenSolitairePerf = api;
 
-  window.addEventListener("beforeunload", flushEntries);
+  window.addEventListener("beforeunload", flushEntriesForced);
 }
 
 export function perfLog(msg: string): void {
@@ -271,12 +321,20 @@ export function perfLog(msg: string): void {
   if (!PERF_LOG_CAPTURE_ENABLED) return;
   if (typeof window === "undefined") return;
 
-  entries.push({ ts: safeNow(), msg });
+  const nowTs = safeNow();
+  entries.push({ ts: nowTs, msg });
   if (entries.length > MAX_ENTRIES) {
     entries.splice(0, entries.length - MAX_ENTRIES);
   }
+  lastEntryTs = nowTs;
+  if (!dirty) dirtySinceTs = nowTs;
   dirty = true;
   scheduleFlush();
+}
+
+export function perfLogLazy(msgFactory: () => string): void {
+  if (!isPerfLoggingEnabled()) return;
+  perfLog(msgFactory());
 }
 
 export function clearPerfLog(): void {
@@ -289,5 +347,6 @@ export function clearPerfLog(): void {
   if (typeof window === "undefined") return;
   entries = [];
   dirty = true;
-  flushEntries();
+  dirtySinceTs = safeNow();
+  flushEntriesForced();
 }

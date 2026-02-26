@@ -23,7 +23,7 @@ import {
 import { BG_BOARD, FG_CARD_LIGHT, MENU_BG_FAINT } from "./palette";
 import { drawFaceUpCard, drawFacedownCard, drawEmptySlot, pathRoundRect } from "./card-canvas";
 import { drawCenteredTextWithLetterSpacing } from "./text-utils";
-import { canvasToPngBytes } from "./png-utils";
+import { canvasToPngBytes, pngBytesToImageBitmap } from "./png-utils";
 import type { Card } from "../game/types";
 
 const W = VIRTUAL_IMAGE_TABLEAU.width;
@@ -64,8 +64,8 @@ function slotCenterX(i: number): number {
 export function renderBoardTableau(view: TableauRowViewModel, previousFramePng?: number[]): Promise<number[]> {
   if (previousFramePng && previousFramePng.length > 0) {
     return (async () => {
-      const blob = new Blob([new Uint8Array(previousFramePng)], { type: "image/png" });
-      const img = await createImageBitmap(blob);
+      const img = await pngBytesToImageBitmap(previousFramePng);
+      if (!img) return [];
       try {
         const canvas = document.createElement("canvas");
         canvas.width = W;

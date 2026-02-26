@@ -33,7 +33,7 @@ import {
 import { BG_BOARD, FG_CARD_LIGHT, MENU_BG_FAINT } from "./palette";
 import { drawCenteredTextWithLetterSpacing, drawTitleWithCenteredDot } from "./text-utils";
 import { drawFaceUpCard, drawFacedownCard, drawEmptySlot, pathRoundRect } from "./card-canvas";
-import { canvasToPngBytes } from "./png-utils";
+import { canvasToPngBytes, pngBytesToImageBitmap } from "./png-utils";
 import type { Card } from "../game/types";
 
 const W = VIRTUAL_IMAGE_TOP.width;
@@ -243,8 +243,8 @@ export function renderBoardTopToCanvas(
 export function renderBoardTop(view: TopRowViewModel, previousFramePng?: number[]): Promise<number[]> {
   if (previousFramePng && previousFramePng.length > 0) {
     return (async () => {
-      const blob = new Blob([new Uint8Array(previousFramePng)], { type: "image/png" });
-      const img = await createImageBitmap(blob);
+      const img = await pngBytesToImageBitmap(previousFramePng);
+      if (!img) return [];
       try {
         const canvas = document.createElement("canvas");
         canvas.width = W;

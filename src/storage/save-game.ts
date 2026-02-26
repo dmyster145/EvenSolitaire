@@ -15,12 +15,11 @@ export interface SavePayload {
 }
 
 export function serializeSave(payload: Omit<SavePayload, "savedAt">): string {
-  const out: SavePayload = {
-    game: JSON.parse(JSON.stringify(payload.game)),
+  return JSON.stringify({
+    game: payload.game,
     moveAssist: payload.moveAssist,
     savedAt: Date.now(),
-  };
-  return JSON.stringify(out);
+  } satisfies SavePayload);
 }
 
 export function deserializeSave(raw: string): SavePayload | null {

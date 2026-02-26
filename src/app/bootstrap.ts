@@ -194,35 +194,37 @@ export async function initApp(): Promise<void> {
     }
   }
 
-  hub.subscribeEvents((event) => {
-    handleSystemLifecycleSysEvent(event);
-    const eventReceivedAtMs = perfNowMs();
-    const action = mapEvenHubEvent(event, store.getState());
-    if (action) {
-      switch (action.type) {
-        case "FOCUS_MOVE":
-        case "MENU_MOVE":
-          perfLastInputAtMs = eventReceivedAtMs;
-          perfLastInputSeq += 1;
-          perfLastInputLabel = `${action.type}:${action.direction}`;
-          break;
-        case "DRAW_STOCK":
-        case "SOURCE_SELECT":
-        case "DEST_SELECT":
-        case "DEST_SELECT_INVALID":
-        case "CANCEL_SELECTION":
-        case "MENU_SELECT":
-        case "TOGGLE_MENU":
-        case "NEW_GAME":
-          perfLastInputAtMs = eventReceivedAtMs;
-          perfLastInputSeq += 1;
-          perfLastInputLabel = action.type;
-          break;
+  function subscribeHubEvents(): void {
+    hub.subscribeEvents((event) => {
+      handleSystemLifecycleSysEvent(event);
+      const eventReceivedAtMs = perfNowMs();
+      const action = mapEvenHubEvent(event, store.getState());
+      if (action) {
+        switch (action.type) {
+          case "FOCUS_MOVE":
+          case "MENU_MOVE":
+            perfLastInputAtMs = eventReceivedAtMs;
+            perfLastInputSeq += 1;
+            perfLastInputLabel = `${action.type}:${action.direction}`;
+            break;
+          case "DRAW_STOCK":
+          case "SOURCE_SELECT":
+          case "DEST_SELECT":
+          case "DEST_SELECT_INVALID":
+          case "CANCEL_SELECTION":
+          case "MENU_SELECT":
+          case "TOGGLE_MENU":
+          case "NEW_GAME":
+            perfLastInputAtMs = eventReceivedAtMs;
+            perfLastInputSeq += 1;
+            perfLastInputLabel = action.type;
+            break;
+        }
+        if (action.type === "NEW_GAME") resetTapCooldown();
+        dispatchWithPerfSource("input", action);
       }
-      if (action.type === "NEW_GAME") resetTapCooldown();
-      dispatchWithPerfSource("input", action);
-    }
-  });
+    });
+  }
 
   // Win animation disabled for now; may re-enable later.
   // const WIN_ANIMATION_TICK_MS = 32;
@@ -247,6 +249,7 @@ export async function initApp(): Promise<void> {
   let pendingSave: ReturnType<typeof setTimeout> | null = null;
   let pendingBlink: ReturnType<typeof setTimeout> | null = null;
   let flushInProgress = false;
+  let flushLoopArmed = false;
   let saveInProgress = false;
   let pendingRecoveryRefresh = false;
   let pendingRecoveryCacheInvalidate = false;
@@ -259,8 +262,23 @@ export async function initApp(): Promise<void> {
   // let winAnimationInterval: ReturnType<typeof setInterval> | null = null;
   // let hasOverlayContainer = true;
 
+  function armFlushLoopAfterStartup(): void {
+    if (flushLoopArmed) return;
+    flushLoopArmed = true;
+    if (completedFlushVersion < requestedFlushVersion && !pendingFlush) {
+      pendingFlush = setTimeout(() => {
+        pendingFlush = null;
+        void runFlushLoop();
+      }, 0);
+    }
+  }
+
+  subscribeStoreEffects();
+  subscribeHubEvents();
+
   function scheduleFlush(): void {
     requestedFlushVersion += 1;
+    if (!flushLoopArmed) return;
     if (pendingFlush) clearTimeout(pendingFlush);
     const dispatchTrace = getLastPerfDispatchTrace();
     const absorbMs = getMenuBurstAbsorbMs(dispatchTrace.actionType);
@@ -307,7 +325,6 @@ export async function initApp(): Promise<void> {
 
   try {
     const setupStartMs = perfNowMs();
-    const state = store.getState();
     const startupPage = DYNAMIC_SWAP_MODE
       ? composeSwapModeStartupPage()
       : composeStartupPage();
@@ -324,13 +341,15 @@ export async function initApp(): Promise<void> {
         scheduleFlush();
       }
       const initialImagesStartMs = perfNowMs();
-      await sendInitialImages(hub, state);
+      await sendInitialImages(hub, store.getState());
       perfLog(
         `[Perf][Startup] initialImages ms=${(perfNowMs() - initialImagesStartMs).toFixed(1)}`
       );
     }
   } catch (err) {
     console.error("[EvenSolitaire] Initialization failed:", err);
+  } finally {
+    armFlushLoopAfterStartup();
   }
 
   function scheduleSaveAttempt(delayMs: number): void {
@@ -421,6 +440,7 @@ export async function initApp(): Promise<void> {
   });
 
   async function runFlushLoop(): Promise<void> {
+    if (!flushLoopArmed) return;
     if (flushInProgress) return;
     flushInProgress = true;
     try {
@@ -475,7 +495,7 @@ export async function initApp(): Promise<void> {
       }
     } finally {
       flushInProgress = false;
-      if (completedFlushVersion < requestedFlushVersion && !pendingFlush) {
+      if (flushLoopArmed && completedFlushVersion < requestedFlushVersion && !pendingFlush) {
         pendingFlush = setTimeout(() => {
           pendingFlush = null;
           void runFlushLoop();
@@ -484,51 +504,53 @@ export async function initApp(): Promise<void> {
     }
   }
 
-  store.subscribe((state, prevState) => {
-    if (state === prevState) return;
+  function subscribeStoreEffects(): void {
+    store.subscribe((state, prevState) => {
+      if (state === prevState) return;
 
-    // Win animation disabled for now; may re-enable later.
-    // if (state.game.won && !state.ui.winAnimation) {
-    //   if (!hasOverlayContainer) {
-    //     (async () => {
-    //       await hub.rebuildPage(composeStartupPage());
-    //       hasOverlayContainer = true;
-    //       store.dispatch({ type: "WIN_ANIMATION_START" });
-    //     })();
-    //     return;
-    //   }
-    //   store.dispatch({ type: "WIN_ANIMATION_START" });
-    // }
-    // if (state.game.won && state.ui.winAnimation?.phase === "playing") {
-    //   if (!winAnimationInterval) {
-    //     winAnimationInterval = setInterval(() => {
-    //       store.dispatch({ type: "WIN_ANIMATION_TICK" });
-    //     }, WIN_ANIMATION_TICK_MS);
-    //   }
-    // } else {
-    //   if (winAnimationInterval) {
-    //     clearInterval(winAnimationInterval);
-    //     winAnimationInterval = null;
-    //   }
-    // }
+      // Win animation disabled for now; may re-enable later.
+      // if (state.game.won && !state.ui.winAnimation) {
+      //   if (!hasOverlayContainer) {
+      //     (async () => {
+      //       await hub.rebuildPage(composeStartupPage());
+      //       hasOverlayContainer = true;
+      //       store.dispatch({ type: "WIN_ANIMATION_START" });
+      //     })();
+      //     return;
+      //   }
+      //   store.dispatch({ type: "WIN_ANIMATION_START" });
+      // }
+      // if (state.game.won && state.ui.winAnimation?.phase === "playing") {
+      //   if (!winAnimationInterval) {
+      //     winAnimationInterval = setInterval(() => {
+      //       store.dispatch({ type: "WIN_ANIMATION_TICK" });
+      //     }, WIN_ANIMATION_TICK_MS);
+      //   }
+      // } else {
+      //   if (winAnimationInterval) {
+      //     clearInterval(winAnimationInterval);
+      //     winAnimationInterval = null;
+      //   }
+      // }
 
-    const gameOrSettingsChanged =
-      state.game !== prevState.game || state.ui.moveAssist !== prevState.ui.moveAssist;
-    if (gameOrSettingsChanged) {
-      queueAutosave(state.game, state.ui.moveAssist);
-    }
-    scheduleFlush();
-    const blink = state.ui.selectionInvalidBlink;
-    const prevBlink = prevState.ui.selectionInvalidBlink;
-    const shouldScheduleBlink =
-      blink && blink.remaining > 0 && (!prevBlink || prevBlink.remaining !== blink.remaining);
-    if (shouldScheduleBlink) {
-      if (pendingBlink) clearTimeout(pendingBlink);
-      pendingBlink = setTimeout(() => {
-        pendingBlink = null;
-        dispatchWithPerfSource("timer", { type: "BLINK_TICK" });
-      }, 120);
-    }
-  });
+      const gameOrSettingsChanged =
+        state.game !== prevState.game || state.ui.moveAssist !== prevState.ui.moveAssist;
+      if (gameOrSettingsChanged) {
+        queueAutosave(state.game, state.ui.moveAssist);
+      }
+      scheduleFlush();
+      const blink = state.ui.selectionInvalidBlink;
+      const prevBlink = prevState.ui.selectionInvalidBlink;
+      const shouldScheduleBlink =
+        blink && blink.remaining > 0 && (!prevBlink || prevBlink.remaining !== blink.remaining);
+      if (shouldScheduleBlink) {
+        if (pendingBlink) clearTimeout(pendingBlink);
+        pendingBlink = setTimeout(() => {
+          pendingBlink = null;
+          dispatchWithPerfSource("timer", { type: "BLINK_TICK" });
+        }, 120);
+      }
+    });
+  }
 
 }

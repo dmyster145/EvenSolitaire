@@ -31,20 +31,20 @@ function mapListEvent(event: List_ItemEvent, state: AppState): Action | null {
   const et = event.eventType;
   switch (et) {
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (isScrollDebounced() || isScrollSuppressed()) return null;
+      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
       return scrollAction(state, "prev");
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
-      if (isScrollDebounced() || isScrollSuppressed()) return null;
+      if (isScrollDebounced("next") || isScrollSuppressed()) return null;
       return scrollAction(state, "next");
     case OsEventTypeList.CLICK_EVENT:
-      if (!tryConsumeTap()) return null;
+      if (!tryConsumeTap("tap")) return null;
       return tapAction(state);
     case OsEventTypeList.DOUBLE_CLICK_EVENT:
-      if (!tryConsumeTap()) return null;
+      if (!tryConsumeTap("double")) return null;
       return doubleTapAction(state);
     default:
       if (event.currentSelectItemIndex != null && (et === undefined || (et as number) === 0)) {
-        if (!tryConsumeTap()) return null;
+        if (!tryConsumeTap("tap")) return null;
         return tapAction(state);
       }
       return null;
@@ -55,20 +55,20 @@ function mapTextEvent(event: Text_ItemEvent, state: AppState): Action | null {
   const et = event.eventType;
   switch (et) {
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (isScrollDebounced() || isScrollSuppressed()) return null;
+      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
       return scrollAction(state, "prev");
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
-      if (isScrollDebounced() || isScrollSuppressed()) return null;
+      if (isScrollDebounced("next") || isScrollSuppressed()) return null;
       return scrollAction(state, "next");
     case OsEventTypeList.CLICK_EVENT:
-      if (!tryConsumeTap()) return null;
+      if (!tryConsumeTap("tap")) return null;
       return tapAction(state);
     case OsEventTypeList.DOUBLE_CLICK_EVENT:
-      if (!tryConsumeTap()) return null;
+      if (!tryConsumeTap("double")) return null;
       return doubleTapAction(state);
     default:
       if (et == null) {
-        if (!tryConsumeTap()) return null;
+        if (!tryConsumeTap("tap")) return null;
         return tapAction(state);
       }
       return null;
@@ -79,20 +79,20 @@ function mapSysEvent(event: Sys_ItemEvent, state: AppState): Action | null {
   const et = event.eventType;
   switch (et) {
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (isScrollDebounced() || isScrollSuppressed()) return null;
+      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
       return scrollAction(state, "prev");
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
-      if (isScrollDebounced() || isScrollSuppressed()) return null;
+      if (isScrollDebounced("next") || isScrollSuppressed()) return null;
       return scrollAction(state, "next");
     case OsEventTypeList.CLICK_EVENT:
-      if (!tryConsumeTap()) return null;
+      if (!tryConsumeTap("tap")) return null;
       return tapAction(state);
     case OsEventTypeList.DOUBLE_CLICK_EVENT:
-      if (!tryConsumeTap()) return null;
+      if (!tryConsumeTap("double")) return null;
       return doubleTapAction(state);
     default:
       if (et == null) {
-        if (!tryConsumeTap()) return null;
+        if (!tryConsumeTap("tap")) return null;
         return tapAction(state);
       }
       return null;

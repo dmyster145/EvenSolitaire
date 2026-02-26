@@ -47,12 +47,17 @@ import {
 import { renderBoardTopMini, renderBoardTableauMini } from "./board-image-minis";
 import { renderFullscreenBoardText } from "./fullscreen-text-board";
 import { drawFaceUpCard } from "./card-canvas";
-import { canvasToPngBytes, pngBytesToImageBitmap } from "./png-utils";
+import {
+  canvasToPngBytes,
+  canvasToPngUint8Bytes,
+  getPngBytesHash,
+  pngBytesToImageBitmap,
+} from "./png-utils";
 import type { AppState } from "../state/types";
 import type { EvenHubBridge } from "../evenhub/bridge";
 import { getPileView, getMenuLines, getFloatingCards } from "../state/selectors";
 import { focusTargetToIndex } from "../state/ui-mode";
-import { perfLog, perfNowMs } from "../perf/log";
+import { perfLog, perfLogLazy, perfNowMs } from "../perf/log";
 
 export const CONTAINER_ID_TEXT = HUD_TEXT_CONTAINER.id;
 export const CONTAINER_NAME_TEXT = HUD_TEXT_CONTAINER.name;
@@ -74,6 +79,7 @@ export const CONTAINER_NAME_IMAGE_TABLEAU = IMAGE_TABLEAU_MINI.name;
 /** Event-capture container content (invisible; images draw on top). */
 const EVENT_CAPTURE_CONTENT = " ";
 const SCREEN_PLACEHOLDER_CONTENT = "Even Solitaire loading...";
+const EMPTY_PNG_U8 = new Uint8Array(0);
 
 const FULLSCREEN_TEXT_GAMEPLAY_MODE = false;
 const EXPERIMENTAL_2X2_TILE_MODE = false;
@@ -201,14 +207,13 @@ export async function performSwapCycle(
   hub: EvenHubBridge,
   images: { tileTlPng: number[]; tileTrPng: number[]; tileBlPng: number[]; tileBrPng: number[] }
 ): Promise<boolean> {
-  // #region agent log
-  fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:performSwapCycle',message:'entry',data:{tileBrPngLen:images.tileBrPng?.length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-  // #endregion
+  perfLogLazy(() => `[Perf][Composer][SwapCycle] entry brBytes=${images.tileBrPng.length}`);
   // Step 1: Swap to display mode
   const displaySwapOk = await swapToDisplayMode(hub);
-  // #region agent log
-  fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:performSwapCycle',message:'after swapToDisplayMode',data:{displaySwapOk,mode:currentContainerMode},timestamp:Date.now(),hypothesisId:'H4b'})}).catch(()=>{});
-  // #endregion
+  perfLogLazy(
+    () =>
+      `[Perf][Composer][SwapCycle] after-display-swap ok=${displaySwapOk ? "y" : "n"} mode=${currentContainerMode}`
+  );
   if (!displaySwapOk) return false;
 
   // Step 2: Send all 4 tile images
@@ -216,9 +221,7 @@ export async function performSwapCycle(
 
   // Step 3: Swap back to input mode
   const inputSwapOk = await swapToInputMode(hub);
-  // #region agent log
-  fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:performSwapCycle',message:'after swapToInputMode',data:{inputSwapOk,mode:'input'},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-  // #endregion
+  perfLogLazy(() => `[Perf][Composer][SwapCycle] after-input-swap ok=${inputSwapOk ? "y" : "n"} mode=input`);
   if (!inputSwapOk) return false;
 
   // Step 4: Re-send 3 visible tiles (BR is now replaced by event capture text)
@@ -567,6 +570,30 @@ async function cropScaleSourceToPngBytes(
   return canvasToPngBytes(canvas, `crop:${canvasKey}`);
 }
 
+async function cropScaleSourceToPngUint8Bytes(
+  source: CanvasImageSource,
+  sourceRect: { x: number; y: number; width: number; height: number },
+  targetRect: { width: number; height: number },
+  canvasKey: string
+): Promise<Uint8Array> {
+  const { canvas, ctx } = getReusableCanvas2D(canvasKey, targetRect.width, targetRect.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.globalCompositeOperation = "copy";
+  ctx.drawImage(
+    source,
+    sourceRect.x,
+    sourceRect.y,
+    sourceRect.width,
+    sourceRect.height,
+    0,
+    0,
+    targetRect.width,
+    targetRect.height
+  );
+  ctx.globalCompositeOperation = "source-over";
+  return canvasToPngUint8Bytes(canvas, `crop:${canvasKey}`);
+}
+
 function getReusableBoardRowSourceCanvases(): {
   topSourceCanvas: HTMLCanvasElement;
   tableauSourceCanvas: HTMLCanvasElement;
@@ -648,9 +675,8 @@ export async function renderWinOverlay(
   let tableauImg: ImageBitmap | null = null;
   try {
     if (previousOverlayPng && previousOverlayPng.length > 0) {
-      const blob = new Blob([new Uint8Array(previousOverlayPng)], { type: "image/png" });
-      prevImg = await createImageBitmap(blob);
-      ctx.drawImage(prevImg, 0, 0);
+      prevImg = await pngBytesToImageBitmap(previousOverlayPng);
+      if (prevImg) ctx.drawImage(prevImg, 0, 0);
     } else {
       const boardCtx = buildBoardViewContext(state);
       const topView = topRowViewFromState(state, boardCtx);
@@ -660,12 +686,12 @@ export async function renderWinOverlay(
         renderBoardTableau({ ...tableauView, flyingCard: undefined }),
       ]);
       if (topPng.length > 0) {
-        topImg = await createImageBitmap(new Blob([new Uint8Array(topPng)], { type: "image/png" }));
-        ctx.drawImage(topImg, 0, 0);
+        topImg = await pngBytesToImageBitmap(topPng);
+        if (topImg) ctx.drawImage(topImg, 0, 0);
       }
       if (tableauPng.length > 0) {
-        tableauImg = await createImageBitmap(new Blob([new Uint8Array(tableauPng)], { type: "image/png" }));
-        ctx.drawImage(tableauImg, 0, FULL_SCREEN_CENTER_Y);
+        tableauImg = await pngBytesToImageBitmap(tableauPng);
+        if (tableauImg) ctx.drawImage(tableauImg, 0, FULL_SCREEN_CENTER_Y);
       }
     }
 
@@ -702,12 +728,12 @@ async function overlayPngFromBoardImages(topPng: number[], tableauPng: number[])
   let tableauImg: ImageBitmap | null = null;
   try {
     if (topPng.length > 0) {
-      topImg = await createImageBitmap(new Blob([new Uint8Array(topPng)], { type: "image/png" }));
-      ctx.drawImage(topImg, 0, 0);
+      topImg = await pngBytesToImageBitmap(topPng);
+      if (topImg) ctx.drawImage(topImg, 0, 0);
     }
     if (tableauPng.length > 0) {
-      tableauImg = await createImageBitmap(new Blob([new Uint8Array(tableauPng)], { type: "image/png" }));
-      ctx.drawImage(tableauImg, 0, FULL_SCREEN_CENTER_Y);
+      tableauImg = await pngBytesToImageBitmap(tableauPng);
+      if (tableauImg) ctx.drawImage(tableauImg, 0, FULL_SCREEN_CENTER_Y);
     }
     return canvasToPngBytes(canvas);
   } finally {
@@ -767,7 +793,8 @@ async function renderTiledBoardImages(state: AppState): Promise<{
   const cropMs = perfNowMs() - cropStartMs;
   const totalMs = perfNowMs() - totalStartMs;
 
-  perfLog(
+  perfLogLazy(
+    () =>
     `[Perf][Render][4Tile] rows=${boardRowsMs.toFixed(1)}ms composite=${compositeMs.toFixed(
       1
     )}ms crop=${cropMs.toFixed(1)}ms total=${totalMs.toFixed(1)}ms bytes=` +
@@ -786,9 +813,9 @@ async function renderFullBoard3Tiles(
   state: AppState,
   options?: { focusIdxOverride?: number }
 ): Promise<{
-  topPng: number[];
-  bottomLeftPng: number[];
-  bottomRightPng: number[];
+  topPng: Uint8Array;
+  bottomLeftPng: Uint8Array;
+  bottomRightPng: Uint8Array;
 }> {
   const totalStartMs = perfNowMs();
   const boardRowsStartMs = perfNowMs();
@@ -806,19 +833,19 @@ async function renderFullBoard3Tiles(
   const bottomCropH = OVERLAY_H - TILE_CROP_SPLIT_Y;
   const cropStartMs = perfNowMs();
   const [topTilePng, bottomLeftPng, bottomRightPng] = await Promise.all([
-    cropScaleSourceToPngBytes(
+    cropScaleSourceToPngUint8Bytes(
       fullBoardCanvas,
       { x: TOP_TILE_CROP_X, y: 0, width: TOP_TILE_CROP_W, height: TILE_CROP_SPLIT_Y },
       { width: IMAGE_TILE_TOP.width, height: IMAGE_TILE_TOP.height },
       "tile-3-top"
     ),
-    cropScaleSourceToPngBytes(
+    cropScaleSourceToPngUint8Bytes(
       fullBoardCanvas,
       { x: 0, y: TILE_CROP_SPLIT_Y, width: srcHalfW, height: bottomCropH },
       { width: IMAGE_TILE_BOTTOM_LEFT.width, height: IMAGE_TILE_BOTTOM_LEFT.height },
       "tile-3-bottom-left"
     ),
-    cropScaleSourceToPngBytes(
+    cropScaleSourceToPngUint8Bytes(
       fullBoardCanvas,
       { x: srcHalfW, y: TILE_CROP_SPLIT_Y, width: srcHalfW, height: bottomCropH },
       { width: IMAGE_TILE_BOTTOM_RIGHT.width, height: IMAGE_TILE_BOTTOM_RIGHT.height },
@@ -828,7 +855,8 @@ async function renderFullBoard3Tiles(
   const cropMs = perfNowMs() - cropStartMs;
   const totalMs = perfNowMs() - totalStartMs;
 
-  perfLog(
+  perfLogLazy(
+    () =>
     `[Perf][Render][3Tile] rows=${boardRowsMs.toFixed(1)}ms composite=${compositeMs.toFixed(
       1
     )}ms crop=${cropMs.toFixed(1)}ms total=${totalMs.toFixed(1)}ms bytes=` +
@@ -840,7 +868,7 @@ async function renderFullBoard3Tiles(
 async function renderFullBoard3TopTileOnly(
   state: AppState,
   options?: { focusIdxOverride?: number }
-): Promise<number[]> {
+): Promise<Uint8Array> {
   const totalStartMs = perfNowMs();
   const topRowStartMs = perfNowMs();
   const { topSourceCanvas } = getReusableBoardRowSourceCanvases();
@@ -848,8 +876,8 @@ async function renderFullBoard3TopTileOnly(
   const topCanvas = renderBoardTopToCanvas(topRowViewFromState(state, boardCtx), topSourceCanvas);
   const topRowMs = perfNowMs() - topRowStartMs;
   const cropStartMs = perfNowMs();
-  if (!topCanvas) return [];
-  const topTilePng = await cropScaleSourceToPngBytes(
+  if (!topCanvas) return EMPTY_PNG_U8;
+  const topTilePng = await cropScaleSourceToPngUint8Bytes(
     topCanvas,
     { x: TOP_TILE_CROP_X, y: 0, width: TOP_TILE_CROP_W, height: TILE_CROP_SPLIT_Y },
     { width: IMAGE_TILE_TOP.width, height: IMAGE_TILE_TOP.height },
@@ -857,7 +885,8 @@ async function renderFullBoard3TopTileOnly(
   );
   const cropMs = perfNowMs() - cropStartMs;
   const totalMs = perfNowMs() - totalStartMs;
-  perfLog(
+  perfLogLazy(
+    () =>
     `[Perf][Render][3TileTopOnly] row=${topRowMs.toFixed(1)}ms crop=${cropMs.toFixed(
       1
     )}ms total=${totalMs.toFixed(1)}ms bytes=${topTilePng.length}`
@@ -869,8 +898,8 @@ async function renderFullBoard3BottomTilesOnly(
   state: AppState,
   options?: { focusIdxOverride?: number }
 ): Promise<{
-  bottomLeftPng: number[];
-  bottomRightPng: number[];
+  bottomLeftPng: Uint8Array;
+  bottomRightPng: Uint8Array;
 }> {
   const totalStartMs = perfNowMs();
   const boardRowsStartMs = perfNowMs();
@@ -888,13 +917,13 @@ async function renderFullBoard3BottomTilesOnly(
   const bottomCropH = OVERLAY_H - TILE_CROP_SPLIT_Y;
   const cropStartMs = perfNowMs();
   const [bottomLeftPng, bottomRightPng] = await Promise.all([
-    cropScaleSourceToPngBytes(
+    cropScaleSourceToPngUint8Bytes(
       fullBoardCanvas,
       { x: 0, y: TILE_CROP_SPLIT_Y, width: srcHalfW, height: bottomCropH },
       { width: IMAGE_TILE_BOTTOM_LEFT.width, height: IMAGE_TILE_BOTTOM_LEFT.height },
       "tile-3-bottom-left-only"
     ),
-    cropScaleSourceToPngBytes(
+    cropScaleSourceToPngUint8Bytes(
       fullBoardCanvas,
       { x: srcHalfW, y: TILE_CROP_SPLIT_Y, width: srcHalfW, height: bottomCropH },
       { width: IMAGE_TILE_BOTTOM_RIGHT.width, height: IMAGE_TILE_BOTTOM_RIGHT.height },
@@ -904,7 +933,8 @@ async function renderFullBoard3BottomTilesOnly(
   const cropMs = perfNowMs() - cropStartMs;
   const totalMs = perfNowMs() - totalStartMs;
 
-  perfLog(
+  perfLogLazy(
+    () =>
     `[Perf][Render][3TileBottomOnly] rows=${boardRowsMs.toFixed(1)}ms composite=${compositeMs.toFixed(
       1
     )}ms crop=${cropMs.toFixed(1)}ms total=${totalMs.toFixed(1)}ms bytes=` +
@@ -916,9 +946,9 @@ async function renderFullBoard3BottomTilesOnly(
 type ImageSendBehavior = "await" | "enqueue";
 type HubImageSendOptions = Parameters<EvenHubBridge["updateImage"]>[1];
 type FullBoard3TileImages = {
-  topPng: number[];
-  bottomLeftPng: number[];
-  bottomRightPng: number[];
+  topPng: Uint8Array;
+  bottomLeftPng: Uint8Array;
+  bottomRightPng: Uint8Array;
 };
 type FullBoard3TileRegion = "top" | "bottomLeft" | "bottomRight";
 type FullBoard3TileDirtyMask = Record<FullBoard3TileRegion, boolean>;
@@ -950,9 +980,11 @@ async function sendHubImage(
   await hub.updateImage(update, options);
 }
 
-function pngBytesEqual(a?: number[], b?: number[]): boolean {
+function pngBytesEqual(a?: number[] | Uint8Array, b?: number[] | Uint8Array): boolean {
   if (!a || !b) return false;
+  if (a === b) return true;
   if (a.length !== b.length) return false;
+  if (getPngBytesHash(a) !== getPngBytesHash(b)) return false;
   for (let i = 0; i < a.length; i += 1) {
     if (a[i] !== b[i]) return false;
   }
@@ -1129,9 +1161,9 @@ function predictMenuNavigation3TileHint(params: {
     uiMode: string;
     topPileHash?: string;
     tableauPileHash?: string;
-    last3TileTopPng?: number[];
-    last3TileBottomLeftPng?: number[];
-    last3TileBottomRightPng?: number[];
+    last3TileTopPng?: Uint8Array;
+    last3TileBottomLeftPng?: Uint8Array;
+    last3TileBottomRightPng?: Uint8Array;
   };
 }): FullBoard3TilePreRenderHint | null {
   const {
@@ -1200,8 +1232,8 @@ function predictFullBoard3TilePreRenderHint(params: {
     uiMode: string;
     topPileHash?: string;
     tableauPileHash?: string;
-    last3TileBottomLeftPng?: number[];
-    last3TileBottomRightPng?: number[];
+    last3TileBottomLeftPng?: Uint8Array;
+    last3TileBottomRightPng?: Uint8Array;
   };
 }): FullBoard3TilePreRenderHint {
   const {
@@ -1292,9 +1324,9 @@ function shouldSkipStaleBackloggedImageRender(
 function diffFullBoard3TileImages(
   images: FullBoard3TileImages,
   lastSent: {
-    last3TileTopPng?: number[];
-    last3TileBottomLeftPng?: number[];
-    last3TileBottomRightPng?: number[];
+    last3TileTopPng?: Uint8Array;
+    last3TileBottomLeftPng?: Uint8Array;
+    last3TileBottomRightPng?: Uint8Array;
   }
 ): { dirty: FullBoard3TileDirtyMask; changedCount: number } {
   const dirty: FullBoard3TileDirtyMask = {
@@ -1311,9 +1343,9 @@ function diffFullBoard3TileImages(
 
 function cacheFullBoard3TileImages(
   lastSent: {
-    last3TileTopPng?: number[];
-    last3TileBottomLeftPng?: number[];
-    last3TileBottomRightPng?: number[];
+    last3TileTopPng?: Uint8Array;
+    last3TileBottomLeftPng?: Uint8Array;
+    last3TileBottomRightPng?: Uint8Array;
   },
   images: FullBoard3TileImages
 ): void {
@@ -1341,7 +1373,7 @@ async function sendFullBoard3Tiles(
   const queuePrioritiesByRank = ["high", "normal", "low"] as const;
   const allEntries: Array<{
     region: FullBoard3TileRegion;
-    bytes: number[];
+    bytes: Uint8Array;
     containerID: number;
     containerName: string;
   }> = [
@@ -1459,9 +1491,9 @@ async function sendExperimentalTiledDisplayImages(
     );
   }
   if (images.tileBrPng.length > 0) {
-    // #region agent log
-    fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:sendExperimentalTiledDisplayImages',message:'sending BR tile',data:{containerID:CONTAINER_ID_IMAGE_TILE_BR,tileBrPngLen:images.tileBrPng.length},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
+    perfLogLazy(
+      () => `[Perf][Composer][4Tile] send cid=${CONTAINER_ID_IMAGE_TILE_BR} brBytes=${images.tileBrPng.length}`
+    );
     await sendHubImage(
       hub,
       new ImageRawDataUpdate({
@@ -1677,9 +1709,9 @@ export async function flushDisplayUpdate(
     topPileHash?: string;
     tableauPileHash?: string;
     /** Cached 3-tile PNGs for transport dirty detection (geometry unchanged, bytes only). */
-    last3TileTopPng?: number[];
-    last3TileBottomLeftPng?: number[];
-    last3TileBottomRightPng?: number[];
+    last3TileTopPng?: Uint8Array;
+    last3TileBottomLeftPng?: Uint8Array;
+    last3TileBottomRightPng?: Uint8Array;
   },
   options?: FlushDisplayUpdateOptions
 ): Promise<{ lastSent: typeof lastSent; didClearOverlay?: boolean }> {
@@ -1695,7 +1727,8 @@ export async function flushDisplayUpdate(
   const runtimeImageSendBehavior: ImageSendBehavior = "enqueue";
   const logSkippedVisualFlush = (reason: string): { lastSent: typeof lastSent; didClearOverlay?: boolean } => {
     perfPath = `${perfPath || "image"}-skip`;
-    perfLog(
+    perfLogLazy(
+      () =>
       `[Perf][Composer][Flush] path=${perfPath} total=${(perfNowMs() - perfFlushStartMs).toFixed(
         1
       )}ms changed=skip reason=${reason} focus=${focusIdx} menu=${menuOpen ? "y" : "n"} ` +
@@ -1887,8 +1920,8 @@ export async function flushDisplayUpdate(
             }
             const partialImages: FullBoard3TileImages = {
               topPng: topTilePng,
-              bottomLeftPng: lastSent.last3TileBottomLeftPng ?? [],
-              bottomRightPng: lastSent.last3TileBottomRightPng ?? [],
+              bottomLeftPng: lastSent.last3TileBottomLeftPng ?? EMPTY_PNG_U8,
+              bottomRightPng: lastSent.last3TileBottomRightPng ?? EMPTY_PNG_U8,
             };
             const { dirty, changedCount } = diffFullBoard3TileImages(partialImages, lastSent);
             record3TilePerfBytes(partialImages, dirty);
@@ -1930,7 +1963,7 @@ export async function flushDisplayUpdate(
               return logSkippedVisualFlush(burstyVisualState ? "stale-burst-post" : "stale-backlog-post");
             }
             const partialImages: FullBoard3TileImages = {
-              topPng: lastSent.last3TileTopPng ?? [],
+              topPng: lastSent.last3TileTopPng ?? EMPTY_PNG_U8,
               bottomLeftPng,
               bottomRightPng,
             };
@@ -2001,9 +2034,12 @@ export async function flushDisplayUpdate(
           const skipSwap =
             DISABLE_SWAP_CYCLE_FOR_DEBUG ||
             (SKIP_DISPLAY_SWAP_FOR_RAPID_CHANGES && (selectionInvalidBlinkRemaining > 0 || menuOpen));
-          // #region agent log
-          fetch('http://127.0.0.1:7249/ingest/74e51f32-cd7c-4cd0-a151-0268a78c9f74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a42d7d'},body:JSON.stringify({sessionId:'a42d7d',location:'composer.ts:flushDisplayUpdate',message:'swap path',data:{changed,skipSwap,tileBrLen:images.tileBrPng?.length,willRunSwapCycle:!skipSwap},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-          // #endregion
+          perfLogLazy(
+            () =>
+            `[Perf][Composer][Flush][SwapPath] changed=${changed ? "y" : "n"} ` +
+              `skipSwap=${skipSwap ? "y" : "n"} brBytes=${images.tileBrPng.length} ` +
+              `cycle=${!skipSwap ? "y" : "n"}`
+          );
           if (skipSwap) {
             await sendInputModeTiles(hub, {
               tileTlPng: images.tileTlPng,
@@ -2068,7 +2104,8 @@ export async function flushDisplayUpdate(
     // lastSent.flyX = flyX;
     // lastSent.flyY = flyY;
 
-    perfLog(
+    perfLogLazy(
+      () =>
       `[Perf][Composer][Flush] path=${perfPath} total=${(perfNowMs() - perfFlushStartMs).toFixed(
         1
       )}ms changed=y focus=${focusIdx} menu=${menuOpen ? "y" : "n"} ` +

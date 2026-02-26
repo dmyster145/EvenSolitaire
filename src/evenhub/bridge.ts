@@ -12,7 +12,7 @@ import {
   type EvenHubEvent,
 } from "@evenrealities/even_hub_sdk";
 import { log, warn, error } from "../utils/logger";
-import { perfLog, perfNowMs } from "../perf/log";
+import { perfLog, perfLogLazy, perfNowMs } from "../perf/log";
 
 export type EvenHubEventHandler = (event: EvenHubEvent) => void;
 export type ImageUpdatePriority = "high" | "normal" | "low";
@@ -58,6 +58,7 @@ const PERF_BRIDGE_SUMMARY_EVERY_IMAGES = 20;
 const PERF_BRIDGE_LOG_THROTTLE_WAIT_MS = 80;
 const PERF_BRIDGE_LOG_SLOW_STORAGE_MS = 120;
 const PERF_BRIDGE_SUMMARY_EVERY_STORAGE_OPS = 8;
+const PERF_BRIDGE_DIAG_DEGRADED_SUMMARY_EVERY_MS = 2000;
 const IMAGE_HEALTH_WINDOW_SAMPLES = 8;
 const IMAGE_HEALTH_MIN_SAMPLES = 3;
 const IMAGE_LINK_SLOW_DEGRADED_AVG_SEND_MS = 1050;
@@ -75,6 +76,10 @@ const IMAGE_BACKLOG_NON_HIGH_INTER_SEND_GAP_MS = 120;
 const IMAGE_LINK_SLOW_NON_HIGH_INTER_SEND_GAP_MS = 180;
 const IMAGE_INTERRUPTION_TRIGGER_SEND_MS = 2500;
 const IMAGE_INTERRUPTION_TRIGGER_TOTAL_MS = 3500;
+const IMAGE_INTERRUPTION_TRIGGER_TOTAL_CONFIRM_COUNT = 2;
+const IMAGE_INTERRUPTION_TRIGGER_TOTAL_CONFIRM_WINDOW_MS = 5000;
+const IMAGE_INTERRUPTION_TRIGGER_TOTAL_IMMEDIATE_SEND_MS = 1400;
+const IMAGE_INTERRUPTION_TRIGGER_TOTAL_IMMEDIATE_QWAIT_MS = 7000;
 const IMAGE_INTERRUPTION_RECOVER_MAX_SEND_MS = 1200;
 const IMAGE_INTERRUPTION_RECOVER_MAX_QWAIT_MS = 1200;
 const IMAGE_INTERRUPTION_RECOVER_GOOD_SENDS = 3;
@@ -141,6 +146,8 @@ export class EvenHubBridge {
   private imageSendWedged = false;
   private imageSurvivalMode = false;
   private imageInterruptedRecoveryGoodSends = 0;
+  private slowTotalInterruptCandidateCount = 0;
+  private slowTotalInterruptCandidateLastAtMs = 0;
   private recentWatchdogTripAtMs: number[] = [];
   private lastImageSendStartMsByContainer = new Map<number, number>();
   private lastAnyImageSendEndAtMs = 0;
@@ -158,6 +165,14 @@ export class EvenHubBridge {
   private perfStorageTotalMs = 0;
   private perfStorageMaxMs = 0;
   private perfStorageTotalBytes = 0;
+  private perfDiagDegradedWindowStartMs = 0;
+  private perfDiagDegradedImages = 0;
+  private perfDiagDegradedTotalQueueWaitMs = 0;
+  private perfDiagDegradedTotalSendMs = 0;
+  private perfDiagDegradedMaxQueueWaitMs = 0;
+  private perfDiagDegradedMaxSendMs = 0;
+  private perfDiagDegradedWatchdogs = 0;
+  private perfDiagLastDegradedSummaryAtMs = 0;
 
   async init(): Promise<void> {
     try {
@@ -322,7 +337,8 @@ export class EvenHubBridge {
   notifySystemLifecycleEvent(event: BridgeSystemLifecycleEvent): void {
     const q = this.getImageQueueDepth();
     const busy = this.hasPendingImageWork();
-    perfLog(
+    perfLogLazy(
+      () =>
       `[Perf][Bridge][Lifecycle] event=${event} q=${q} busy=${busy ? "y" : "n"} intr=${
         this.imageInterrupted ? "y" : "n"
       } wedged=${this.imageSendWedged ? "y" : "n"} survival=${this.imageSurvivalMode ? "y" : "n"}`
@@ -344,6 +360,124 @@ export class EvenHubBridge {
         }
         return;
     }
+  }
+
+  private isTransportDegraded(): boolean {
+    return (
+      this.imageQueueBacklogged ||
+      this.imageLinkSlow ||
+      this.imageInterrupted ||
+      this.imageSendWedged ||
+      this.imageSurvivalMode
+    );
+  }
+
+  private buildQueueDiagnosticSummary(): string {
+    const queuedCount = this.imageQueue.length;
+    const deferredCount = this.inFlightDeferredCoalesced.size;
+    const head = this.imageQueue
+      .slice(0, 4)
+      .map((queued) => {
+        const cid = queued.data.containerID ?? -1;
+        const prot = queued.interruptProtected ? "p" : "";
+        return `${cid}:${queued.priority}${prot}`;
+      })
+      .join(",");
+    const deferredHead = [...this.inFlightDeferredCoalesced.values()]
+      .slice(0, 3)
+      .map((queued) => {
+        const cid = queued.data.containerID ?? -1;
+        const prot = queued.interruptProtected ? "p" : "";
+        return `${cid}:${queued.priority}${prot}`;
+      })
+      .join(",");
+    const inFlight = this.inFlightQueuedImage;
+    const inFlightSummary = inFlight
+      ? ` inflight=${inFlight.data.containerID ?? -1}:${inFlight.priority}${inFlight.interruptProtected ? "p" : ""}`
+      : "";
+    const inFlightAgeMs =
+      inFlight && inFlight.enqueuedAtMs > 0 ? perfNowMs() - inFlight.enqueuedAtMs : 0;
+    const inFlightAgeSummary = inFlight ? ` inflightAge=${inFlightAgeMs.toFixed(1)}ms` : "";
+    return (
+      `queued=${queuedCount} deferred=${deferredCount}` +
+      (head ? ` head=${head}` : "") +
+      (deferredHead ? ` deferredHead=${deferredHead}` : "") +
+      inFlightSummary +
+      inFlightAgeSummary
+    );
+  }
+
+  private logTransportDiagnostic(reason: string, extra?: string): void {
+    const health = this.getImageSendHealth();
+    const maxRecentSendMs = this.recentSendMs.reduce((max, ms) => Math.max(max, ms), 0);
+    perfLogLazy(
+      () =>
+      `[Perf][Bridge][Diag] reason=${reason} q=${this.getImageQueueDepth()} busy=${health.busy ? "y" : "n"} ` +
+        `avgQ=${health.avgQueueWaitMs.toFixed(1)}ms maxQ=${health.maxQueueWaitMs.toFixed(1)}ms ` +
+        `avgS=${health.avgSendMs.toFixed(1)}ms maxS=${maxRecentSendMs.toFixed(1)}ms ` +
+        `samples=${health.sampleCount} backlog=${this.imageQueueBacklogged ? "y" : "n"} ` +
+        `linkSlow=${this.imageLinkSlow ? "y" : "n"} intr=${this.imageInterrupted ? "y" : "n"} ` +
+        `wedged=${this.imageSendWedged ? "y" : "n"} survival=${this.imageSurvivalMode ? "y" : "n"} ` +
+        `${this.buildQueueDiagnosticSummary()}` +
+        (extra ? ` ${extra}` : "")
+    );
+  }
+
+  private resetDegradedDiagWindow(nowMs: number): void {
+    this.perfDiagDegradedWindowStartMs = nowMs;
+    this.perfDiagDegradedImages = 0;
+    this.perfDiagDegradedTotalQueueWaitMs = 0;
+    this.perfDiagDegradedTotalSendMs = 0;
+    this.perfDiagDegradedMaxQueueWaitMs = 0;
+    this.perfDiagDegradedMaxSendMs = 0;
+    this.perfDiagDegradedWatchdogs = 0;
+    this.perfDiagLastDegradedSummaryAtMs = nowMs;
+  }
+
+  private maybeLogDegradedDiagWindow(reason: string, nowMs: number, force: boolean = false): void {
+    if (this.perfDiagDegradedWindowStartMs <= 0) {
+      this.resetDegradedDiagWindow(nowMs);
+      return;
+    }
+    const hasSamples = this.perfDiagDegradedImages > 0 || this.perfDiagDegradedWatchdogs > 0;
+    const due =
+      force || nowMs - this.perfDiagLastDegradedSummaryAtMs >= PERF_BRIDGE_DIAG_DEGRADED_SUMMARY_EVERY_MS;
+    if (!hasSamples || !due) return;
+    const images = Math.max(1, this.perfDiagDegradedImages);
+    perfLogLazy(
+      () =>
+      `[Perf][Bridge][DiagWindow] reason=${reason} dur=${(nowMs - this.perfDiagDegradedWindowStartMs).toFixed(
+        1
+      )}ms images=${this.perfDiagDegradedImages} avgQ=${(
+        this.perfDiagDegradedTotalQueueWaitMs / images
+      ).toFixed(1)}ms maxQ=${this.perfDiagDegradedMaxQueueWaitMs.toFixed(1)}ms ` +
+        `avgS=${(this.perfDiagDegradedTotalSendMs / images).toFixed(1)}ms ` +
+        `maxS=${this.perfDiagDegradedMaxSendMs.toFixed(1)}ms watchdogs=${this.perfDiagDegradedWatchdogs} ` +
+        `q=${this.getImageQueueDepth()} backlog=${this.imageQueueBacklogged ? "y" : "n"} ` +
+        `linkSlow=${this.imageLinkSlow ? "y" : "n"} intr=${this.imageInterrupted ? "y" : "n"} ` +
+        `wedged=${this.imageSendWedged ? "y" : "n"} survival=${this.imageSurvivalMode ? "y" : "n"} ` +
+        `${this.buildQueueDiagnosticSummary()}`
+    );
+    this.resetDegradedDiagWindow(nowMs);
+  }
+
+  private recordDegradedDiagSample(queueWaitMs: number, sendMs: number): void {
+    const nowMs = perfNowMs();
+    if (!this.isTransportDegraded()) {
+      this.maybeLogDegradedDiagWindow("recovered", nowMs, true);
+      this.perfDiagDegradedWindowStartMs = 0;
+      return;
+    }
+    if (this.perfDiagDegradedWindowStartMs <= 0) {
+      this.resetDegradedDiagWindow(nowMs);
+      this.logTransportDiagnostic("degraded-enter");
+    }
+    this.perfDiagDegradedImages += 1;
+    this.perfDiagDegradedTotalQueueWaitMs += queueWaitMs;
+    this.perfDiagDegradedTotalSendMs += sendMs;
+    this.perfDiagDegradedMaxQueueWaitMs = Math.max(this.perfDiagDegradedMaxQueueWaitMs, queueWaitMs);
+    this.perfDiagDegradedMaxSendMs = Math.max(this.perfDiagDegradedMaxSendMs, sendMs);
+    this.maybeLogDegradedDiagWindow("periodic", nowMs, false);
   }
 
   private enqueueImageUpdate(
@@ -456,11 +590,20 @@ export class EvenHubBridge {
       this.inFlightImageWatchdogTriggered = true;
       this.perfWatchdogTrips += 1;
       this.recordWatchdogTripForSurvival();
+      if (this.perfDiagDegradedWindowStartMs <= 0) {
+        this.resetDegradedDiagWindow(perfNowMs());
+      }
+      this.perfDiagDegradedWatchdogs += 1;
       const elapsedMs = perfNowMs() - sendStartedAtMs;
-      perfLog(
+      perfLogLazy(
+        () =>
         `[Perf][Bridge][Watchdog] active=y cid=${queued.data.containerID ?? -1} ` +
           `elapsed=${elapsedMs.toFixed(1)}ms qwait=${queueWaitMs.toFixed(1)}ms ` +
           `pending=${this.imageQueue.length + this.inFlightDeferredCoalesced.size}`
+      );
+      this.logTransportDiagnostic(
+        "watchdog-trip",
+        `cid=${queued.data.containerID ?? -1} elapsed=${elapsedMs.toFixed(1)}ms qwait=${queueWaitMs.toFixed(1)}ms`
       );
       this.setImageInterrupted(true, "watchdog-send");
       // While the SDK call is still in flight, keep trimming stale queued work.
@@ -489,6 +632,7 @@ export class EvenHubBridge {
     if (this.imageSendWedged === active) return;
     this.imageSendWedged = active;
     perfLog(`[Perf][Bridge][Wedge] active=${active ? "y" : "n"} reason=${reason}`);
+    this.logTransportDiagnostic(active ? "wedge-on" : "wedge-off", `cause=${reason}`);
   }
 
   private armImageSendHardTimeout(
@@ -507,7 +651,8 @@ export class EvenHubBridge {
       this.perfHardWedgeTrips += 1;
       queued.abandoned = true;
       const elapsedMs = perfNowMs() - sendStartedAtMs;
-      perfLog(
+      perfLogLazy(
+        () =>
         `[Perf][Bridge][Wedge] active=y cid=${queued.data.containerID ?? -1} ` +
           `elapsed=${elapsedMs.toFixed(1)}ms qwait=${queueWaitMs.toFixed(1)}ms ` +
           `pending=${this.imageQueue.length + this.inFlightDeferredCoalesced.size}`
@@ -540,8 +685,9 @@ export class EvenHubBridge {
     }
     this.inFlightImageWatchdogSeq += 1;
     if (this.inFlightImageWatchdogTriggered && completed) {
-      perfLog(
-        `[Perf][Bridge][Watchdog] active=n cid=${completed.cid ?? -1} send=${completed.sendMs.toFixed(1)}ms`
+      perfLogLazy(
+        () =>
+          `[Perf][Bridge][Watchdog] active=n cid=${completed.cid ?? -1} send=${completed.sendMs.toFixed(1)}ms`
       );
     }
     this.inFlightImageWatchdogTriggered = false;
@@ -558,7 +704,8 @@ export class EvenHubBridge {
     }
     this.inFlightImageHardTimeoutSeq += 1;
     if (this.inFlightImageHardTimeoutTriggered && completed) {
-      perfLog(
+      perfLogLazy(
+        () =>
         `[Perf][Bridge][Wedge] active=n cid=${completed.cid ?? -1} send=${completed.sendMs.toFixed(1)}ms ` +
           `abandoned=${completed.abandoned ? "y" : "n"}`
       );
@@ -607,7 +754,8 @@ export class EvenHubBridge {
             }
             for (const resolve of queued.resolves) resolve(result);
           } else if (inFlightQueued.abandoned) {
-            perfLog(
+            perfLogLazy(
+              () =>
               `[Perf][Bridge][Wedge] late-return cid=${queued.data.containerID ?? -1} ` +
                 `send=${sendMs.toFixed(1)}ms result=${ImageRawDataUpdateResult.isSuccess(result) ? "ok" : "non-ok"}`
             );
@@ -627,7 +775,8 @@ export class EvenHubBridge {
             error("[EvenHubBridge] Image update error:", err);
             for (const resolve of queued.resolves) resolve(null);
           } else if (inFlightQueued.abandoned) {
-            perfLog(
+            perfLogLazy(
+              () =>
               `[Perf][Bridge][Wedge] late-error cid=${queued.data.containerID ?? -1} send=${sendMs.toFixed(1)}ms`
             );
             this.setImageSendWedged(false, "late-error");
@@ -701,7 +850,8 @@ export class EvenHubBridge {
     this.perfThrottleCount += 1;
     this.perfThrottleWaitMs += waitMs;
     if (waitMs >= PERF_BRIDGE_LOG_THROTTLE_WAIT_MS) {
-      perfLog(
+      perfLogLazy(
+        () =>
         `[Perf][Bridge][Throttle] cid=${queued.data.containerID} p=${queued.priority} reason=${pressureReason} wait=${waitMs.toFixed(
           1
         )}ms q=${pendingDepth + 1} survival=${this.imageSurvivalMode ? "y" : "n"}`
@@ -792,10 +942,12 @@ export class EvenHubBridge {
   private setImageSurvivalMode(active: boolean, reason: string): void {
     if (this.imageSurvivalMode === active) return;
     this.imageSurvivalMode = active;
-    perfLog(
+    perfLogLazy(
+      () =>
       `[Perf][Bridge][Survival] active=${active ? "y" : "n"} reason=${reason} ` +
         `watchdogs=${this.recentWatchdogTripAtMs.length}`
     );
+    this.logTransportDiagnostic(active ? "survival-on" : "survival-off", `cause=${reason}`);
   }
 
   private recordWatchdogTripForSurvival(): void {
@@ -835,10 +987,13 @@ export class EvenHubBridge {
     if (this.imageInterrupted === active) return;
     this.imageInterrupted = active;
     this.imageInterruptedRecoveryGoodSends = 0;
+    this.slowTotalInterruptCandidateCount = 0;
+    this.slowTotalInterruptCandidateLastAtMs = 0;
     if (active) {
       this.pruneQueuedImagesForInterruption();
     }
     perfLog(`[Perf][Bridge][Interrupt] active=${active ? "y" : "n"} reason=${reason}`);
+    this.logTransportDiagnostic(active ? "interrupt-on" : "interrupt-off", `cause=${reason}`);
     for (const listener of this.imageInterruptionListeners) {
       try {
         listener(active);
@@ -850,14 +1005,57 @@ export class EvenHubBridge {
 
   private updateInterruptionState(queueWaitMs: number, sendMs: number, pendingDepth: number): void {
     const totalMs = queueWaitMs + sendMs;
-    if (
-      sendMs >= IMAGE_INTERRUPTION_TRIGGER_SEND_MS ||
-      totalMs >= IMAGE_INTERRUPTION_TRIGGER_TOTAL_MS
-    ) {
-      this.setImageInterrupted(true, sendMs >= IMAGE_INTERRUPTION_TRIGGER_SEND_MS ? "slow-send" : "slow-total");
+    const slowSend = sendMs >= IMAGE_INTERRUPTION_TRIGGER_SEND_MS;
+    const slowTotal = totalMs >= IMAGE_INTERRUPTION_TRIGGER_TOTAL_MS;
+    if (slowSend) {
+      this.slowTotalInterruptCandidateCount = 0;
+      this.slowTotalInterruptCandidateLastAtMs = 0;
+      this.setImageInterrupted(true, "slow-send");
       this.updateSurvivalMode(pendingDepth);
       return;
     }
+    if (slowTotal) {
+      const nowMs = perfNowMs();
+      const immediateSlowTotal =
+        this.imageLinkSlow ||
+        sendMs >= IMAGE_INTERRUPTION_TRIGGER_TOTAL_IMMEDIATE_SEND_MS ||
+        queueWaitMs >= IMAGE_INTERRUPTION_TRIGGER_TOTAL_IMMEDIATE_QWAIT_MS;
+      if (immediateSlowTotal) {
+        this.slowTotalInterruptCandidateCount = 0;
+        this.slowTotalInterruptCandidateLastAtMs = 0;
+        this.setImageInterrupted(true, "slow-total");
+        this.updateSurvivalMode(pendingDepth);
+        return;
+      }
+
+      const withinConfirmWindow =
+        this.slowTotalInterruptCandidateLastAtMs > 0 &&
+        nowMs - this.slowTotalInterruptCandidateLastAtMs <= IMAGE_INTERRUPTION_TRIGGER_TOTAL_CONFIRM_WINDOW_MS;
+      this.slowTotalInterruptCandidateCount = withinConfirmWindow
+        ? this.slowTotalInterruptCandidateCount + 1
+        : 1;
+      this.slowTotalInterruptCandidateLastAtMs = nowMs;
+      if (this.slowTotalInterruptCandidateCount >= IMAGE_INTERRUPTION_TRIGGER_TOTAL_CONFIRM_COUNT) {
+        this.slowTotalInterruptCandidateCount = 0;
+        this.slowTotalInterruptCandidateLastAtMs = 0;
+        this.setImageInterrupted(true, "slow-total");
+        this.updateSurvivalMode(pendingDepth);
+        return;
+      }
+
+      perfLogLazy(
+        () =>
+        `[Perf][Bridge][InterruptCandidate] reason=slow-total-suppressed ` +
+          `qwait=${queueWaitMs.toFixed(1)}ms send=${sendMs.toFixed(1)}ms total=${totalMs.toFixed(
+            1
+          )}ms pending=${pendingDepth} n=${this.slowTotalInterruptCandidateCount}`
+      );
+      this.updateSurvivalMode(pendingDepth);
+      return;
+    }
+
+    this.slowTotalInterruptCandidateCount = 0;
+    this.slowTotalInterruptCandidateLastAtMs = 0;
 
     if (!this.imageInterrupted) {
       this.updateSurvivalMode(pendingDepth);
@@ -917,12 +1115,15 @@ export class EvenHubBridge {
 
     const totalMs = queueWaitMs + sendMs;
     if (totalMs >= PERF_BRIDGE_LOG_SLOW_IMAGE_MS || pendingDepth > 0) {
-      perfLog(
+      perfLogLazy(
+        () =>
         `[Perf][Bridge][Image] cid=${data.containerID} bytes=${bytes} ` +
           `qwait=${queueWaitMs.toFixed(1)}ms send=${sendMs.toFixed(1)}ms ` +
           `total=${totalMs.toFixed(1)}ms pending=${pendingDepth}`
       );
     }
+
+    this.recordDegradedDiagSample(queueWaitMs, sendMs);
 
     if (this.perfImageCount % PERF_BRIDGE_SUMMARY_EVERY_IMAGES !== 0) return;
 
@@ -940,7 +1141,8 @@ export class EvenHubBridge {
       })
       .join(",");
 
-    perfLog(
+    perfLogLazy(
+      () =>
       `[Perf][Bridge][Summary] images=${this.perfImageCount} avgBytes=${avgBytes} ` +
         `avgQueueWait=${avgQueueWaitMs.toFixed(1)}ms avgSend=${avgSendMs.toFixed(1)}ms ` +
         `throughput=${throughputKbps.toFixed(1)}KB/s maxQueue=${this.perfMaxQueueDepth} ` +
@@ -986,7 +1188,8 @@ export class EvenHubBridge {
     else this.perfStorageSetCount += 1;
 
     if (durMs >= PERF_BRIDGE_LOG_SLOW_STORAGE_MS || !ok) {
-      perfLog(
+      perfLogLazy(
+        () =>
         `[Perf][Bridge][Storage] op=${op} key=${key} bytes=${bytes} dur=${durMs.toFixed(
           1
         )}ms ok=${ok ? "y" : "n"}`
@@ -999,7 +1202,8 @@ export class EvenHubBridge {
     const avgMs = this.perfStorageTotalMs / this.perfStorageCount;
     const avgBytes = Math.round(this.perfStorageTotalBytes / Math.max(1, this.perfStorageCount));
     const throughputKbps = (this.perfStorageTotalBytes / elapsedMs) * 1000 / 1024;
-    perfLog(
+    perfLogLazy(
+      () =>
       `[Perf][Bridge][StorageSummary] ops=${this.perfStorageCount} get=${this.perfStorageGetCount} ` +
         `set=${this.perfStorageSetCount} avgBytes=${avgBytes} avgDur=${avgMs.toFixed(1)}ms ` +
         `maxDur=${this.perfStorageMaxMs.toFixed(1)}ms throughput=${throughputKbps.toFixed(1)}KB/s`
@@ -1045,19 +1249,23 @@ export class EvenHubBridge {
         maxSendMs >= IMAGE_LINK_SLOW_DEGRADED_MAX_SEND_MS
       ) {
         this.imageLinkSlow = true;
+        this.logTransportDiagnostic("linkSlow-on");
       }
     } else if (
       avgSendMs <= IMAGE_LINK_SLOW_RECOVER_AVG_SEND_MS &&
       maxSendMs <= IMAGE_LINK_SLOW_RECOVER_MAX_SEND_MS
     ) {
       this.imageLinkSlow = false;
+      this.logTransportDiagnostic("linkSlow-off");
     }
 
     if (!this.imageQueueBacklogged) {
-      this.imageQueueBacklogged =
+      const nextBacklogged =
         pendingDepth >= IMAGE_BACKLOG_DEGRADED_QUEUE_DEPTH ||
         avgQueueWaitMs >= IMAGE_BACKLOG_DEGRADED_AVG_QWAIT_MS ||
         maxQueueWaitMs >= IMAGE_BACKLOG_DEGRADED_MAX_QWAIT_MS;
+      this.imageQueueBacklogged = nextBacklogged;
+      if (nextBacklogged) this.logTransportDiagnostic("backlog-on");
       return;
     }
 
@@ -1067,6 +1275,7 @@ export class EvenHubBridge {
       maxQueueWaitMs <= IMAGE_BACKLOG_RECOVER_MAX_QWAIT_MS
     ) {
       this.imageQueueBacklogged = false;
+      this.logTransportDiagnostic("backlog-off");
     }
     this.updateSurvivalMode(pendingDepth);
   }

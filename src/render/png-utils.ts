@@ -1,6 +1,8 @@
 /** PNG/canvas helpers for image-container rendering. */
 import { isPerfLoggingEnabled, perfLog, perfNowMs } from "../perf/log";
 
+export type PngBytes = number[] | Uint8Array;
+
 let pngEncodeQueueTail: Promise<void> = Promise.resolve();
 let pngEncodePendingCount = 0;
 let pngEncodeMaxPending = 0;
@@ -37,6 +39,12 @@ let pngEncodePerfMaxEncodeMs = 0;
 let pngEncodePerfMaxTotalMs = 0;
 let pngEncodePerfSlowCount = 0;
 let pngEncodePerfLabels = new Map<string, number>();
+const pngBytesUint8Cache = new WeakMap<number[], Uint8Array>();
+const pngBytesHashCache = new WeakMap<PngBytes, number>();
+const EMPTY_PNG_UINT8 = new Uint8Array(0);
+
+const FNV32_OFFSET = 0x811c9dc5;
+const FNV32_PRIME = 0x01000193;
 
 function enqueueSerializedPngEncode<T>(task: () => Promise<T>): Promise<T> {
   const run = pngEncodeQueueTail.then(task, task);
@@ -108,10 +116,47 @@ function canvasToBlobPng(canvas: HTMLCanvasElement): Promise<Blob | null> {
 function arrayBufferToNumberArray(buffer: ArrayBuffer): number[] {
   const bytes = new Uint8Array(buffer);
   const out = new Array<number>(bytes.length);
+  let hash = FNV32_OFFSET;
   for (let i = 0; i < bytes.length; i += 1) {
-    out[i] = bytes[i]!;
+    const value = bytes[i]!;
+    out[i] = value;
+    hash ^= value;
+    hash = Math.imul(hash, FNV32_PRIME);
   }
+  pngBytesHashCache.set(out, hash >>> 0);
   return out;
+}
+
+function arrayBufferToUint8Array(buffer: ArrayBuffer): Uint8Array {
+  const bytes = new Uint8Array(buffer);
+  let hash = FNV32_OFFSET;
+  for (let i = 0; i < bytes.length; i += 1) {
+    hash ^= bytes[i]!;
+    hash = Math.imul(hash, FNV32_PRIME);
+  }
+  pngBytesHashCache.set(bytes, hash >>> 0);
+  return bytes;
+}
+
+function numberArrayToUint8Array(bytes: number[]): Uint8Array {
+  const cached = pngBytesUint8Cache.get(bytes);
+  if (cached && cached.length === bytes.length) return cached;
+  const out = Uint8Array.from(bytes);
+  pngBytesUint8Cache.set(bytes, out);
+  return out;
+}
+
+export function getPngBytesHash(pngBytes: PngBytes): number {
+  const cached = pngBytesHashCache.get(pngBytes);
+  if (cached != null) return cached;
+  let hash = FNV32_OFFSET;
+  for (let i = 0; i < pngBytes.length; i += 1) {
+    hash ^= pngBytes[i] ?? 0;
+    hash = Math.imul(hash, FNV32_PRIME);
+  }
+  const normalized = hash >>> 0;
+  pngBytesHashCache.set(pngBytes, normalized);
+  return normalized;
 }
 
 function closeImageBitmapSafe(bitmap: ImageBitmap | null | undefined): void {
@@ -123,17 +168,25 @@ function closeImageBitmapSafe(bitmap: ImageBitmap | null | undefined): void {
   }
 }
 
-async function blobToNumberArray(blob: Blob): Promise<number[]> {
+async function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
   if (typeof blob.arrayBuffer === "function") {
-    return arrayBufferToNumberArray(await blob.arrayBuffer());
+    return await blob.arrayBuffer();
   }
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      resolve(arrayBufferToNumberArray(reader.result as ArrayBuffer));
+      resolve(reader.result as ArrayBuffer);
     };
     reader.readAsArrayBuffer(blob);
   });
+}
+
+async function blobToNumberArray(blob: Blob): Promise<number[]> {
+  return arrayBufferToNumberArray(await blobToArrayBuffer(blob));
+}
+
+async function blobToUint8Array(blob: Blob): Promise<Uint8Array> {
+  return arrayBufferToUint8Array(await blobToArrayBuffer(blob));
 }
 
 export function canvasToPngBytes(canvas: HTMLCanvasElement, label = "canvas"): Promise<number[]> {
@@ -199,9 +252,78 @@ export function canvasToPngBytes(canvas: HTMLCanvasElement, label = "canvas"): P
   });
 }
 
-export async function pngBytesToImageBitmap(pngBytes: number[]): Promise<ImageBitmap | null> {
+export function canvasToPngUint8Bytes(
+  canvas: HTMLCanvasElement,
+  label = "canvas"
+): Promise<Uint8Array> {
+  // Serializing PNG encodes reduces toBlob contention and crop/encode jitter on device WebViews.
+  const perfEnabled = isPerfLoggingEnabled();
+  const callStartMs = perfEnabled ? perfNowMs() : 0;
+  let pendingAtEnqueue = 0;
+  if (perfEnabled) {
+    pngEncodePendingCount += 1;
+    pngEncodeMaxPending = Math.max(pngEncodeMaxPending, pngEncodePendingCount);
+    pendingAtEnqueue = pngEncodePendingCount;
+  }
+  return enqueueSerializedPngEncode(async () => {
+    const taskStartMs = perfEnabled ? perfNowMs() : 0;
+    const pendingAtStart = perfEnabled ? pngEncodePendingCount : 0;
+    try {
+      const blobStartMs = perfEnabled ? perfNowMs() : 0;
+      const blob = await canvasToBlobPng(canvas);
+      const toBlobMs = perfEnabled ? perfNowMs() - blobStartMs : 0;
+      if (!blob) {
+        if (perfEnabled) {
+          const endMs = perfNowMs();
+          recordPngEncodePerf({
+            label,
+            width: canvas.width,
+            height: canvas.height,
+            qwaitMs: taskStartMs - callStartMs,
+            toBlobMs,
+            readMs: 0,
+            encodeMs: endMs - taskStartMs,
+            totalMs: endMs - callStartMs,
+            bytes: 0,
+            pendingAtEnqueue,
+            pendingAtStart,
+          });
+        }
+        return EMPTY_PNG_UINT8;
+      }
+      const readStartMs = perfEnabled ? perfNowMs() : 0;
+      const bytes = await blobToUint8Array(blob);
+      if (perfEnabled) {
+        const endMs = perfNowMs();
+        recordPngEncodePerf({
+          label,
+          width: canvas.width,
+          height: canvas.height,
+          qwaitMs: taskStartMs - callStartMs,
+          toBlobMs,
+          readMs: endMs - readStartMs,
+          encodeMs: endMs - taskStartMs,
+          totalMs: endMs - callStartMs,
+          bytes: bytes.length,
+          pendingAtEnqueue,
+          pendingAtStart,
+        });
+      }
+      return bytes;
+    } finally {
+      if (perfEnabled) {
+        pngEncodePendingCount = Math.max(0, pngEncodePendingCount - 1);
+      }
+    }
+  });
+}
+
+export async function pngBytesToImageBitmap(pngBytes: PngBytes): Promise<ImageBitmap | null> {
   if (!pngBytes || pngBytes.length === 0) return null;
-  const blob = new Blob([new Uint8Array(pngBytes)], { type: "image/png" });
+  const blob = new Blob(
+    [pngBytes instanceof Uint8Array ? pngBytes : numberArrayToUint8Array(pngBytes)],
+    { type: "image/png" }
+  );
   return await createImageBitmap(blob);
 }
 
