@@ -2,7 +2,7 @@
 
 Klondike Solitaire for **Even Realities G2** smart glasses: play with scroll/tap/double-tap controls, manage piles from a HUD-first interface, and use optional Move Assist when you want cleaner destination navigation.
 
-This repo does not currently include a `LICENSE` file.
+This project is licensed under the MIT License — see [LICENSE](LICENSE).
 
 ## Screenshots
 
@@ -115,4 +115,4 @@ Full behavior, controls, and app-specific rule notes are on the in-app help page
 
 - **Even Hub SDK** — [@evenrealities/even_hub_sdk](https://www.npmjs.com/package/@evenrealities/even_hub_sdk) for G2 container updates, event input, and bridge integration.
 - **Klondike Solitaire rules** — The app follows standard Klondike rules with documented G2-specific control and menu adaptations (see [index.html](index.html)).
-- **License** — No `LICENSE` file is currently checked into this repo. Add one before distributing or reusing the project outside private development.
+- **License** — MIT License. See [LICENSE](LICENSE).
