@@ -10,6 +10,35 @@ import {
 } from "../../src/game/moves";
 import { isLegalMove, getLegalDests } from "../../src/game/validation";
 import { resetIdCounter } from "../../src/game/cards";
+import type { GameState, Card } from "../../src/game/types";
+
+function card(id: string, rank: Card["rank"], suit: Card["suit"], faceUp = true): Card {
+  return { id, rank, suit, faceUp };
+}
+
+function customFoundationBlockingState(): GameState {
+  return {
+    stock: [],
+    waste: [],
+    foundations: [
+      { cards: [card("f4c", 4, "C"), card("f5c", 5, "C")] },
+      { cards: [] },
+      { cards: [] },
+      { cards: [] },
+    ],
+    tableau: [
+      { hidden: [], visible: [card("t6c", 6, "C"), card("t5d", 5, "D")] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+    ],
+    moves: 0,
+    won: false,
+  };
+}
 
 describe("moves", () => {
   beforeEach(() => resetIdCounter());
@@ -171,5 +200,21 @@ describe("moves", () => {
     expect(next.tableau[pileIndex].visible.length).toBe(1);
     expect(next.tableau[pileIndex].hidden.length).toBe(pile.hidden.length - 1);
     expect(next.tableau[pileIndex].visible[0]).toEqual(expect.objectContaining({ faceUp: true }));
+  });
+
+  it("applyMove rejects moving a tableau stack to foundation when only the lead card is valid", () => {
+    const state = customFoundationBlockingState();
+
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 2 }, { area: "foundation", index: 0 })).toBe(false);
+
+    const next = applyMove(
+      state,
+      { area: "tableau", pileIndex: 0, count: 2 },
+      { area: "foundation", index: 0 }
+    );
+
+    expect(next).toBe(state);
+    expect(next.foundations[0].cards.map((c) => c.id)).toEqual(["f4c", "f5c"]);
+    expect(next.tableau[0].visible.map((c) => c.id)).toEqual(["t6c", "t5d"]);
   });
 });

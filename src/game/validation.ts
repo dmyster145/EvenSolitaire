@@ -14,6 +14,8 @@ export function canMoveToFoundation(
   state: GameState,
   source: Source
 ): Dest[] {
+  // Foundations only accept single-card moves. Tableau stacks can move only to tableau.
+  if (source.area === "tableau" && source.count !== 1) return [];
   const card = getSourceCard(state, source);
   if (!card) return [];
   const dests: Dest[] = [];

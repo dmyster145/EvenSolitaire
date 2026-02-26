@@ -1829,7 +1829,9 @@ export async function flushDisplayUpdate(
     !lastSent.menuOpen &&
     prevFocusRegion != null &&
     nextFocusRegion != null &&
-    prevFocusRegion !== nextFocusRegion;
+    prevFocusRegion !== nextFocusRegion &&
+    prevFocusRegion !== "top" &&
+    nextFocusRegion !== "top";
   const renderFocusIdxOverride = interruptCrossContainerFocusSuppression ? -1 : undefined;
   const extraHighPriorityVisualTransition = interruptCrossContainerFocusSuppression;
   const interruptFocusHintSuffix = interruptCrossContainerFocusSuppression ? "+intr-focus-suppress" : "";

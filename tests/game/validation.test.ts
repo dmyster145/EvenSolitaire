@@ -2,6 +2,35 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { deal } from "../../src/game/deal";
 import { getLegalDests, isLegalMove } from "../../src/game/validation";
 import { resetIdCounter } from "../../src/game/cards";
+import type { GameState, Card } from "../../src/game/types";
+
+function card(id: string, rank: Card["rank"], suit: Card["suit"], faceUp = true): Card {
+  return { id, rank, suit, faceUp };
+}
+
+function customFoundationBlockingState(): GameState {
+  return {
+    stock: [],
+    waste: [],
+    foundations: [
+      { cards: [card("f4c", 4, "C"), card("f5c", 5, "C")] },
+      { cards: [] },
+      { cards: [] },
+      { cards: [] },
+    ],
+    tableau: [
+      { hidden: [], visible: [card("t6c", 6, "C"), card("t5d", 5, "D")] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+      { hidden: [], visible: [] },
+    ],
+    moves: 0,
+    won: false,
+  };
+}
 
 describe("validation", () => {
   beforeEach(() => resetIdCounter());
@@ -67,5 +96,14 @@ describe("validation", () => {
     for (const dest of dests) {
       expect(isLegalMove(withWaste, { area: "waste" }, dest)).toBe(true);
     }
+  });
+
+  it("does not allow moving a multi-card tableau stack to a foundation", () => {
+    const state = customFoundationBlockingState();
+
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 2 }, { area: "foundation", index: 0 })).toBe(false);
+
+    const stackDests = getLegalDests(state, { area: "tableau", pileIndex: 0, count: 2 });
+    expect(stackDests.some((d) => d.area === "foundation" && d.index === 0)).toBe(false);
   });
 });
