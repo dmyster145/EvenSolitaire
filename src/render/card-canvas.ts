@@ -6,6 +6,7 @@
 import type { Card } from "../game/types";
 import type { Suit } from "../game/types";
 import { FG_BLACK, FG_CARD_LIGHT, FG_EMPTY_SLOT, NORMAL_BORDER_WIDTH, FOCUS_BORDER_WIDTH, CORNER_RADIUS, STRIPE_DASH } from "./palette";
+import { perfLog, perfNowMs } from "../perf/log";
 
 import clubUrl from "./assets/suits/club.png";
 import spadeUrl from "./assets/suits/spade.png";
@@ -34,16 +35,53 @@ const CORNER_SUIT_IMAGE_URLS: Record<Suit, string> = {
 const suitImages: Partial<Record<Suit, HTMLImageElement>> = {};
 const cornerSuitImages: Partial<Record<Suit, HTMLImageElement>> = {};
 let stockBackImage: HTMLImageElement | null = null;
+const suitGlyphBitmapCache = new Map<string, HTMLCanvasElement>();
+const stockPatternBitmapCache = new Map<number, HTMLCanvasElement>();
 
-let cardAssetsReadyCallback: (() => void) | null = null;
+const cardAssetLoadStartedAtMs = perfNowMs();
+let cardAssetsReadyCallbacks: Array<() => void> = [];
+let cardSuitAssetsReadyCallbacks: Array<() => void> = [];
 const TOTAL_ASSETS = 4 + 4 + 1; // suits + corner suits + stock back
 let loadedCount = 0;
+let loadedSuitCount = 0;
+let loadedCornerSuitCount = 0;
+let stockBackLoaded = false;
+let firstSuitAssetLogged = false;
+let suitAssetsReadyLogged = false;
+let cardAssetsReadyLogged = false;
+
+function cardAssetsElapsedMs(): string {
+  return (perfNowMs() - cardAssetLoadStartedAtMs).toFixed(1);
+}
+
+function maybeNotifySuitAssetsReady(): void {
+  if (loadedSuitCount + loadedCornerSuitCount < 8) return;
+  if (!suitAssetsReadyLogged) {
+    suitAssetsReadyLogged = true;
+    perfLog(
+      `[Perf][CardAssets] suits-ready ms=${cardAssetsElapsedMs()} main=${loadedSuitCount}/4 corner=${loadedCornerSuitCount}/4 loaded=${loadedCount}/${TOTAL_ASSETS}`
+    );
+  }
+  if (cardSuitAssetsReadyCallbacks.length > 0) {
+    const callbacks = cardSuitAssetsReadyCallbacks;
+    cardSuitAssetsReadyCallbacks = [];
+    for (const cb of callbacks) cb();
+  }
+}
 
 function maybeNotifyAssetsReady(): void {
-  if (loadedCount >= TOTAL_ASSETS && cardAssetsReadyCallback) {
-    const fn = cardAssetsReadyCallback;
-    cardAssetsReadyCallback = null;
-    fn();
+  if (loadedCount >= TOTAL_ASSETS) {
+    if (!cardAssetsReadyLogged) {
+      cardAssetsReadyLogged = true;
+      perfLog(
+        `[Perf][CardAssets] all-ready ms=${cardAssetsElapsedMs()} main=${loadedSuitCount}/4 corner=${loadedCornerSuitCount}/4 stock=${stockBackLoaded ? "y" : "n"} loaded=${loadedCount}/${TOTAL_ASSETS}`
+      );
+    }
+    if (cardAssetsReadyCallbacks.length > 0) {
+      const callbacks = cardAssetsReadyCallbacks;
+      cardAssetsReadyCallbacks = [];
+      for (const cb of callbacks) cb();
+    }
   }
 }
 
@@ -53,7 +91,28 @@ export function whenCardAssetsReady(cb: () => void): void {
     cb();
     return;
   }
-  cardAssetsReadyCallback = cb;
+  cardAssetsReadyCallbacks.push(cb);
+}
+
+/** Register a one-shot callback to run when all suit glyph assets (main+corner) have loaded. */
+export function whenCardSuitAssetsReady(cb: () => void): void {
+  if (loadedSuitCount + loadedCornerSuitCount >= 8) {
+    cb();
+    return;
+  }
+  cardSuitAssetsReadyCallbacks.push(cb);
+}
+
+function logAssetLoaded(kind: string, name: string): void {
+  perfLog(
+    `[Perf][CardAssets] load kind=${kind} name=${name} ms=${cardAssetsElapsedMs()} loaded=${loadedCount}/${TOTAL_ASSETS}`
+  );
+}
+
+function logAssetError(kind: string, name: string): void {
+  perfLog(
+    `[Perf][CardAssets] error kind=${kind} name=${name} ms=${cardAssetsElapsedMs()} loaded=${loadedCount}/${TOTAL_ASSETS}`
+  );
 }
 
 function loadSuitImages(): void {
@@ -62,9 +121,20 @@ function loadSuitImages(): void {
     const img = new Image();
     img.onload = () => {
       suitImages[suit] = img;
+      loadedSuitCount += 1;
       loadedCount += 1;
+      if (!firstSuitAssetLogged) {
+        firstSuitAssetLogged = true;
+        perfLog(`[Perf][CardAssets] first-suit ms=${cardAssetsElapsedMs()}`);
+      }
+      logAssetLoaded("suit-main", suit);
+      if (loadedSuitCount === 4) {
+        perfLog(`[Perf][CardAssets] main-suits-ready ms=${cardAssetsElapsedMs()}`);
+      }
+      maybeNotifySuitAssetsReady();
       maybeNotifyAssetsReady();
     };
+    img.onerror = () => logAssetError("suit-main", suit);
     img.src = SUIT_IMAGE_URLS[suit];
   }
 }
@@ -76,9 +146,20 @@ function loadCornerSuitImages(): void {
     const img = new Image();
     img.onload = () => {
       cornerSuitImages[suit] = img;
+      loadedCornerSuitCount += 1;
       loadedCount += 1;
+      if (!firstSuitAssetLogged) {
+        firstSuitAssetLogged = true;
+        perfLog(`[Perf][CardAssets] first-suit ms=${cardAssetsElapsedMs()}`);
+      }
+      logAssetLoaded("suit-corner", suit);
+      if (loadedCornerSuitCount === 4) {
+        perfLog(`[Perf][CardAssets] corner-suits-ready ms=${cardAssetsElapsedMs()}`);
+      }
+      maybeNotifySuitAssetsReady();
       maybeNotifyAssetsReady();
     };
+    img.onerror = () => logAssetError("suit-corner", suit);
     img.src = CORNER_SUIT_IMAGE_URLS[suit];
   }
 }
@@ -88,9 +169,13 @@ function loadStockBackImage(): void {
   const img = new Image();
   img.onload = () => {
     stockBackImage = img;
+    stockBackLoaded = true;
+    stockPatternBitmapCache.clear();
     loadedCount += 1;
+    logAssetLoaded("stock-back", "stock-back");
     maybeNotifyAssetsReady();
   };
+  img.onerror = () => logAssetError("stock-back", "stock-back");
   img.src = stockBackUrl;
 }
 loadStockBackImage();
@@ -126,6 +211,80 @@ export interface DrawSlotOptions {
 
 function borderWidth(highlight: Highlight | undefined): number {
   return highlight === "focus" || highlight === "source" ? FOCUS_BORDER_WIDTH : NORMAL_BORDER_WIDTH;
+}
+
+function applyBinaryAlphaThreshold(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const id = ctx.getImageData(0, 0, w, h);
+  const data = id.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const r0 = data[i]!;
+    const g = data[i + 1]!;
+    const b = data[i + 2]!;
+    const a = data[i + 3]!;
+    const lum = (r0 * 0.299 + g * 0.587 + b * 0.114) | 0;
+    if (lum > 200 || a < 128) data[i + 3] = 0;
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+function buildTintedMaskBitmap(
+  d: number,
+  drawMask: (ctx: CanvasRenderingContext2D, d: number) => void
+): HTMLCanvasElement | null {
+  const mask = document.createElement("canvas");
+  mask.width = d;
+  mask.height = d;
+  const mctx = mask.getContext("2d");
+  if (!mctx) return null;
+  drawMask(mctx, d);
+  applyBinaryAlphaThreshold(mctx, d, d);
+
+  const off = document.createElement("canvas");
+  off.width = d;
+  off.height = d;
+  const octx = off.getContext("2d");
+  if (!octx) return null;
+  octx.fillStyle = FG_CARD_LIGHT;
+  octx.fillRect(0, 0, d, d);
+  octx.globalCompositeOperation = "destination-in";
+  octx.drawImage(mask, 0, 0, d, d);
+  return off;
+}
+
+function getSuitGlyphBitmap(
+  suit: Suit,
+  d: number,
+  useCornerAsset: boolean
+): HTMLCanvasElement | null {
+  const img = useCornerAsset ? cornerSuitImages[suit] : suitImages[suit];
+  if (!(img?.complete && img.naturalWidth > 0)) return null;
+  const key = `${useCornerAsset ? "corner" : "main"}:${suit}:${d}`;
+  const cached = suitGlyphBitmapCache.get(key);
+  if (cached) return cached;
+  const built = buildTintedMaskBitmap(d, (mctx) => {
+    mctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, d, d);
+  });
+  if (built) suitGlyphBitmapCache.set(key, built);
+  return built;
+}
+
+function getStockPatternBitmap(d: number): HTMLCanvasElement | null {
+  const img = stockBackImage;
+  if (!(img?.complete && img.naturalWidth > 0)) return null;
+  const cached = stockPatternBitmapCache.get(d);
+  if (cached) return cached;
+  const built = buildTintedMaskBitmap(d, (mctx) => {
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    const scale = Math.min(d / nw, d / nh);
+    const drawW = nw * scale;
+    const drawH = nh * scale;
+    const ox = (d - drawW) / 2;
+    const oy = (d - drawH) / 2;
+    mctx.drawImage(img, 0, 0, nw, nh, ox, oy, drawW, drawH);
+  });
+  if (built) stockPatternBitmapCache.set(d, built);
+  return built;
 }
 
 export function pathRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -173,42 +332,8 @@ export function drawFacedownCard(
     const d = Math.ceil(size);
     const sx = Math.floor(cx - d / 2);
     const sy = Math.floor(cy - d / 2);
-    const mask = document.createElement("canvas");
-    mask.width = d;
-    mask.height = d;
-    const mctx = mask.getContext("2d");
-    if (mctx) {
-      const nw = stockBackImage.naturalWidth;
-      const nh = stockBackImage.naturalHeight;
-      const scale = Math.min(d / nw, d / nh);
-      const drawW = nw * scale;
-      const drawH = nh * scale;
-      const ox = (d - drawW) / 2;
-      const oy = (d - drawH) / 2;
-      mctx.drawImage(stockBackImage, 0, 0, nw, nh, ox, oy, drawW, drawH);
-      const id = mctx.getImageData(0, 0, d, d);
-      const data = id.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const r0 = data[i]!;
-        const g = data[i + 1]!;
-        const b = data[i + 2]!;
-        const a = data[i + 3]!;
-        const lum = (r0 * 0.299 + g * 0.587 + b * 0.114) | 0;
-        if (lum > 200 || a < 128) data[i + 3] = 0;
-      }
-      mctx.putImageData(id, 0, 0);
-      const off = document.createElement("canvas");
-      off.width = d;
-      off.height = d;
-      const octx = off.getContext("2d");
-      if (octx) {
-        octx.fillStyle = FG_CARD_LIGHT;
-        octx.fillRect(0, 0, d, d);
-        octx.globalCompositeOperation = "destination-in";
-        octx.drawImage(mask, 0, 0, d, d);
-        ctx.drawImage(off, sx, sy, d, d);
-      }
-    }
+    const bitmap = getStockPatternBitmap(d);
+    if (bitmap) ctx.drawImage(bitmap, sx, sy, d, d);
   } else if (options?.pattern === "stock") {
     const cx = x + w / 2;
     const cy = y + h / 2;
@@ -242,34 +367,8 @@ function drawSuitGlyph(
     const d = Math.ceil(2 * r);
     const x = cx - r;
     const y = cy - r;
-    const mask = document.createElement("canvas");
-    mask.width = d;
-    mask.height = d;
-    const mctx = mask.getContext("2d");
-    if (!mctx) return;
-    mctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, d, d);
-    const id = mctx.getImageData(0, 0, d, d);
-    const data = id.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const r0 = data[i]!;
-      const g = data[i + 1]!;
-      const b = data[i + 2]!;
-      const a = data[i + 3]!;
-      const lum = (r0 * 0.299 + g * 0.587 + b * 0.114) | 0;
-      if (lum > 200 || a < 128) data[i + 3] = 0;
-    }
-    mctx.putImageData(id, 0, 0);
-    const off = document.createElement("canvas");
-    off.width = d;
-    off.height = d;
-    const octx = off.getContext("2d");
-    if (octx) {
-      octx.fillStyle = FG_CARD_LIGHT;
-      octx.fillRect(0, 0, d, d);
-      octx.globalCompositeOperation = "destination-in";
-      octx.drawImage(mask, 0, 0, d, d);
-      ctx.drawImage(off, x, y, d, d);
-    }
+    const bitmap = getSuitGlyphBitmap(suit, d, !!options?.useCornerAsset);
+    if (bitmap) ctx.drawImage(bitmap, x, y, d, d);
     return;
   }
   ctx.beginPath();

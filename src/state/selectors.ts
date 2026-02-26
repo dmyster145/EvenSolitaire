@@ -53,7 +53,8 @@ export function getPileView(state: AppState): {
     stockCount: g.stock.length,
     wasteTop: g.waste.length > 0 ? g.waste[g.waste.length - 1]! : null,
     foundations: g.foundations.map((f) => (f.cards.length > 0 ? f.cards[f.cards.length - 1]! : null)),
-    tableau: g.tableau.map((p) => ({ hidden: p.hidden.length, visible: [...p.visible] })),
+    // Expose pile views as read-only snapshots of references; callers clone only when they need to mutate.
+    tableau: g.tableau.map((p) => ({ hidden: p.hidden.length, visible: p.visible })),
   };
 }
 

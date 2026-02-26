@@ -5,6 +5,7 @@ import { deal, wonGameState } from "../game/deal";
 import { drawFromStock, recycleWasteToStock, recycleWasteToStockPutFirstAtEnd, recycleWasteToStockMenuCardFirst, applyMove, checkWin } from "../game/klondike-engine";
 import { getLegalDests, isLegalMove } from "../game/validation";
 import type { Source } from "../game/validation";
+import type { Dest } from "../game/validation";
 import { focusIndexToTarget, focusTargetToIndex, focusTargetToDest } from "./ui-mode";
 import { pushUndo, popUndo, clearUndo, canUndo } from "../features/undo";
 
@@ -32,6 +33,56 @@ function isFocusIndexBlank(state: AppState, index: number): boolean {
   return false;
 }
 
+function isFoundationFocusIndex(index: number): boolean {
+  return index >= FOCUS_INDEX_FIRST_FOUNDATION && index < FOCUS_INDEX_FIRST_TABLEAU;
+}
+
+type LegalDestCacheEntry = {
+  dests: Dest[];
+  focusIndexes: Set<number>;
+};
+
+// Cache legal destinations across focus navigation while the immutable game snapshot and
+// selection source/count remain unchanged. This removes repeated move-validation work in
+// select_destination swipes without changing reducer behavior.
+const legalDestCacheByGame = new WeakMap<AppState["game"], Map<string, LegalDestCacheEntry>>();
+
+function legalDestCacheKey(source: Source): string {
+  return source.area === "waste" ? "w" : `t:${source.pileIndex}:${source.count}`;
+}
+
+function getCachedLegalDestEntry(game: AppState["game"], source: Source): LegalDestCacheEntry {
+  let bySource = legalDestCacheByGame.get(game);
+  if (!bySource) {
+    bySource = new Map<string, LegalDestCacheEntry>();
+    legalDestCacheByGame.set(game, bySource);
+  }
+  const key = legalDestCacheKey(source);
+  const cached = bySource.get(key);
+  if (cached) return cached;
+
+  const dests = getLegalDests(game, source);
+  const focusIndexes = new Set<number>();
+  for (const dest of dests) {
+    if (dest.area === "foundation") {
+      focusIndexes.add(FOCUS_INDEX_FIRST_FOUNDATION + dest.index);
+    } else {
+      focusIndexes.add(FOCUS_INDEX_FIRST_TABLEAU + dest.index);
+    }
+  }
+  const entry = { dests, focusIndexes };
+  bySource.set(key, entry);
+  return entry;
+}
+
+function getLegalDestFocusIndexSet(state: AppState): Set<number> | null {
+  const src = state.ui.selection.source;
+  if (!src) return null;
+  const source = sourceFromTarget(state, src);
+  if (!source) return null;
+  return getCachedLegalDestEntry(state.game, source).focusIndexes;
+}
+
 /** True when focus index is a legal drop target for the current selection (select_destination). */
 function isFocusIndexLegalDest(state: AppState, focusIndex: number): boolean {
   const src = state.ui.selection.source;
@@ -41,8 +92,11 @@ function isFocusIndexLegalDest(state: AppState, focusIndex: number): boolean {
   const target = focusIndexToTarget(focusIndex);
   const dest = focusTargetToDest(target);
   if (!dest) return false;
-  const legal = getLegalDests(state.game, source);
-  return legal.some((d) => d.area === dest.area && d.index === dest.index);
+  const destFocusIndex =
+    dest.area === "foundation"
+      ? FOCUS_INDEX_FIRST_FOUNDATION + dest.index
+      : FOCUS_INDEX_FIRST_TABLEAU + dest.index;
+  return getCachedLegalDestEntry(state.game, source).focusIndexes.has(destFocusIndex);
 }
 
 /** Next focus index in direction. In browse mode skip blank slots; in select_destination skip waste (and, if moveAssist, illegal stacks). */
@@ -52,16 +106,32 @@ function nextFocusIndex(state: AppState, direction: "next" | "prev"): number {
   if (state.ui.mode === "browse") {
     for (let i = 1; i <= FOCUS_COUNT; i++) {
       const next = (idx + step * i + FOCUS_COUNT) % FOCUS_COUNT;
+      if (isFoundationFocusIndex(next)) continue;
       if (!isFocusIndexBlank(state, next)) return next;
     }
     return idx;
   }
   if (state.ui.mode === "select_destination") {
+    const sourceFocusIndex = state.ui.selection.source
+      ? focusTargetToIndex(state.ui.selection.source)
+      : -1;
+    const legalDestFocusIndexes = getLegalDestFocusIndexSet(state);
+    if (idx === sourceFocusIndex && legalDestFocusIndexes && legalDestFocusIndexes.size > 0) {
+      for (let f = FOCUS_INDEX_FIRST_FOUNDATION; f < FOCUS_INDEX_FIRST_TABLEAU; f += 1) {
+        if (legalDestFocusIndexes.has(f)) return f;
+      }
+    }
     const skipIllegal = state.ui.moveAssist;
     for (let i = 1; i <= FOCUS_COUNT; i++) {
       const next = (idx + step * i + FOCUS_COUNT) % FOCUS_COUNT;
       if (next === FOCUS_INDEX_STOCK || next === FOCUS_INDEX_WASTE) continue;
-      if (skipIllegal && !isFocusIndexLegalDest(state, next)) continue;
+      if (skipIllegal) {
+        if (legalDestFocusIndexes) {
+          if (!legalDestFocusIndexes.has(next)) continue;
+        } else if (!isFocusIndexLegalDest(state, next)) {
+          continue;
+        }
+      }
       return next;
     }
     return idx;
@@ -141,7 +211,7 @@ export function rootReducer(
       if (state.ui.mode !== "browse" || state.game.won) return state;
       const source = sourceFromTarget(state, action.target);
       if (!source) return state;
-      const dests = getLegalDests(state.game, source);
+      const dests = getCachedLegalDestEntry(state.game, source).dests;
       return {
         ...state,
         ui: {
