@@ -13,6 +13,7 @@ import { tryConsumeTap, isScrollSuppressed } from "./gestures";
 import type { Action } from "../state/actions";
 import type { AppState } from "../state/types";
 import { focusTargetToDest } from "../state/ui-mode";
+import { MENU_OPTIONS } from "../state/constants";
 
 export function mapEvenHubEvent(event: EvenHubEvent, state: AppState): Action | null {
   if (!event) return null;
@@ -110,7 +111,12 @@ function tapAction(state: AppState): Action {
     // if (state.ui.winAnimation?.phase === "playing") return { type: "WIN_ANIMATION_SKIP" };
     return { type: "NEW_GAME" };
   }
-  if (state.ui.menuOpen) return { type: "MENU_SELECT" };
+  if (state.ui.menuOpen) {
+    if (state.ui.pendingResetConfirm) return { type: "MENU_SELECT" };
+    const opt = MENU_OPTIONS[state.ui.menuSelectedIndex];
+    if (opt === "Exit") return { type: "EXIT_APP" };
+    return { type: "MENU_SELECT" };
+  }
   if (state.ui.mode === "select_destination") {
     const dest = focusTargetToDest(state.ui.focus);
     if (dest) return { type: "DEST_SELECT", dest };

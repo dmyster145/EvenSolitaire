@@ -23,6 +23,7 @@ import {
   IMAGE_TILE_BOTTOM_LEFT,
   IMAGE_TILE_BOTTOM_RIGHT,
   SWAP_MODE_EVENT_CAPTURE,
+  INFO_TEXT_CONTAINER,
   VIRTUAL_IMAGE_TOP,
   VIRTUAL_IMAGE_TABLEAU,
   VIRTUAL_IMAGE_WIN_OVERLAY,
@@ -55,7 +56,7 @@ import {
 } from "./png-utils";
 import type { AppState } from "../state/types";
 import type { EvenHubBridge } from "../evenhub/bridge";
-import { getPileView, getMenuLines, getFloatingCards } from "../state/selectors";
+import { getPileView, getMenuLines, getFloatingCards, getInfoPanelText } from "../state/selectors";
 import { focusTargetToIndex } from "../state/ui-mode";
 import { perfLog, perfLogLazy, perfNowMs } from "../perf/log";
 
@@ -135,10 +136,10 @@ export function composeDisplayModePage(): RebuildPageContainer {
   });
 }
 
-/** Input mode: 3 image tiles + 1 text event capture. Enables scroll/tap input. */
+/** Input mode: 3 image tiles + 1 info panel text (with event capture). */
 export function composeInputModePage(): RebuildPageContainer {
   assertG2ContainerBudget(3, 1);
-  const textContainer = createSwapModeEventCaptureContainer();
+  const textContainer = createInfoPanelTextContainer();
   const [tile1, tile2, tile3] = USE_FULL_BOARD_3_TILE_LAYOUT
     ? [IMAGE_TILE_TOP, IMAGE_TILE_BOTTOM_LEFT, IMAGE_TILE_BOTTOM_RIGHT]
     : [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL];
@@ -149,10 +150,10 @@ export function composeInputModePage(): RebuildPageContainer {
   });
 }
 
-/** Startup page for dynamic swap mode: starts in input mode to receive initial events. */
+/** Startup page: 3 image tiles + info panel text (with event capture). */
 export function composeSwapModeStartupPage(): CreateStartUpPageContainer {
   assertG2ContainerBudget(3, 1);
-  const textContainer = createSwapModeEventCaptureContainer();
+  const textContainer = createInfoPanelTextContainer();
   const [tile1, tile2, tile3] = USE_FULL_BOARD_3_TILE_LAYOUT
     ? [IMAGE_TILE_TOP, IMAGE_TILE_BOTTOM_LEFT, IMAGE_TILE_BOTTOM_RIGHT]
     : [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL];
@@ -262,22 +263,24 @@ function createEventCaptureTextContainer(): TextContainerProperty {
   });
 }
 
-/** Event capture text container for swap mode (uses id: 4 to avoid collision with tile TL). */
-function createSwapModeEventCaptureContainer(): TextContainerProperty {
+/** Info panel text container: visible on the left, also captures events. */
+function createInfoPanelTextContainer(content = "Even Solitaire"): TextContainerProperty {
   return new TextContainerProperty({
-    xPosition: SWAP_MODE_EVENT_CAPTURE.x,
-    yPosition: SWAP_MODE_EVENT_CAPTURE.y,
-    width: SWAP_MODE_EVENT_CAPTURE.width,
-    height: SWAP_MODE_EVENT_CAPTURE.height,
+    xPosition: INFO_TEXT_CONTAINER.x,
+    yPosition: INFO_TEXT_CONTAINER.y,
+    width: INFO_TEXT_CONTAINER.width,
+    height: INFO_TEXT_CONTAINER.height,
     borderWidth: 0,
     borderColor: 0,
     paddingLength: 0,
-    containerID: SWAP_MODE_EVENT_CAPTURE.id,
-    containerName: SWAP_MODE_EVENT_CAPTURE.name,
-    content: EVENT_CAPTURE_CONTENT,
+    containerID: INFO_TEXT_CONTAINER.id,
+    containerName: INFO_TEXT_CONTAINER.name,
+    content,
     isEventCapture: 1,
   });
 }
+export const CONTAINER_ID_INFO = INFO_TEXT_CONTAINER.id;
+export const CONTAINER_NAME_INFO = INFO_TEXT_CONTAINER.name;
 
 function createScreenTextContainer(content = SCREEN_PLACEHOLDER_CONTENT): TextContainerProperty {
   return new TextContainerProperty({
@@ -442,15 +445,18 @@ function topRowViewFromState(state: AppState, boardCtx: BoardViewContext = build
     blinkVisible,
     wasteWithoutTop,
     foundationWithoutTop,
-    menuOverlay:
-      menuLines.length > 0
-        ? {
-            menuOpen: state.ui.menuOpen,
-            lines: menuLines,
-            selectedIndex: state.ui.menuSelectedIndex,
-            resetConfirm: state.ui.pendingResetConfirm,
-          }
-        : undefined,
+    // Menu overlay is disabled in the current G2 3-tile layout.
+    // Keep the payload shape here (commented) so it can be restored later if needed.
+    // menuOverlay:
+    //   menuLines.length > 0
+    //     ? {
+    //         menuOpen: state.ui.menuOpen,
+    //         lines: menuLines,
+    //         selectedIndex: state.ui.menuSelectedIndex,
+    //         resetConfirm: state.ui.pendingResetConfirm,
+    //       }
+    //     : undefined,
+    menuOverlay: undefined,
     tableauFloatingCards,
     flyingCard:
       flyingInTop && wa?.flyingCard
@@ -499,15 +505,18 @@ function tableauViewFromState(
     blinkVisible,
     selectionCount:
       sourceTableauIdx !== null && hasFloating ? count : undefined,
-    menuOverlay:
-      state.ui.menuOpen && menuLines.length > 0
-        ? {
-            menuOpen: true,
-            lines: menuLines,
-            selectedIndex: state.ui.menuSelectedIndex,
-            resetConfirm: state.ui.pendingResetConfirm,
-          }
-        : undefined,
+    // Menu overlay is disabled in the current G2 3-tile layout.
+    // Keep the payload shape here (commented) so it can be restored later if needed.
+    // menuOverlay:
+    //   state.ui.menuOpen && menuLines.length > 0
+    //     ? {
+    //         menuOpen: true,
+    //         lines: menuLines,
+    //         selectedIndex: state.ui.menuSelectedIndex,
+    //         resetConfirm: state.ui.pendingResetConfirm,
+    //       }
+    //     : undefined,
+    menuOverlay: undefined,
     flyingCard:
       flyingInTableau && wa?.flyingCard
         ? { card: wa.flyingCard, centerX: wa.flyX, centerY: wa.flyY }
@@ -1657,6 +1666,7 @@ export async function sendInitialImages(hub: EvenHubBridge, state: AppState): Pr
     if (USE_FULL_BOARD_3_TILE_LAYOUT) {
       const images = await renderFullBoard3Tiles(state);
       await sendFullBoard3Tiles(hub, images);
+      await hub.updateText(CONTAINER_ID_INFO, CONTAINER_NAME_INFO, getInfoPanelText(state));
     } else {
       const images = await renderSwapModeTiles(state);
       await sendInputModeTiles(hub, {
@@ -1712,6 +1722,8 @@ export async function flushDisplayUpdate(
     last3TileTopPng?: Uint8Array;
     last3TileBottomLeftPng?: Uint8Array;
     last3TileBottomRightPng?: Uint8Array;
+    /** Last info panel text sent to the device. */
+    infoPanelText?: string;
   },
   options?: FlushDisplayUpdateOptions
 ): Promise<{ lastSent: typeof lastSent; didClearOverlay?: boolean }> {
@@ -2100,9 +2112,12 @@ export async function flushDisplayUpdate(
     lastSent.uiMode = uiMode;
     lastSent.topPileHash = topPileHash;
     lastSent.tableauPileHash = tableauPileHash;
-    // lastSent.winAnimationPhase = winAnimationPhase;
-    // lastSent.flyX = flyX;
-    // lastSent.flyY = flyY;
+
+    const nextInfoText = getInfoPanelText(state);
+    if (nextInfoText !== lastSent.infoPanelText) {
+      await hub.updateText(CONTAINER_ID_INFO, CONTAINER_NAME_INFO, nextInfoText);
+      lastSent.infoPanelText = nextInfoText;
+    }
 
     perfLogLazy(
       () =>

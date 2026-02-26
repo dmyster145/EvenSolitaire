@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { deal } from "../../src/game/deal";
-import { drawFromStock, recycleWasteToStock, recycleWasteToStockPutFirstAtEnd, recycleWasteToStockMenuCardFirst, applyMove } from "../../src/game/moves";
+import {
+  drawFromStock,
+  drawThreeFromStock,
+  recycleWasteToStock,
+  recycleWasteToStockPutFirstAtEnd,
+  recycleWasteToStockMenuCardFirst,
+  applyMove,
+} from "../../src/game/moves";
 import { isLegalMove, getLegalDests } from "../../src/game/validation";
 import { resetIdCounter } from "../../src/game/cards";
 
@@ -14,6 +21,27 @@ describe("moves", () => {
     expect(next.stock.length).toBe(stockBefore - 1);
     expect(next.waste.length).toBe(1);
     expect(next.waste[0].faceUp).toBe(true);
+  });
+
+  it("drawThree moves up to three cards from stock to waste as one action", () => {
+    const state = deal(10);
+    const firstThree = state.stock.slice(0, 3);
+    const next = drawThreeFromStock(state);
+    expect(next.stock.length).toBe(state.stock.length - 3);
+    expect(next.waste.length).toBe(3);
+    expect(next.moves).toBe(state.moves + 1);
+    expect(next.waste.every((c) => c.faceUp)).toBe(true);
+    expect(next.waste.map((c) => c.id)).toEqual(firstThree.map((c) => c.id));
+    expect(next.waste[next.waste.length - 1]?.id).toBe(firstThree[2]?.id);
+  });
+
+  it("drawThree draws remaining cards when stock has fewer than three", () => {
+    const state = deal(10);
+    const trimmed = { ...state, stock: state.stock.slice(0, 2) };
+    const next = drawThreeFromStock(trimmed);
+    expect(next.stock.length).toBe(0);
+    expect(next.waste.length).toBe(2);
+    expect(next.moves).toBe(trimmed.moves + 1);
   });
 
   it("draw is no-op when stock empty", () => {

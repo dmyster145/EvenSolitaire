@@ -1,5 +1,5 @@
 /**
- * Apply move, draw-1, recycle waste→stock, flip tableau top. Immutable where possible.
+ * Apply move, draw helpers, recycle waste→stock, flip tableau top. Immutable where possible.
  */
 import type { GameState, Card, TableauPile } from "./types";
 import type { Source, Dest } from "./validation";
@@ -17,6 +17,19 @@ export function drawFromStock(state: GameState): GameState {
   };
 }
 
+/** Draw up to three cards from stock to waste as one action (Klondike draw-3). */
+export function drawThreeFromStock(state: GameState): GameState {
+  if (state.stock.length === 0) return state;
+  const drawCount = Math.min(3, state.stock.length);
+  const drawn = state.stock.slice(0, drawCount).map((c) => ({ ...c, faceUp: true }));
+  return {
+    ...state,
+    stock: state.stock.slice(drawCount),
+    waste: [...state.waste, ...drawn],
+    moves: state.moves + 1,
+  };
+}
+
 export function recycleWasteToStock(state: GameState): GameState {
   if (state.waste.length === 0 || state.stock.length > 0) return state;
   const stock = state.waste.map((c) => ({ ...c, faceUp: false }));
@@ -28,7 +41,7 @@ export function recycleWasteToStock(state: GameState): GameState {
   };
 }
 
-/** Recycle waste to stock but put the first card of waste (the "Draw Card" menu draw) at the end so draw order persists. */
+/** Recycle waste to stock but put the first card of waste (the menu draw) at the end so draw order persists. */
 export function recycleWasteToStockPutFirstAtEnd(state: GameState): GameState {
   if (state.waste.length <= 1 || state.stock.length > 0) return state;
   const [first, ...rest] = state.waste;

@@ -8,7 +8,7 @@ export const FOCUS_INDEX_WASTE = 1;
 export const FOCUS_INDEX_FIRST_FOUNDATION = 2;
 export const FOCUS_INDEX_FIRST_TABLEAU = 6;
 
-export const MENU_OPTIONS = ["Draw Card", "Move Assist", "Reset", "Exit"] as const;
+export const MENU_OPTIONS = ["Move Assist", "Draw Card", "Reset", "Exit"] as const;
 export type MenuOption = (typeof MENU_OPTIONS)[number];
 
 /** Shown when user selects Reset; scroll between these, tap to confirm or cancel. */

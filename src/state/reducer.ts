@@ -2,7 +2,15 @@ import type { AppState } from "./types";
 import { FOCUS_COUNT, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU } from "./constants";
 import { MENU_OPTIONS, CONFIRM_RESET_OPTIONS } from "./constants";
 import { deal, wonGameState } from "../game/deal";
-import { drawFromStock, recycleWasteToStock, recycleWasteToStockPutFirstAtEnd, recycleWasteToStockMenuCardFirst, applyMove, checkWin } from "../game/klondike-engine";
+import {
+  drawFromStock,
+  drawThreeFromStock,
+  recycleWasteToStock,
+  recycleWasteToStockPutFirstAtEnd,
+  recycleWasteToStockMenuCardFirst,
+  applyMove,
+  checkWin,
+} from "../game/klondike-engine";
 import { getLegalDests, isLegalMove } from "../game/validation";
 import type { Source } from "../game/validation";
 import type { Dest } from "../game/validation";
@@ -190,7 +198,7 @@ export function rootReducer(
         didRecycle = true;
       }
       if (game.stock.length > 0) {
-        game = drawFromStock(game);
+        game = drawThreeFromStock(game);
       }
       const nextGame = checkWin(game);
       const message = didRecycle ? "Stock reset" : undefined;
@@ -233,10 +241,12 @@ export function rootReducer(
 
     case "DEST_SELECT_INVALID": {
       if (state.ui.mode !== "select_destination" || !state.ui.selection.source) return state;
+      const source = state.ui.selection.source;
       return {
         ...state,
         ui: {
           ...state.ui,
+          focus: source,
           selectionInvalidBlink: { remaining: 4, visible: true },
         },
       };
@@ -282,6 +292,7 @@ export function rootReducer(
         ...state,
         ui: {
           ...state.ui,
+          focus: src,
           selectionInvalidBlink: { remaining: 4, visible: true },
         },
       };
@@ -315,9 +326,17 @@ export function rootReducer(
     case "CANCEL_SELECTION": {
       const inSelection = state.ui.mode === "select_source" || state.ui.mode === "select_destination";
       if (!inSelection) return state;
+      const source = state.ui.selection.source;
       return {
         ...state,
-        ui: { ...state.ui, mode: "browse", selection: {}, selectionInvalidBlink: undefined, message: undefined },
+        ui: {
+          ...state.ui,
+          mode: "browse",
+          selection: {},
+          selectionInvalidBlink: undefined,
+          message: undefined,
+          focus: source ?? state.ui.focus,
+        },
       };
     }
 
@@ -326,6 +345,9 @@ export function rootReducer(
       if (!prev) return state;
       return { ...state, game: prev };
     }
+
+    case "EXIT_APP":
+      return { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } };
 
     case "OPEN_MENU":
       return { ...state, ui: { ...state.ui, menuOpen: true, pendingResetConfirm: false } };

@@ -162,17 +162,18 @@ export const SWAP_MODE_DISPLAY_TILES = [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE
 export const SWAP_MODE_INPUT_TILES = [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL] as const;
 
 /**
- * Full-board 3-tile layout: entire board visible in 3 tiles (no missing quadrant).
- * - Tile 1 (top): full top half (stock, waste, foundations)
- * - Tile 2 (bottom-left): bottom-left quadrant (tableau left)
- * - Tile 3 (bottom-right): bottom-right quadrant (tableau right)
- * Same container limit (3 images + 1 event capture); 4th container = event capture.
+ * Full-board 3-tile layout with info panel:
+ *   Left 176px: text container (info panel + event capture)
+ *   Right 400px: 3 image tiles (top center, bottom-left, bottom-right)
+ * 4 containers total: 1 text + 3 images = SDK max.
  */
+const INFO_PANEL_W = CANVAS_W - TILE_BOARD_W; // 176
+const BOARD_RIGHT_X = INFO_PANEL_W;
 const FULL_BOARD_BOTTOM_Y = TILE_BOARD_Y + TILE_H;
 export const IMAGE_TILE_TOP = {
   id: 1,
   name: "tile-top",
-  x: Math.floor((CANVAS_W - TILE_W) / 2),
+  x: BOARD_RIGHT_X + Math.floor((TILE_BOARD_W - TILE_W) / 2),
   y: TILE_BOARD_Y,
   width: TILE_W,
   height: TILE_H,
@@ -180,7 +181,7 @@ export const IMAGE_TILE_TOP = {
 export const IMAGE_TILE_BOTTOM_LEFT = {
   id: 2,
   name: "tile-bl",
-  x: TILE_BOARD_X,
+  x: BOARD_RIGHT_X,
   y: FULL_BOARD_BOTTOM_Y,
   width: TILE_W,
   height: TILE_H,
@@ -188,21 +189,24 @@ export const IMAGE_TILE_BOTTOM_LEFT = {
 export const IMAGE_TILE_BOTTOM_RIGHT = {
   id: 3,
   name: "tile-br",
-  x: TILE_BOARD_X + TILE_W,
+  x: BOARD_RIGHT_X + TILE_W,
   y: FULL_BOARD_BOTTOM_Y,
   width: TILE_W,
   height: TILE_H,
 };
 
-/** Event capture text container for swap mode (id: 4 to avoid collision with tile TL which is id: 1). */
-export const SWAP_MODE_EVENT_CAPTURE = {
+/** Info panel + event capture text container (visible on the left, also captures scroll/tap). */
+export const INFO_TEXT_CONTAINER = {
   id: 4,
-  name: "swap-evt",
+  name: "info",
   x: 0,
-  y: 0,
-  width: CANVAS_W,
-  height: CANVAS_H,
+  y: TILE_BOARD_Y,
+  width: INFO_PANEL_W,
+  height: TILE_BOARD_H,
 };
+
+/** @deprecated Alias kept for backward compat; points to INFO_TEXT_CONTAINER. */
+export const SWAP_MODE_EVENT_CAPTURE = INFO_TEXT_CONTAINER;
 
 /** Total board area in display mode (4 tiles). */
 export const SWAP_MODE_BOARD_W = TILE_BOARD_W;
@@ -295,7 +299,7 @@ export const MENU_DIVIDER_PADDING_ABOVE = 8;
 export const MENU_DIVIDER_PADDING_BELOW = 8;
 export const MENU_DIVIDER_Y = MENU_TITLE_CENTER_Y + MENU_TITLE_FONT_SIZE / 2 + 4 + MENU_DIVIDER_PADDING_ABOVE;
 export const MENU_DIVIDER_HEIGHT = 1;
-/** First option center Y. Offset +6 so the second line (Move Assist) sits below the canvas seam with room for ascenders. */
+/** First option center Y. Offset +6 so the second line (Draw Card) sits below the canvas seam with room for ascenders. */
 export const MENU_FIRST_OPTION_CENTER_Y = MENU_DIVIDER_Y + MENU_DIVIDER_HEIGHT + MENU_DIVIDER_PADDING_BELOW + MENU_LINE_HEIGHT / 2 + 6;
 
 /** Full-screen width/height for win animation coordinates. */
@@ -312,20 +316,28 @@ export const TOP_TILE_CROP_W = 288;
 export const TOP_TILE_CROP_X = Math.floor((CANVAS_W - TOP_TILE_CROP_W) / 2);
 
 /**
- * Top row: 4 columns (stock, waste, F0+F2, F1+F3), 2 rows within the crop band.
+ * Top row layout: 2 rows within the crop band.
+ *   Row 0 (stock + waste): 2 items, left-aligned in 2 columns.
+ *   Row 1 (F0–F3): 4 foundations spread across 4 columns.
  * Row step uses TOP_AREA_H/2 = 88 so row 0 centers at y=44, row 1 at y=132.
  * Row 1 cards (y=92..172) cross the tile crop boundary (y=144), appearing in both tiles.
  */
-export const TOP_ROW_COL_COUNT = 4;
 export const TOP_ROW_ROW_COUNT = 2;
-const TOP_ROW_COL_STEP = Math.floor(TOP_TILE_CROP_W / TOP_ROW_COL_COUNT);
 const TOP_ROW_ROW_STEP = Math.floor(TOP_AREA_H / TOP_ROW_ROW_COUNT);
-/** Center (x, y) for each top-row slot in full-screen 576×288. Columns are centered within the crop band. */
+const ROW_COL_COUNT = 4;
+const ROW_COL_STEP = Math.floor(TOP_TILE_CROP_W / ROW_COL_COUNT);
+/** Center (x, y) for each top-row slot in full-screen 576×288.
+ *  Row 0 cols 0–1: stock, waste.  Row 1 cols 0–3: F0–F3.
+ *  Both rows use the same column grid so stock/waste align above F0/F1. */
 export function topRowSlotCenter(slotIndex: number): { x: number; y: number } {
-  const col = slotIndex <= 1 ? slotIndex : slotIndex === 2 || slotIndex === 4 ? 2 : 3;
-  const row = slotIndex <= 3 ? 0 : 1;
-  const x = TOP_TILE_CROP_X + Math.floor(col * TOP_ROW_COL_STEP + TOP_ROW_COL_STEP / 2);
-  const y = Math.floor(row * TOP_ROW_ROW_STEP + TOP_ROW_ROW_STEP / 2);
+  if (slotIndex <= 1) {
+    const x = TOP_TILE_CROP_X + Math.floor(slotIndex * ROW_COL_STEP + ROW_COL_STEP / 2);
+    const y = Math.floor(TOP_ROW_ROW_STEP / 2);
+    return { x, y };
+  }
+  const col = slotIndex - 2;
+  const x = TOP_TILE_CROP_X + Math.floor(col * ROW_COL_STEP + ROW_COL_STEP / 2);
+  const y = Math.floor(TOP_ROW_ROW_STEP + TOP_ROW_ROW_STEP / 2);
   return { x, y };
 }
 

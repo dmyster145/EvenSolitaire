@@ -1,88 +1,775 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EvenSolitaire</title>
-  <style>
-    #perf-console-panel {
-      position: fixed;
-      right: 8px;
-      bottom: 8px;
-      width: min(760px, calc(100vw - 16px));
-      max-height: 42vh;
-      display: none;
-      flex-direction: column;
-      border: 1px solid #3a3a3a;
-      border-radius: 8px;
-      background: rgba(10, 10, 10, 0.92);
-      color: #d8f7d0;
-      font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      z-index: 2147483647;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EvenSolitaire - Klondike Solitaire for Even Realities G2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        /* Text Colors (TC) */
+        --tc-1st: #232323;
+        --tc-2nd: #7B7B7B;
+        --tc-highlight: #FFFFFF;
+        --tc-red: #FF4535;
+        --tc-green: #4BB954;
 
-    #perf-console-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 8px;
-      border-bottom: 1px solid #2a2a2a;
-      background: rgba(24, 24, 24, 0.95);
-    }
+        /* Background Colors (BC) */
+        --bc-1st: #FFFFFF;
+        --bc-2nd: #F6F6F6;
+        --bc-3rd: #EEEEEE;
+        --bc-4th: #E4E4E4;
+        --bc-accent: #FEF991;
+        --bc-highlight: #232323;
 
-    #perf-console-title {
-      font-weight: 600;
-      color: #f0f0f0;
-      margin-right: auto;
-    }
+        /* Semantic aliases */
+        --bg-primary: var(--bc-3rd);
+        --bg-secondary: var(--bc-2nd);
+        --bg-card: var(--bc-1st);
+        --bg-tertiary: var(--bc-4th);
+        --text-primary: var(--tc-1st);
+        --text-secondary: var(--tc-2nd);
+        --accent: var(--bc-accent);
+        --accent-dark: #E5E082;
+        --border: var(--bc-4th);
+      }
 
-    #perf-console-header button {
-      border: 1px solid #4a4a4a;
-      border-radius: 4px;
-      background: #1b1b1b;
-      color: #e6e6e6;
-      padding: 2px 8px;
-      cursor: pointer;
-      font: inherit;
-    }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
-    #perf-console-header button:hover {
-      background: #262626;
-    }
+      html {
+        scroll-behavior: smooth;
+      }
 
-    #perf-console-output {
-      margin: 0;
-      padding: 8px;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      min-height: 90px;
-      max-height: calc(42vh - 42px);
-    }
+      body {
+        font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        line-height: 1.5;
+        min-height: 100vh;
+        font-size: 15px;
+        font-weight: 400;
+        letter-spacing: -0.15px;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
 
-    #perf-console-panel[data-collapsed="true"] #perf-console-output {
-      display: none;
-    }
+      .container {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 12px;
+      }
 
-    #perf-console-panel[data-collapsed="true"] {
-      max-height: none;
-      width: auto;
-    }
-  </style>
-</head>
-<body>
-  <div id="app"></div>
-  <div id="perf-console-panel" data-collapsed="false" aria-live="polite">
-    <div id="perf-console-header">
-      <span id="perf-console-title">Perf Console</span>
-      <button id="perf-console-toggle" type="button">Hide</button>
-      <button id="perf-console-clear" type="button">Clear</button>
-      <button id="perf-console-copy" type="button">Copy All</button>
-      <button id="perf-console-download" type="button">Download</button>
+      /* Header & Logo */
+      .header {
+        text-align: center;
+        padding: 24px 0;
+        margin-bottom: 24px;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .logo-text {
+        font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        color: var(--text-primary);
+      }
+
+      .logo-text .dot {
+        color: var(--text-primary);
+        font-size: 20px;
+        vertical-align: middle;
+        margin: 0 1px;
+      }
+
+      .knight-icon {
+        display: none;
+      }
+
+      .subtitle {
+        color: var(--text-secondary);
+        font-size: 13px;
+        font-weight: 400;
+        letter-spacing: -0.13px;
+        margin-top: 8px;
+      }
+
+      /* Table of Contents */
+      .toc {
+        background: var(--bg-card);
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 24px;
+      }
+
+      .toc h2 {
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+      }
+
+      .toc-list {
+        list-style: none;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 6px;
+      }
+
+      .toc-list a {
+        color: var(--text-primary);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 400;
+        letter-spacing: -0.13px;
+        display: block;
+        padding: 6px 10px;
+        background: var(--accent);
+        border-radius: 6px;
+        transition: background 0.2s, transform 0.2s;
+      }
+
+      .toc-list a:hover {
+        background: var(--accent-dark);
+        transform: translateY(-1px);
+      }
+
+      /* Sections */
+      .section {
+        margin-bottom: 12px;
+      }
+
+      details {
+        background: var(--bg-card);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+
+      details[open] {
+        box-shadow: 0 0 0 2px var(--accent);
+      }
+
+      summary {
+        padding: 16px;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 17px;
+        letter-spacing: -0.17px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        user-select: none;
+        list-style: none;
+        transition: background 0.2s;
+      }
+
+      summary::-webkit-details-marker {
+        display: none;
+      }
+
+      summary::before {
+        content: '▸';
+        font-size: 12px;
+        color: var(--text-primary);
+        background: var(--accent);
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: transform 0.2s;
+      }
+
+      details[open] summary::before {
+        transform: rotate(90deg);
+      }
+
+      summary:hover {
+        background: var(--bg-secondary);
+      }
+
+      .section-content {
+        padding: 0 16px 16px;
+        color: var(--text-secondary);
+      }
+
+      .section-content h3 {
+        color: var(--text-primary);
+        font-size: 15px;
+        font-weight: 500;
+        letter-spacing: -0.15px;
+        margin: 16px 0 8px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section-content h3:first-child {
+        margin-top: 0;
+      }
+
+      .section-content p {
+        margin: 8px 0;
+        font-size: 15px;
+        font-weight: 300;
+        letter-spacing: -0.15px;
+      }
+
+      .section-content ul,
+      .section-content ol {
+        margin: 8px 0 8px 20px;
+        font-size: 15px;
+        font-weight: 300;
+        letter-spacing: -0.15px;
+        padding-left: 8px;
+      }
+
+      .section-content li {
+        margin: 6px 0;
+      }
+
+      /* Code/command styling */
+      code {
+        font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+        background: var(--bg-secondary);
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 13px;
+        color: var(--text-primary);
+      }
+
+      /* Gesture cards */
+      .gesture-grid {
+        display: grid;
+        gap: 6px;
+        margin: 12px 0;
+      }
+
+      .gesture-card {
+        background: var(--bg-secondary);
+        border-radius: 6px;
+        padding: 12px 16px;
+        font-size: 15px;
+        font-weight: 300;
+      }
+
+      .gesture-card strong {
+        color: var(--text-primary);
+        display: block;
+        margin-bottom: 4px;
+        font-weight: 500;
+      }
+
+      /* Time control table (reused for reference tables) */
+      .time-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 6px;
+        margin: 12px 0;
+        font-size: 15px;
+        font-weight: 300;
+      }
+
+      .time-table th,
+      .time-table td {
+        padding: 8px 12px;
+        text-align: left;
+      }
+
+      .time-table th {
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .time-table tr {
+        background: var(--bg-secondary);
+      }
+
+      .time-table td:first-child {
+        font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+        color: var(--text-primary);
+        font-weight: 500;
+        border-radius: 6px 0 0 6px;
+      }
+
+      .time-table td:last-child {
+        border-radius: 0 6px 6px 0;
+      }
+
+      /* Tips */
+      .tip {
+        background: var(--accent);
+        padding: 12px 16px;
+        margin: 12px 0;
+        border-radius: 6px;
+        font-size: 15px;
+        font-weight: 300;
+      }
+
+      .tip strong {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      /* Footer */
+      .footer {
+        text-align: center;
+        padding: 24px 0;
+        margin-top: 24px;
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 400;
+        letter-spacing: -0.11px;
+      }
+
+      .footer a {
+        color: var(--text-primary);
+        text-decoration: underline;
+      }
+
+      /* Hide app container */
+      #app {
+        display: none;
+      }
+
+      /* Preserve existing perf console panel styles and IDs for src/perf/log.ts wiring */
+      #perf-console-panel {
+        position: fixed;
+        right: 8px;
+        bottom: 8px;
+        width: min(760px, calc(100vw - 16px));
+        max-height: 42vh;
+        display: none;
+        flex-direction: column;
+        border: 1px solid #3a3a3a;
+        border-radius: 8px;
+        background: rgba(10, 10, 10, 0.92);
+        color: #d8f7d0;
+        font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        z-index: 2147483647;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      }
+
+      #perf-console-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-bottom: 1px solid #2a2a2a;
+        background: rgba(24, 24, 24, 0.95);
+      }
+
+      #perf-console-title {
+        font-weight: 600;
+        color: #f0f0f0;
+        margin-right: auto;
+      }
+
+      #perf-console-header button {
+        border: 1px solid #4a4a4a;
+        border-radius: 4px;
+        background: #1b1b1b;
+        color: #e6e6e6;
+        padding: 2px 8px;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      #perf-console-header button:hover {
+        background: #262626;
+      }
+
+      #perf-console-output {
+        margin: 0;
+        padding: 8px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        min-height: 90px;
+        max-height: calc(42vh - 42px);
+      }
+
+      #perf-console-panel[data-collapsed="true"] #perf-console-output {
+        display: none;
+      }
+
+      #perf-console-panel[data-collapsed="true"] {
+        max-height: none;
+        width: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div class="container">
+      <header class="header">
+        <div class="logo">
+          <span class="logo-text">EVEN<span class="dot">•</span>SOLITAIRE</span>
+          <svg class="knight-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M19 22H5v-2h14v2M17.16 8.26A3.99 3.99 0 0 0 18 6c0-.23-.03-.46-.06-.69l1.56-.56-.37-1.45-1.67.6a4.007 4.007 0 0 0-2.7-1.86l.2-1.04h-1.5l-.2 1.04c-1.14.18-2.13.78-2.78 1.67l-1.5-.54-.36 1.45 1.33.48C10.08 5.4 10 5.68 10 6c0 .93.32 1.78.85 2.46L4 20h2l4.46-8.91c.75.52 1.65.84 2.62.9l.92 3.56 1.94-.5-.86-3.31a4.01 4.01 0 0 0 2.08-3.48z"/>
+          </svg>
+        </div>
+        <p class="subtitle">Klondike Solitaire for Even Realities G2</p>
+      </header>
+
+      <nav class="toc">
+        <h2>Quick Navigation</h2>
+        <ul class="toc-list">
+          <li><a href="#getting-started">Getting Started</a></li>
+          <li><a href="#board-layout">Board Layout</a></li>
+          <li><a href="#controls">Controls</a></li>
+          <li><a href="#gameplay">Gameplay Flow</a></li>
+          <li><a href="#rules">Rules</a></li>
+          <li><a href="#menu-options">Menu Options</a></li>
+          <li><a href="#status-feedback">Status & Feedback</a></li>
+          <li><a href="#save-resume">Save & Resume</a></li>
+          <li><a href="#debug-console">Debug Console</a></li>
+          <li><a href="#tips">Tips & Notes</a></li>
+        </ul>
+      </nav>
+
+      <section class="section" id="getting-started">
+        <details>
+          <summary>Getting Started</summary>
+          <div class="section-content">
+            <h3>Welcome</h3>
+            <p>EvenSolitaire is Klondike Solitaire built for Even Realities G2 gesture input: scroll, tap, and double-tap.</p>
+
+            <h3>Launch</h3>
+            <p>On launch, the app restores your last saved game when available. If no valid save is found, it deals a new shuffled game.</p>
+            <ul>
+              <li>Restores game state when a save exists</li>
+              <li>Restores your <strong>Move Assist</strong> setting with the save</li>
+              <li>After a win, tap or double-tap starts a new game</li>
+            </ul>
+
+            <h3>What This Covers</h3>
+            <p>This page documents the current user-facing behavior: controls, menus, prompts, save/resume behavior, and the Klondike rules used by this build.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="section" id="board-layout">
+        <details>
+          <summary>Board Layout</summary>
+          <div class="section-content">
+            <h3>Core Piles</h3>
+            <ul>
+              <li><strong>Stock:</strong> Face-down draw pile. Tap to draw up to three cards.</li>
+              <li><strong>Waste:</strong> Face-up draw pile. Only the top card is playable.</li>
+              <li><strong>Foundations (4):</strong> Build each suit from Ace to King.</li>
+              <li><strong>Tableau (7):</strong> Main play columns built downward in alternating colors.</li>
+            </ul>
+
+            <h3>Focus Navigation</h3>
+            <p>The app is gesture-driven, so a focus cursor moves between pile targets:</p>
+            <ul>
+              <li>Browse mode skips empty non-stock piles</li>
+              <li>Browse mode also skips foundations</li>
+              <li>Destination mode moves across tableau and foundation drop targets</li>
+              <li>With Move Assist ON, illegal destinations are skipped</li>
+            </ul>
+
+            <div class="tip">
+              <strong>Note:</strong> Foundations can be focused during placement, even though browse mode skips them.
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section class="section" id="controls">
+        <details>
+          <summary>Controls</summary>
+          <div class="section-content">
+            <p>Use three gestures on the G2 touchpad:</p>
+
+            <div class="gesture-grid">
+              <div class="gesture-card">
+                <strong>Scroll</strong>
+                Move focus between piles, destinations, or menu items.
+              </div>
+
+              <div class="gesture-card">
+                <strong>Tap</strong>
+                Draw from stock, select a source pile, place cards, or confirm a menu option.
+              </div>
+
+              <div class="gesture-card">
+                <strong>Double Tap</strong>
+                Open or close the menu, or cancel an active selection. On win, start a new game.
+              </div>
+            </div>
+
+            <h3>Tap Behavior by Context</h3>
+            <table class="time-table">
+              <thead>
+                <tr>
+                  <th>Focus / State</th>
+                  <th>Tap Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Stock</td><td>Draw up to 3 cards. If stock is empty and waste has cards, recycle the waste and continue.</td></tr>
+                <tr><td>Waste</td><td>Select top waste card as the move source.</td></tr>
+                <tr><td>Tableau</td><td>Select as source, or place a carried card/run in destination mode.</td></tr>
+                <tr><td>Foundation</td><td>Destination during placement (legal moves only).</td></tr>
+                <tr><td>Menu Open</td><td>Select the highlighted menu option.</td></tr>
+                <tr><td>Win State</td><td>Start a new game.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <section class="section" id="gameplay">
+        <details>
+          <summary>Gameplay Flow</summary>
+          <div class="section-content">
+            <h3>Basic Move Flow</h3>
+            <ol>
+              <li><strong>Scroll</strong> to the pile you want to use (stock, waste, or tableau)</li>
+              <li><strong>Tap</strong> to select the source (or draw from stock)</li>
+              <li>When carrying cards, <strong>scroll</strong> to a destination (tableau or foundation)</li>
+              <li><strong>Tap</strong> to place</li>
+            </ol>
+
+            <h3>Selecting Tableau Runs (Multi-card Moves)</h3>
+            <p>In destination mode, tapping the <strong>same tableau column</strong> cycles the carried run size (1, 2, 3, and so on up to the visible count, then back to 1).</p>
+            <p>This is how the app supports moving tableau runs without an extra gesture.</p>
+
+            <h3>Invalid Moves and Canceling</h3>
+            <ul>
+              <li>Illegal placements blink briefly and return focus to the source</li>
+              <li>If a selected source has no legal moves, the HUD may show <code>No legal move from selected pile</code></li>
+              <li><strong>Double-tap</strong> cancels the current selection and returns to browsing</li>
+            </ul>
+
+            <h3>Stock Recycling</h3>
+            <p>When the stock is empty, drawing recycles the waste back into stock. The HUD may show <code>Stock reset</code>.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="section" id="rules">
+        <details>
+          <summary>Rules (Klondike Solitaire)</summary>
+          <div class="section-content">
+            <h3>Official Rules Reference</h3>
+            <p>Baseline reference: Bicycle Cards' standard Klondike Solitaire rules. EvenSolitaire follows that structure, with G2-specific interaction notes below.</p>
+
+            <h3>Objective</h3>
+            <p>Move all cards to the four foundations, building each suit from Ace to King.</p>
+
+            <h3>Initial Deal (Implemented)</h3>
+            <ul>
+              <li>Seven tableau piles are dealt with 1 through 7 cards</li>
+              <li>Only the top card in each tableau pile starts face-up</li>
+              <li>The remaining cards form the stock</li>
+            </ul>
+
+            <h3>Foundation Rules</h3>
+            <ul>
+              <li>Start with an <strong>Ace</strong></li>
+              <li>Build upward in the <strong>same suit</strong> (A to K)</li>
+            </ul>
+
+            <h3>Tableau Rules</h3>
+            <ul>
+              <li>Build downward in rank with <strong>alternating colors</strong></li>
+              <li>Move valid face-up runs between tableau piles</li>
+              <li>Only a <strong>King</strong> (or a run starting with a King) can move to an empty tableau column</li>
+              <li>When the top face-down card is uncovered, it is flipped face-up automatically</li>
+            </ul>
+
+            <h3>App-Specific Clarifications</h3>
+            <ul>
+              <li><strong>Board draw:</strong> Tapping the stock draws <strong>three cards</strong> (or fewer when fewer cards remain)</li>
+              <li><strong>Menu draw assist:</strong> The menu’s <strong>Draw Card</strong> option draws <strong>one card</strong> to help when you are stuck</li>
+              <li><strong>Recycle:</strong> The waste can be recycled when the stock is empty</li>
+              <li><strong>Win condition:</strong> You win when all four foundations have 13 cards</li>
+            </ul>
+
+            <div class="tip">
+              <strong>Tip:</strong> Turn on <strong>Move Assist</strong> to skip illegal destinations while learning the rules.
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section class="section" id="menu-options">
+        <details>
+          <summary>Menu Options</summary>
+          <div class="section-content">
+            <p>Double-tap during normal play to open the menu. Scroll to browse. Tap to select. Double-tap again to close the menu.</p>
+
+            <h3>Move Assist</h3>
+            <p>Toggles destination filtering and legal move counts in the info panel.</p>
+            <ul>
+              <li><strong>On:</strong> Destination scrolling skips illegal drops while carrying cards</li>
+              <li><strong>Off:</strong> You can scroll to any tableau or foundation destination</li>
+            </ul>
+
+            <h3>Draw Card</h3>
+            <p>Draws one card from the stock as an assist action when you are stuck. This is separate from the board stock draw, which draws up to three cards.</p>
+
+            <h3>Reset</h3>
+            <p>Shows a <code>Yes</code>/<code>No</code> confirmation before starting a new game.</p>
+
+            <h3>Exit</h3>
+            <p>Closes the app and saves the current game state before exit. Use double-tap if you only want to close the menu.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="section" id="status-feedback">
+        <details>
+          <summary>Status &amp; Feedback</summary>
+          <div class="section-content">
+            <h3>HUD Prompts</h3>
+            <p>The HUD changes by mode and may show prompts such as:</p>
+            <ul>
+              <li><code>Select source pile</code></li>
+              <li><code>Select destination</code></li>
+              <li><code>Focus: Stock</code>, <code>Focus: Waste</code>, <code>Focus: T1</code> ... <code>Focus: T7</code></li>
+              <li><code>[Menu]</code> plus the current menu items</li>
+              <li><code>You win! Tap for new game</code></li>
+              <li><code>Stock reset</code> and other short status messages</li>
+            </ul>
+
+            <h3>Info Panel / Focus Details</h3>
+            <ul>
+              <li>Shows cards in the focused pile (or the active source pile while carrying cards)</li>
+              <li>Shows <code>Move Assist: ON/OFF</code></li>
+              <li>When Move Assist is ON, shows a legal move count for the focused pile</li>
+            </ul>
+
+            <h3>Menu Overlay</h3>
+            <p>The menu appears as an overlay with the selected line highlighted. Reset switches the overlay to a confirmation prompt.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="section" id="save-resume">
+        <details>
+          <summary>Save &amp; Resume</summary>
+          <div class="section-content">
+            <h3>Autosave</h3>
+            <p>The app autosaves your game state and Move Assist setting. Saves are queued and debounced so rendering stays responsive under load.</p>
+
+            <h3>Persistence</h3>
+            <ul>
+              <li><strong>Even Hub / G2:</strong> Uses the bridge storage API</li>
+              <li><strong>Browser fallback:</strong> Uses <code>localStorage</code></li>
+            </ul>
+
+            <h3>Resume on Launch</h3>
+            <p>On startup, the app restores a saved game and Move Assist before creating the initial state when valid save data exists.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="section" id="debug-console">
+        <details>
+          <summary>Debug Console (Perf Panel)</summary>
+          <div class="section-content">
+            <p>The floating perf console panel is preserved on this page and uses the same DOM IDs and controls as the original Solitaire <code>index.html</code>.</p>
+
+            <h3>Panel Controls</h3>
+            <ul>
+              <li><strong>Hide / Show</strong></li>
+              <li><strong>Clear</strong></li>
+              <li><strong>Copy All</strong></li>
+              <li><strong>Download</strong></li>
+            </ul>
+
+            <h3>When It Appears</h3>
+            <p>The panel is hidden by default and appears when DOM perf logging is enabled in <code>src/perf/log.ts</code> (for example, <code>PERF_LOG_DOM_ENABLED</code>).</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="section" id="tips">
+        <details>
+          <summary>Tips &amp; Notes</summary>
+          <div class="section-content">
+            <h3>Playing Efficiently</h3>
+            <ul>
+              <li>Use <strong>Move Assist</strong> while learning. It reduces destination scrolling noise.</li>
+              <li>If a tableau selection looks wrong, double-tap to cancel and reselect.</li>
+              <li>Tapping the same tableau column while carrying cards changes the run size.</li>
+              <li>Watch for newly exposed tableau cards. The app flips them automatically.</li>
+            </ul>
+
+            <h3>Documentation Scope</h3>
+            <p>This page documents current user-facing behavior. Internal actions and experimental UI states may exist in code without a gesture or menu binding.</p>
+
+            <div class="tip">
+              <strong>Rule reference:</strong> Klondike rules are the baseline. EvenSolitaire adapts them to G2 gestures and visual overlays.
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <footer class="footer">
+        <p>EvenSolitaire docs | Based on Klondike Solitaire rules</p>
+      </footer>
     </div>
-    <pre id="perf-console-output"></pre>
-  </div>
-  <script type="module" src="/src/main.ts"></script>
-</body>
+
+    <div id="perf-console-panel" data-collapsed="false" aria-live="polite">
+      <div id="perf-console-header">
+        <span id="perf-console-title">Perf Console</span>
+        <button id="perf-console-toggle" type="button">Hide</button>
+        <button id="perf-console-clear" type="button">Clear</button>
+        <button id="perf-console-copy" type="button">Copy All</button>
+        <button id="perf-console-download" type="button">Download</button>
+      </div>
+      <pre id="perf-console-output"></pre>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+    <script>
+      // Expand the section that matches the given id (or current URL hash)
+      function openSectionForHash(idOrEmpty) {
+        const id = idOrEmpty != null ? idOrEmpty : window.location.hash.substring(1);
+        if (!id) return;
+        const section = document.getElementById(id);
+        if (section) {
+          const details = section.querySelector('details');
+          if (details) details.setAttribute('open', '');
+        }
+      }
+      window.addEventListener('hashchange', function () { openSectionForHash(); });
+      // On link click, always open the target section (so re-clicking the same link expands it again)
+      document.addEventListener('click', function (e) {
+        const a = e.target.closest('a[href^="#"]');
+        if (!a) return;
+        const id = a.getAttribute('href').substring(1);
+        if (id) openSectionForHash(id);
+      });
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { openSectionForHash(); });
+      } else {
+        openSectionForHash();
+      }
+    </script>
+  </body>
 </html>

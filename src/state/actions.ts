@@ -18,6 +18,7 @@ export type Action =
   | { type: "APPLY_MOVE" }
   | { type: "CANCEL_SELECTION" }
   | { type: "UNDO" }
+  | { type: "EXIT_APP" }
   | { type: "OPEN_MENU" }
   | { type: "CLOSE_MENU" }
   | { type: "TOGGLE_MENU" }

@@ -215,10 +215,16 @@ export async function initApp(): Promise<void> {
           case "MENU_SELECT":
           case "TOGGLE_MENU":
           case "NEW_GAME":
+          case "EXIT_APP":
             perfLastInputAtMs = eventReceivedAtMs;
             perfLastInputSeq += 1;
             perfLastInputLabel = action.type;
             break;
+        }
+        if (action.type === "EXIT_APP") {
+          recordPerfDispatch("input", action);
+          void requestAppExit();
+          return;
         }
         if (action.type === "NEW_GAME") resetTapCooldown();
         dispatchWithPerfSource("input", action);
@@ -255,6 +261,7 @@ export async function initApp(): Promise<void> {
   let pendingRecoveryCacheInvalidate = false;
   let pendingSavePayload: { game: typeof initialState.game; moveAssist: boolean } | null = null;
   let pendingSaveFirstQueuedAtMs = 0;
+  let exitInProgress = false;
   let requestedFlushVersion = 0;
   let completedFlushVersion = 0;
   let startupPageReadyForAssetRefresh = false;
@@ -275,6 +282,36 @@ export async function initApp(): Promise<void> {
 
   subscribeStoreEffects();
   subscribeHubEvents();
+
+  async function requestAppExit(): Promise<void> {
+    if (exitInProgress) return;
+    exitInProgress = true;
+    try {
+      if (pendingFlush) {
+        clearTimeout(pendingFlush);
+        pendingFlush = null;
+      }
+      if (pendingBlink) {
+        clearTimeout(pendingBlink);
+        pendingBlink = null;
+      }
+      if (pendingSave) {
+        clearTimeout(pendingSave);
+        pendingSave = null;
+      }
+      pendingSavePayload = null;
+      pendingSaveFirstQueuedAtMs = 0;
+
+      const snapshot = store.getState();
+      await saveGame(snapshot.game, snapshot.ui.moveAssist);
+      hub.notifySystemLifecycleEvent("foreground-exit");
+      await hub.shutdown();
+    } catch (err) {
+      console.error("[EvenSolitaire] Exit failed:", err);
+    } finally {
+      exitInProgress = false;
+    }
+  }
 
   function scheduleFlush(): void {
     requestedFlushVersion += 1;

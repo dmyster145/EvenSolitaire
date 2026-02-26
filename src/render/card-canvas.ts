@@ -1,7 +1,7 @@
 /**
  * Card drawing primitives for Flipper-style board: face-up, face-down, empty slot.
  * Uses palette and game Card type only (no evenhub/state).
- * Suit glyphs use bitmap assets when loaded; falls back to programmatic drawing.
+ * Suit glyphs and stock back use bitmap assets only; nothing is drawn until assets load.
  */
 import type { Card } from "../game/types";
 import type { Suit } from "../game/types";
@@ -334,25 +334,10 @@ export function drawFacedownCard(
     const sy = Math.floor(cy - d / 2);
     const bitmap = getStockPatternBitmap(d);
     if (bitmap) ctx.drawImage(bitmap, sx, sy, d, d);
-  } else if (options?.pattern === "stock") {
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const size = Math.min(w, h) * 0.2;
-    const step = size * 0.8;
-    ctx.fillStyle = FG_CARD_LIGHT;
-    for (let row = -1; row <= 1; row += 2) {
-      for (let col = -1; col <= 1; col += 2) {
-        const px = cx + col * step;
-        const py = cy + row * step;
-        ctx.beginPath();
-        ctx.arc(px, py, size / 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
   }
 }
 
-/** Draw suit glyph: bitmap asset when loaded (tinted to FG_CARD_LIGHT), else programmatic path. */
+/** Draw suit glyph: bitmap asset only; draw nothing until assets are loaded. */
 function drawSuitGlyph(
   ctx: CanvasRenderingContext2D,
   suit: Suit,
@@ -362,63 +347,12 @@ function drawSuitGlyph(
   options?: { useCornerAsset?: boolean }
 ): void {
   const img = options?.useCornerAsset ? cornerSuitImages[suit] : suitImages[suit];
-  const useBitmap = !!(img?.complete && img.naturalWidth > 0);
-  if (useBitmap) {
-    const d = Math.ceil(2 * r);
-    const x = cx - r;
-    const y = cy - r;
-    const bitmap = getSuitGlyphBitmap(suit, d, !!options?.useCornerAsset);
-    if (bitmap) ctx.drawImage(bitmap, x, y, d, d);
-    return;
-  }
-  ctx.beginPath();
-  switch (suit) {
-    case "D": {
-      ctx.moveTo(cx, cy - r);
-      ctx.lineTo(cx + r * 0.95, cy);
-      ctx.lineTo(cx, cy + r);
-      ctx.lineTo(cx - r * 0.95, cy);
-      ctx.closePath();
-      break;
-    }
-    case "H": {
-      const top = cy - r * 0.9;
-      const lobeR = r * 0.55;
-      ctx.arc(cx - lobeR * 0.5, top + lobeR * 0.4, lobeR, 0, Math.PI * 2);
-      ctx.arc(cx + lobeR * 0.5, top + lobeR * 0.4, lobeR, 0, Math.PI * 2);
-      ctx.moveTo(cx - r * 0.95, top + lobeR);
-      ctx.lineTo(cx, cy + r * 0.95);
-      ctx.lineTo(cx + r * 0.95, top + lobeR);
-      ctx.closePath();
-      break;
-    }
-    case "S": {
-      const bot = cy + r;
-      const lobeY = cy - r * 0.45;
-      const lobeR = r * 0.55;
-      ctx.arc(cx, lobeY, lobeR, 0, Math.PI * 2);
-      ctx.moveTo(cx - lobeR, lobeY);
-      ctx.lineTo(cx, bot - r * 0.3);
-      ctx.lineTo(cx + lobeR, lobeY);
-      ctx.lineTo(cx + r * 0.3, bot);
-      ctx.lineTo(cx, bot - r * 0.2);
-      ctx.lineTo(cx - r * 0.3, bot);
-      ctx.closePath();
-      break;
-    }
-    case "C": {
-      const stemTop = cy + r * 0.2;
-      const lobeR = r * 0.5;
-      const dx = lobeR * 0.6;
-      ctx.arc(cx - dx, cy - dx, lobeR, 0, Math.PI * 2);
-      ctx.arc(cx + dx, cy - dx, lobeR, 0, Math.PI * 2);
-      ctx.arc(cx, stemTop - lobeR * 0.5, lobeR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(cx - r * 0.25, stemTop, r * 0.5, r * 0.85);
-      return;
-    }
-  }
-  ctx.fill();
+  if (!(img?.complete && img.naturalWidth > 0)) return;
+  const d = Math.ceil(2 * r);
+  const x = cx - r;
+  const y = cy - r;
+  const bitmap = getSuitGlyphBitmap(suit, d, !!options?.useCornerAsset);
+  if (bitmap) ctx.drawImage(bitmap, x, y, d, d);
 }
 
 /** Draw a face-up card: black fill, light border, light rank + suit (inverted for G2 green). */
@@ -444,7 +378,7 @@ export function drawFaceUpCard(
   if (options?.highlight === "focus" || options?.highlight === "source") ctx.setLineDash([]);
 
   const rankStr = RANK_CHAR[card.rank] ?? "?";
-  const fontSize = Math.min(14, Math.max(8, Math.floor(Math.min(w, h) * 0.38)));
+  const fontSize = Math.min(16, Math.max(9, Math.floor(Math.min(w, h) * 0.44)));
   const pad = Math.max(2, Math.floor(Math.min(w, h) * 0.06));
   ctx.font = `${fontSize}px monospace`;
   ctx.fillStyle = FG_CARD_LIGHT;
@@ -453,9 +387,9 @@ export function drawFaceUpCard(
 
   const cx = x + w / 2;
   const cy = y + h / 2;
-  const suitR = Math.min(w, h) * 0.24;
-  /** Corner suits: radius ~6–7.5 px → drawn at 13–15 px. Ideal source image: 16×16 (or 32×32 for 2×). */
-  const cornerSuitR = Math.min(suitR * 0.35, Math.min(w, h) * 0.08);
+  const suitR = Math.min(w, h) * 0.18;
+  /** Corner suits: slightly larger for readability. */
+  const cornerSuitR = Math.min(Math.min(w, h) * 0.11, suitR * 0.55);
   ctx.fillStyle = FG_CARD_LIGHT;
   drawSuitGlyph(ctx, card.suit, cx, cy, suitR);
 
@@ -469,7 +403,7 @@ export function drawFaceUpCard(
   ctx.translate(x + w - pad, y + h - pad);
   ctx.rotate(Math.PI);
   ctx.textBaseline = "top";
-  ctx.font = `${Math.max(6, fontSize - 1)}px monospace`;
+  ctx.font = `${fontSize}px monospace`;
   ctx.fillStyle = FG_CARD_LIGHT;
   ctx.fillText(rankStr, 0, 0);
   ctx.restore();
