@@ -106,16 +106,16 @@ function scrollAction(state: AppState, direction: "next" | "prev"): Action {
 }
 
 function tapAction(state: AppState): Action {
-  if (state.game.won) {
-    // Win animation disabled for now; may re-enable later.
-    // if (state.ui.winAnimation?.phase === "playing") return { type: "WIN_ANIMATION_SKIP" };
-    return { type: "NEW_GAME" };
-  }
   if (state.ui.menuOpen) {
     if (state.ui.pendingResetConfirm) return { type: "MENU_SELECT" };
     const opt = MENU_OPTIONS[state.ui.menuSelectedIndex];
     if (opt === "Exit") return { type: "EXIT_APP" };
     return { type: "MENU_SELECT" };
+  }
+  if (state.game.won) {
+    // Win animation disabled for now; may re-enable later.
+    // if (state.ui.winAnimation?.phase === "playing") return { type: "WIN_ANIMATION_SKIP" };
+    return { type: "NEW_GAME" };
   }
   if (state.ui.mode === "select_destination") {
     const dest = focusTargetToDest(state.ui.focus);
@@ -131,7 +131,8 @@ function tapAction(state: AppState): Action {
 }
 
 function doubleTapAction(state: AppState): Action {
-  if (state.game.won) return { type: "NEW_GAME" };
+  if (state.ui.menuOpen) return { type: "TOGGLE_MENU" };
+  if (state.game.won) return { type: "TOGGLE_MENU" };
   const hasSelection =
     state.ui.mode === "select_source" || state.ui.mode === "select_destination";
   if (hasSelection) return { type: "CANCEL_SELECTION" };

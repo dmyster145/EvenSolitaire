@@ -442,7 +442,7 @@
           <li><a href="#menu-options">Menu Options</a></li>
           <li><a href="#status-feedback">Status & Feedback</a></li>
           <li><a href="#save-resume">Save & Resume</a></li>
-          <li><a href="#debug-console">Debug Console</a></li>
+          <li id="debug-console-nav" hidden><a href="#debug-console">Debug Console</a></li>
           <li><a href="#tips">Tips & Notes</a></li>
         </ul>
       </nav>
@@ -474,7 +474,7 @@
           <div class="section-content">
             <h3>Core Piles</h3>
             <ul>
-              <li><strong>Stock:</strong> Face-down draw pile. Tap to draw up to three cards.</li>
+              <li><strong>Stock:</strong> Face-down draw pile. Tap to draw three cards.</li>
               <li><strong>Waste:</strong> Face-up draw pile. Only the top card is playable.</li>
               <li><strong>Foundations (4):</strong> Build each suit from Ace to King.</li>
               <li><strong>Tableau (7):</strong> Main play columns built downward in alternating colors.</li>
@@ -528,7 +528,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr><td>Stock</td><td>Draw up to 3 cards. If stock is empty and waste has cards, recycle the waste and continue.</td></tr>
+                <tr><td>Stock</td><td>Draw three cards. If stock is empty and waste has cards, recycle the waste and continue.</td></tr>
                 <tr><td>Waste</td><td>Select top waste card as the move source.</td></tr>
                 <tr><td>Tableau</td><td>Select as source, or place a carried card/run in destination mode.</td></tr>
                 <tr><td>Foundation</td><td>Destination during placement (legal moves only).</td></tr>
@@ -629,7 +629,7 @@
             </ul>
 
             <h3>Draw Card</h3>
-            <p>Draws one card from the stock as an assist action when you are stuck. This is separate from the board stock draw, which draws up to three cards.</p>
+            <p>Draws one card from the stock as an assist action when you are stuck. This is separate from the board stock draw, which draws three cards.</p>
 
             <h3>Reset</h3>
             <p>Shows a <code>Yes</code>/<code>No</code> confirmation before starting a new game.</p>
@@ -648,11 +648,10 @@
             <p>The HUD changes by mode and may show prompts such as:</p>
             <ul>
               <li><code>Select source pile</code></li>
-              <li><code>Select destination</code></li>
               <li><code>Focus: Stock</code>, <code>Focus: Waste</code>, <code>Focus: T1</code> ... <code>Focus: T7</code></li>
               <li><code>[Menu]</code> plus the current menu items</li>
               <li><code>You win! Tap for new game</code></li>
-              <li><code>Stock reset</code> and other short status messages</li>
+              <li><code>Status Message</code> and other short messages</li>
             </ul>
 
             <h3>Info Panel / Focus Details</h3>
@@ -687,7 +686,7 @@
         </details>
       </section>
 
-      <section class="section" id="debug-console">
+      <section class="section" id="debug-console" hidden>
         <details>
           <summary>Debug Console (Perf Panel)</summary>
           <div class="section-content">
@@ -718,10 +717,6 @@
               <li>Tapping the same tableau column while carrying cards changes the run size.</li>
               <li>Watch for newly exposed tableau cards. The app flips them automatically.</li>
             </ul>
-
-            <h3>Documentation Scope</h3>
-            <p>This page documents current user-facing behavior. Internal actions and experimental UI states may exist in code without a gesture or menu binding.</p>
-
             <div class="tip">
               <strong>Rule reference:</strong> Klondike rules are the baseline. EvenSolitaire adapts them to G2 gestures and visual overlays.
             </div>
@@ -747,6 +742,21 @@
 
     <script type="module" src="/src/main.ts"></script>
     <script>
+      function syncDebugDocsVisibility() {
+        const cfg = window.__evenSolitairePerfConfig;
+        const visible = !!(cfg && cfg.domEnabled);
+        const debugSection = document.getElementById('debug-console');
+        const debugNav = document.getElementById('debug-console-nav');
+        if (debugSection) {
+          if (visible) debugSection.removeAttribute('hidden');
+          else debugSection.setAttribute('hidden', '');
+        }
+        if (debugNav) {
+          if (visible) debugNav.removeAttribute('hidden');
+          else debugNav.setAttribute('hidden', '');
+        }
+      }
+
       // Expand the section that matches the given id (or current URL hash)
       function openSectionForHash(idOrEmpty) {
         const id = idOrEmpty != null ? idOrEmpty : window.location.hash.substring(1);
@@ -766,8 +776,12 @@
         if (id) openSectionForHash(id);
       });
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () { openSectionForHash(); });
+        document.addEventListener('DOMContentLoaded', function () {
+          syncDebugDocsVisibility();
+          openSectionForHash();
+        });
       } else {
+        syncDebugDocsVisibility();
         openSectionForHash();
       }
     </script>

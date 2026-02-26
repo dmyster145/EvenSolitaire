@@ -67,6 +67,17 @@ describe("info panel text", () => {
     expect(text).not.toContain("Cards Left:");
   });
 
+  it("shows only the win prompt in the info panel when the game is won", () => {
+    const state: AppState = {
+      ...withGame({ ...deal(26), won: true }),
+      ui: { ...initialState.ui, message: "Stock reset" },
+    };
+
+    const text = getInfoPanelText(state);
+
+    expect(text).toBe("You win!\nTap for new game");
+  });
+
   it("updates to the focused destination pile while carrying cards", () => {
     const base = deal(24);
     const state: AppState = {

@@ -14,6 +14,24 @@ const PERF_LOG_CONSOLE_ENABLED = false;
 const PERF_LOG_CAPTURE_ENABLED = false;
 const PERF_LOG_DOM_ENABLED = false;
 
+if (typeof window !== "undefined") {
+  (
+    window as Window & {
+      __evenSolitairePerfConfig?: {
+        consoleEnabled: boolean;
+        captureEnabled: boolean;
+        domEnabled: boolean;
+        anyEnabled: boolean;
+      };
+    }
+  ).__evenSolitairePerfConfig = {
+    consoleEnabled: PERF_LOG_CONSOLE_ENABLED,
+    captureEnabled: PERF_LOG_CAPTURE_ENABLED,
+    domEnabled: PERF_LOG_DOM_ENABLED,
+    anyEnabled: PERF_LOG_CONSOLE_ENABLED || PERF_LOG_CAPTURE_ENABLED || PERF_LOG_DOM_ENABLED,
+  };
+}
+
 interface PerfLogEntry {
   ts: number;
   msg: string;

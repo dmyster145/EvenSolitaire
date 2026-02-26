@@ -152,7 +152,8 @@ export function getInfoPanelText(state: AppState): string {
   if (state.ui.menuOpen) {
     lines.push(...getMenuHudLines(state));
   } else if (g.won) {
-    lines.push("You Win!");
+    lines.push("You win!");
+    lines.push("Tap for new game");
   } else {
     const pileIdx = focusIdx;
     const pileCards = getFocusedPileCards(state, pileIdx);
