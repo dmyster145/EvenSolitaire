@@ -73,6 +73,35 @@ function resolveFocusAfterFoundationMove(state: AppState, sourceFocus: AppState[
   return nextFocusWithTopCard(state, sourceIndex);
 }
 
+function applyLegalMoveAndReturnBrowseState(
+  state: AppState,
+  sourceFocus: AppState["ui"]["focus"],
+  source: Source,
+  dest: Dest
+): AppState {
+  pushUndo(state.game);
+  const nextGame = checkWin(applyMove(state.game, source, dest));
+  const baseAfterMove: AppState = {
+    ...state,
+    game: nextGame,
+    ui: {
+      ...state.ui,
+      mode: "browse",
+      selection: {},
+      selectionInvalidBlink: undefined,
+      message: nextGame.won ? "You win!" : undefined,
+    },
+  };
+  const focus = dest.area === "foundation" ? resolveFocusAfterFoundationMove(baseAfterMove, sourceFocus) : state.ui.focus;
+  return {
+    ...baseAfterMove,
+    ui: {
+      ...baseAfterMove.ui,
+      focus,
+    },
+  };
+}
+
 type LegalDestCacheEntry = {
   dests: Dest[];
   focusIndexes: Set<number>;
@@ -105,19 +134,32 @@ function getAutoDestinationFocusTarget(source: Source, dests: Dest[]): AppState[
   return null;
 }
 
-function getTableauUniqueDestFocusIndexes(
+function getTableauSingleLegalDestFocusIndex(
   game: AppState["game"],
   pileIndex: number
-): Set<number> {
+): number | null {
   const pile = game.tableau[pileIndex];
-  const allFocusIndexes = new Set<number>();
+  let onlyFocusIndex: number | null = null;
+
+  // We only need to know whether there is exactly one unique destination across all
+  // selectable stack sizes. Exit as soon as a second unique destination appears.
   for (let count = 1; count <= pile.visible.length; count += 1) {
-    const entry = getCachedLegalDestEntry(game, { area: "tableau", pileIndex, count });
-    for (const focusIndex of entry.focusIndexes) {
-      allFocusIndexes.add(focusIndex);
+    const focusIndexes = getCachedLegalDestEntry(game, { area: "tableau", pileIndex, count }).focusIndexes;
+    if (focusIndexes.size === 0) continue;
+
+    if (onlyFocusIndex === null) {
+      if (focusIndexes.size > 1) return null;
+      const first = focusIndexes.values().next();
+      if (first.done) continue;
+      onlyFocusIndex = first.value;
+      continue;
     }
+
+    if (focusIndexes.size === 1 && focusIndexes.has(onlyFocusIndex)) continue;
+    return null;
   }
-  return allFocusIndexes;
+
+  return onlyFocusIndex;
 }
 
 // Cache legal destinations across focus navigation while the immutable game snapshot and
@@ -290,17 +332,24 @@ export function rootReducer(
       const source = sourceFromTarget(state, action.target);
       if (!source) return state;
       const dests = getCachedLegalDestEntry(state.game, source).dests;
+
+      // Move Assist quick-play: tapping a tableau Ace auto-places it to foundation.
+      if (state.ui.moveAssist && source.area === "tableau") {
+        const pile = state.game.tableau[source.pileIndex];
+        const top = pile.visible[pile.visible.length - 1];
+        const foundationDest = dests.find((d) => d.area === "foundation");
+        if (top?.rank === 1 && foundationDest && foundationDest.area === "foundation") {
+          return applyLegalMoveAndReturnBrowseState(state, action.target, source, foundationDest);
+        }
+      }
+
       let autoDestinationFocus: AppState["ui"]["focus"] | null = null;
       if (state.ui.moveAssist) {
-        autoDestinationFocus = getAutoDestinationFocusTarget(source, dests);
         if (source.area === "tableau") {
-          const uniqueDestFocusIndexes = getTableauUniqueDestFocusIndexes(state.game, source.pileIndex);
-          if (uniqueDestFocusIndexes.size === 1) {
-            const [onlyFocusIndex] = uniqueDestFocusIndexes;
-            autoDestinationFocus = focusIndexToTarget(onlyFocusIndex);
-          } else {
-            autoDestinationFocus = null;
-          }
+          const onlyFocusIndex = getTableauSingleLegalDestFocusIndex(state.game, source.pileIndex);
+          autoDestinationFocus = onlyFocusIndex === null ? null : focusIndexToTarget(onlyFocusIndex);
+        } else {
+          autoDestinationFocus = getAutoDestinationFocusTarget(source, dests);
         }
       }
       return {
@@ -358,28 +407,7 @@ export function rootReducer(
       const source = sourceFromTarget(state, src);
       if (!source) return state;
       if (isLegalMove(state.game, source, action.dest)) {
-        pushUndo(state.game);
-        const nextGame = checkWin(applyMove(state.game, source, action.dest));
-        const baseAfterMove: AppState = {
-          ...state,
-          game: nextGame,
-          ui: {
-            ...state.ui,
-            mode: "browse",
-            selection: {},
-            selectionInvalidBlink: undefined,
-            message: nextGame.won ? "You win!" : undefined,
-          },
-        };
-        const focus =
-          action.dest.area === "foundation" ? resolveFocusAfterFoundationMove(baseAfterMove, src) : state.ui.focus;
-        return {
-          ...baseAfterMove,
-          ui: {
-            ...baseAfterMove.ui,
-            focus,
-          },
-        };
+        return applyLegalMoveAndReturnBrowseState(state, src, source, action.dest);
       }
       return {
         ...state,

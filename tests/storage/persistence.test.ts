@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setStorageBridge, getStored, setStored } from "../../src/storage/local";
 import { deserializeSave, loadGame, saveGame, serializeSave } from "../../src/storage/save-game";
 import type { Card, GameState } from "../../src/game/types";
@@ -120,6 +120,23 @@ describe("storage/local runtime behavior", () => {
 
     const ok = await setStored("k5", "v5");
     expect(ok).toBe(true);
+  });
+
+  it("does not mirror to browser storage when bridge write succeeds", async () => {
+    const local = installMemoryLocalStorage();
+    const setItemSpy = vi.spyOn(local, "setItem");
+    setStorageBridge({
+      async getLocalStorage() {
+        return "";
+      },
+      async setLocalStorage() {
+        return true;
+      },
+    });
+
+    const ok = await setStored("k6", "v6");
+    expect(ok).toBe(true);
+    expect(setItemSpy).not.toHaveBeenCalled();
   });
 });
 

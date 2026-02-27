@@ -101,6 +101,30 @@ describe("source select auto-destination focus", () => {
     resetIdCounter();
   });
 
+  it("ignores multi-destination ambiguity for tableau Ace and auto-places it to foundation", () => {
+    const game = emptyGame();
+    game.tableau[0].visible = [card("t7h", 7, "H"), card("t6c", 6, "C"), card("tas", 1, "S")];
+    game.tableau[1].visible = [card("t7d", 7, "D")];
+    game.tableau[2].visible = [card("t2d", 2, "D")];
+
+    const state: AppState = {
+      ...withGame(game),
+      ui: {
+        ...initialState.ui,
+        mode: "browse",
+        moveAssist: true,
+        focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+      },
+    };
+
+    const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) });
+
+    expect(next.ui.mode).toBe("browse");
+    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU));
+    expect(next.game.tableau[0].visible.map((c) => c.id)).toEqual(["t7h", "t6c"]);
+    expect(next.game.foundations[0].cards.map((c) => c.id)).toEqual(["tas"]);
+  });
+
   it("auto-focuses foundation for waste when no legal tableau destination exists", () => {
     const game = emptyGame();
     game.waste = [card("w6c", 6, "C")];

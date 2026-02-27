@@ -44,15 +44,15 @@ export async function getStored(key: string): Promise<string | null> {
 
 export async function setStored(key: string, value: string): Promise<boolean> {
   if (bridge) {
-    let bridgeOk = false;
     try {
-      bridgeOk = await bridge.setLocalStorage(key, value);
+      const bridgeOk = await bridge.setLocalStorage(key, value);
+      if (bridgeOk) return true;
     } catch {
-      bridgeOk = false;
+      // Fall through to browser storage fallback.
     }
-    // Mirror to browser storage for simulator/web fallback.
-    const browserOk = writeBrowserStorage(key, value);
-    return bridgeOk || browserOk;
+    // Browser fallback only when bridge storage is unavailable/failing.
+    // Avoid a second synchronous write in the common bridge-success path.
+    return writeBrowserStorage(key, value);
   }
   return writeBrowserStorage(key, value);
 }
