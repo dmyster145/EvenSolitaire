@@ -100,11 +100,7 @@ export const DYNAMIC_SWAP_MODE = true;
  */
 const SKIP_DISPLAY_SWAP_FOR_RAPID_CHANGES = true;
 
-/**
- * SDK requires exactly one container with isEventCapture: 1 per page.
- * Display mode (4 image tiles, 0 text) is therefore invalid and rebuild fails.
- * We must always use input mode (3 image tiles + 1 event-capture text); BR quadrant cannot show.
- */
+/** Keep true for production because full display/input swap is still less stable on-device than fixed 3-tile mode. */
 const DISABLE_SWAP_CYCLE_FOR_DEBUG = true;
 
 /**
@@ -328,16 +324,6 @@ export function composeStartupPage(): CreateStartUpPageContainer {
   const imageBl = createImageContainer(IMAGE_TILE_BL);
   const imageBr = createImageContainer(IMAGE_TILE_BR);
 
-  // Win animation disabled for now; may re-enable later.
-  // const imageWinOverlay = new ImageContainerProperty({
-  //   xPosition: VIRTUAL_IMAGE_WIN_OVERLAY.x,
-  //   yPosition: VIRTUAL_IMAGE_WIN_OVERLAY.y,
-  //   width: VIRTUAL_IMAGE_WIN_OVERLAY.width,
-  //   height: VIRTUAL_IMAGE_WIN_OVERLAY.height,
-  //   containerID: 99,
-  //   containerName: "winovr",
-  // });
-
   return new CreateStartUpPageContainer({
     containerTotalNum: 4,
     imageObject: [imageTl, imageTr, imageBl, imageBr],
@@ -427,7 +413,6 @@ function topRowViewFromState(state: AppState, boardCtx: BoardViewContext = build
       f.cards.length >= 2 ? f.cards[f.cards.length - 2]! : null
     );
   }
-  const menuLines = boardCtx.menuLines;
   const tableauFloatingCards = hasFloating && focusIdx >= 6 ? floatingCards : undefined;
   const wa = boardCtx.winAnimation;
   const flyingInTop =
@@ -445,17 +430,6 @@ function topRowViewFromState(state: AppState, boardCtx: BoardViewContext = build
     blinkVisible,
     wasteWithoutTop,
     foundationWithoutTop,
-    // Menu overlay is disabled in the current G2 3-tile layout.
-    // Keep the payload shape here (commented) so it can be restored later if needed.
-    // menuOverlay:
-    //   menuLines.length > 0
-    //     ? {
-    //         menuOpen: state.ui.menuOpen,
-    //         lines: menuLines,
-    //         selectedIndex: state.ui.menuSelectedIndex,
-    //         resetConfirm: state.ui.pendingResetConfirm,
-    //       }
-    //     : undefined,
     menuOverlay: undefined,
     tableauFloatingCards,
     flyingCard:
@@ -491,7 +465,6 @@ function tableauViewFromState(
     return { hidden: pile.hidden, visible: [...pile.visible] };
   });
   const wa = boardCtx.winAnimation;
-  const menuLines = boardCtx.menuLines;
   const flyingInTableau =
     wa?.phase === "playing" &&
     wa.flyingCard &&
@@ -505,17 +478,6 @@ function tableauViewFromState(
     blinkVisible,
     selectionCount:
       sourceTableauIdx !== null && hasFloating ? count : undefined,
-    // Menu overlay is disabled in the current G2 3-tile layout.
-    // Keep the payload shape here (commented) so it can be restored later if needed.
-    // menuOverlay:
-    //   state.ui.menuOpen && menuLines.length > 0
-    //     ? {
-    //         menuOpen: true,
-    //         lines: menuLines,
-    //         selectedIndex: state.ui.menuSelectedIndex,
-    //         resetConfirm: state.ui.pendingResetConfirm,
-    //       }
-    //     : undefined,
     menuOverlay: undefined,
     flyingCard:
       flyingInTableau && wa?.flyingCard
@@ -1837,10 +1799,6 @@ export async function flushDisplayUpdate(
   const interruptFocusHintSuffix = interruptCrossContainerFocusSuppression ? "+intr-focus-suppress" : "";
   const selectionClearSourceArea =
     sourceArea === null && lastSent.sourceArea != null ? lastSent.sourceArea : null;
-  // Win animation disabled for now; may re-enable later.
-  // const winAnimationPhase = state.ui.winAnimation?.phase;
-  // const flyX = state.ui.winAnimation?.flyX ?? 0;
-  // const flyY = state.ui.winAnimation?.flyY ?? 0;
   if (
     focusIdx !== lastSent.focusIndex ||
     sourceArea !== lastSent.sourceArea ||
@@ -1853,12 +1811,7 @@ export async function flushDisplayUpdate(
     selectionInvalidBlinkVisible !== lastSent.selectionInvalidBlinkVisible ||
     selectedCardCount !== lastSent.selectedCardCount ||
     uiMode !== lastSent.uiMode
-    // winAnimationPhase !== lastSent.winAnimationPhase ||
-    // flyX !== lastSent.flyX ||
-    // flyY !== lastSent.flyY
   ) {
-    // Win animation disabled for now; may re-enable later.
-    // if (winAnimationPhase === "playing") { ... } else {
     lastSent.lastOverlayPng = undefined;
     if (DYNAMIC_SWAP_MODE) {
       const tileHash = dynamicTileVisualKeyFromPrimitives({
@@ -2099,8 +2052,6 @@ export async function flushDisplayUpdate(
     }
     lastSent.lastTopPng = undefined;
     lastSent.lastTableauPng = undefined;
-    // if (lastSent.winAnimationPhase === "playing") { didClearOverlay = true; }
-    // }
     lastSent.focusIndex = focusIdx;
     lastSent.sourceArea = sourceArea;
     lastSent.pileHash = pileHash;

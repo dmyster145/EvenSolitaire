@@ -459,7 +459,7 @@
             <ul>
               <li>Restores game state when a save exists</li>
               <li>Restores your <strong>Move Assist</strong> setting with the save</li>
-              <li>After a win, tap or double-tap starts a new game</li>
+              <li>After a win, tap starts a new game; double-tap opens the menu</li>
             </ul>
 
             <h3>What This Covers</h3>
@@ -515,7 +515,7 @@
 
               <div class="gesture-card">
                 <strong>Double Tap</strong>
-                Open or close the menu, or cancel an active selection. On win, start a new game.
+                Open or close the menu, or cancel an active selection. On win, open the menu.
               </div>
             </div>
 
@@ -529,8 +529,8 @@
               </thead>
               <tbody>
                 <tr><td>Stock</td><td>Draw three cards. If stock is empty and waste has cards, recycle the waste and continue.</td></tr>
-                <tr><td>Waste</td><td>Select top waste card as the move source.</td></tr>
-                <tr><td>Tableau</td><td>Select as source, or place a carried card/run in destination mode.</td></tr>
+                <tr><td>Waste</td><td>Select top waste card as the source. With Move Assist ON, focus auto-jumps to the leftmost legal tableau destination; if none exists, it jumps to a legal foundation.</td></tr>
+                <tr><td>Tableau</td><td>Select as source, or place a carried card/run. With Move Assist ON, if the face-up run has exactly one legal destination across run sizes, focus auto-jumps there. If there are multiple legal moves, focus stays on the source.</td></tr>
                 <tr><td>Foundation</td><td>Destination during placement (legal moves only).</td></tr>
                 <tr><td>Menu Open</td><td>Select the highlighted menu option.</td></tr>
                 <tr><td>Win State</td><td>Start a new game.</td></tr>
@@ -548,7 +548,7 @@
             <ol>
               <li><strong>Scroll</strong> to the pile you want to use (stock, waste, or tableau)</li>
               <li><strong>Tap</strong> to select the source (or draw from stock)</li>
-              <li>When carrying cards, <strong>scroll</strong> to a destination (tableau or foundation)</li>
+              <li>With Move Assist ON, if an auto-destination is available, focus jumps there. Waste prefers the leftmost legal tableau (then foundation). Tableau only auto-jumps when the face-up run has exactly one legal destination.</li>
               <li><strong>Tap</strong> to place</li>
             </ol>
 
@@ -602,6 +602,7 @@
             <ul>
               <li><strong>Board draw:</strong> Tapping the stock draws <strong>three cards</strong> (or fewer when fewer cards remain)</li>
               <li><strong>Menu draw assist:</strong> The menu’s <strong>Draw Card</strong> option draws <strong>one card</strong> to help when you are stuck</li>
+              <li><strong>Auto-destination priority (Move Assist ON):</strong> Selecting from waste auto-focuses the leftmost legal tableau destination, then foundation if needed. Selecting from tableau auto-focuses only when the face-up run has exactly one legal destination. The move is not placed until you tap.</li>
               <li><strong>Recycle:</strong> The waste can be recycled when the stock is empty</li>
               <li><strong>Win condition:</strong> You win when all four foundations have 13 cards</li>
             </ul>
@@ -659,8 +660,8 @@
               <li>When Move Assist is ON, shows a legal move count for the focused pile</li>
             </ul>
 
-            <h3>Menu Overlay</h3>
-            <p>The menu appears as an overlay with the selected line highlighted. Reset switches the overlay to a confirmation prompt.</p>
+            <h3>Menu in HUD</h3>
+            <p>The menu renders in the HUD panel with the selected line highlighted. Reset switches the HUD menu to a confirmation prompt.</p>
           </div>
         </details>
       </section>

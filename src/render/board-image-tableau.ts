@@ -134,6 +134,14 @@ export function renderBoardTableauToCanvas(
       isSource && selectionCount >= 1 && p.visible.length > 0
         ? Math.max(0, Math.min(p.visible.length - 1, p.visible.length - selectionCount))
         : -1;
+    const topIdx = p.visible.length - 1;
+    const selectedCard = raiseIndex >= 0 ? (p.visible[raiseIndex] ?? null) : null;
+    const raiseDepthFromTop = raiseIndex >= 0 ? topIdx - raiseIndex : -1;
+    const clampedRaiseDepth =
+      raiseDepthFromTop >= 0 ? Math.min(raiseDepthFromTop, MAX_PEEK_ITEMS) : -1;
+    const displayRaiseIndex =
+      raiseIndex >= 0 && topIdx >= 0 ? Math.max(0, topIdx - clampedRaiseDepth) : -1;
+    const usesClampedRaisePreview = raiseIndex >= 0 && displayRaiseIndex !== raiseIndex;
 
     for (let j = 0; j < maxHidPeek; j++) {
       const y = BASE_Y - (totalPeeks - j) * STACK_OFFSET_Y_PEEK;
@@ -143,9 +151,12 @@ export function renderBoardTableauToCanvas(
     const firstVisIdx = p.visible.length - 1 - maxVisPeek;
     for (let j = 0; j < maxVisPeek; j++) {
       const cardIdx = firstVisIdx + j;
-      const card = p.visible[cardIdx]!;
+      const card =
+        usesClampedRaisePreview && cardIdx === displayRaiseIndex && selectedCard
+          ? selectedCard
+          : p.visible[cardIdx]!;
       let y = BASE_Y - (maxVisPeek - j) * STACK_OFFSET_Y_PEEK;
-      const isRaised = cardIdx === raiseIndex;
+      const isRaised = cardIdx === displayRaiseIndex;
       if (isRaised) y -= CARD_ELEVATION_OFFSET_Y;
       drawFaceUpCard(ctx, x, y, CARD_TABLEAU_W, CARD_TABLEAU_H, card, {
         highlight: isRaised ? highlight !== "none" ? highlight : undefined : undefined,
@@ -153,8 +164,7 @@ export function renderBoardTableauToCanvas(
     }
 
     const topVisible = p.visible.length > 0 ? p.visible[p.visible.length - 1]! : null;
-    const topIdx = p.visible.length - 1;
-    const topRaised = topIdx === raiseIndex;
+    const topRaised = topIdx === displayRaiseIndex;
     if (topVisible) {
       const topY = BASE_Y - (topRaised ? CARD_ELEVATION_OFFSET_Y : 0);
       const topGetsHighlight =
@@ -190,13 +200,16 @@ export function renderBoardTableauToCanvas(
     const stackOffset = (floats.length - 1) * STACK_OFFSET_Y_PEEK;
     for (let j = 0; j < floats.length; j++) {
       const isRaisedCard = j === 0;
+      const isFrontCard = j === floats.length - 1;
       const cy = isRaisedCard
         ? BASE_Y - stackOffset - CARD_ELEVATION_OFFSET_Y
         : BASE_Y - (floats.length - 1 - j) * STACK_OFFSET_Y_PEEK;
       const cardBottom = cy + CARD_TABLEAU_H;
       if (cy >= 0 && cardBottom <= H) {
         drawFaceUpCard(ctx, fx, cy, CARD_TABLEAU_W, CARD_TABLEAU_H, floats[j]!, {
-          highlight: isRaisedCard ? "focus" : undefined,
+          // Keep the active (back) card outlined and also outline the visible front card
+          // so destination focus is obvious when carrying multi-card tableau stacks.
+          highlight: isRaisedCard || isFrontCard ? "focus" : undefined,
         });
       }
     }
@@ -245,7 +258,7 @@ export function renderBoardTableauToCanvas(
   return targetCanvas;
 }
 
-/** Legacy placeholder. */
+/** Deterministic placeholder frame used in tests and startup fallback paths. */
 export function renderBoardTableauPlaceholder(focusIndex: number): Promise<number[]> {
   return renderBoardTableau({
     piles: Array(7).fill({ hidden: 0, visible: [] }),

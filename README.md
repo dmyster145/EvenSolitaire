@@ -11,6 +11,8 @@ Screenshots are not checked into this repo yet. Add images under `assets/` if yo
 ## Quick links
 
 - **In-app help:** Open the app URL on your phone to see the full instructions (getting started, controls, rules, menu, save/resume). Same content as [index.html](index.html) in this repo.
+- **On-device smoke checklist:** Quick runtime regression pass for glasses behavior in [docs/on-device-smoke-checklist.md](docs/on-device-smoke-checklist.md).
+- **Performance design notes:** Architecture and tuning choices from perf/responsiveness passes in [docs/performance-responsiveness-design.md](docs/performance-responsiveness-design.md).
 
 ## Tech stack
 
@@ -89,6 +91,9 @@ EvenSolitaire/
 | `npm run typecheck` | Run TypeScript type-check (`tsc --noEmit`) |
 | `npm run test` | Run tests once |
 | `npm run test:watch` | Run tests in watch mode |
+| `npm run test:coverage` | Run tests with coverage + threshold enforcement |
+
+`test:coverage` is CI-enforced. If `@vitest/coverage-v8` is not installed locally, the command skips with a message instead of failing.
 
 ## Build and deploy
 
@@ -103,13 +108,19 @@ Output is in `dist/`. Deploy that folder to any static host, then open the deplo
 - **Klondike Solitaire gameplay:** Standard tableau/foundation rules with automatic flip of newly exposed tableau cards.
 - **Stock draw behavior:** Tapping the stock draws **three** cards (or fewer if fewer remain).
 - **Menu assist draw:** The menu’s **Draw Card** option draws **one** card to help when you are stuck.
-- **Move Assist:** Optional destination filtering and legal-move counts in the info panel while navigating moves.
+ - **Move Assist:** Optional destination filtering and legal-move counts in the info panel while navigating moves. With Move Assist ON, destination scroll skips illegal drops; waste selection auto-focuses the leftmost legal tableau destination (then foundation), and tableau auto-focuses only when exactly one legal destination exists.
 - **HUD-first menu:** Settings menu is shown in the HUD/info panel (not a board overlay) and includes Move Assist, Draw Card, Reset, and Exit.
 - **Save & resume:** Autosaves game state and Move Assist setting; restores on launch when valid data exists.
 - **Exit behavior:** Choosing **Exit** saves the current game state, then closes the app.
 - **Win prompt:** Shows `You win!` and `Tap for new game`; tap starts a new game, double-tap opens the menu.
 
 Full behavior, controls, and app-specific rule notes are on the in-app help page ([index.html](index.html)).
+
+## Performance and responsiveness
+
+This project contains explicit transport-pressure handling, stale-render skipping, tile-level partial updates, and input/autosave debouncing tuned for Even Hub + G2 constraints. See [docs/performance-responsiveness-design.md](docs/performance-responsiveness-design.md) for the implementation rationale and guardrails.
+
+Current default runtime profile is the full-board **3-tile** layout (top + bottom-left + bottom-right image tiles) with the left info panel as the event-capture text container.
 
 ## License & credits
 

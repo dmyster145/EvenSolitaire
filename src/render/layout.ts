@@ -202,7 +202,8 @@ export const INFO_TEXT_CONTAINER = {
   x: 0,
   y: TILE_BOARD_Y,
   width: INFO_PANEL_W,
-  height: TILE_BOARD_H,
+  // Extend to the bottom of the canvas (beyond the 200px board height) for more HUD lines.
+  height: CANVAS_H - TILE_BOARD_Y,
 };
 
 /** @deprecated Alias kept for backward compat; points to INFO_TEXT_CONTAINER. */

@@ -48,6 +48,7 @@ export function tryConsumeTap(kind: "tap" | "double" = "tap"): boolean {
 
 export function resetTapCooldown(): void {
   tapCooldownUntil = 0;
+  lastTapTime = 0;
   lastAcceptedTapTime = 0;
   lastAcceptedTapKind = null;
 }

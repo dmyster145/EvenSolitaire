@@ -25,8 +25,7 @@ import {
 import type { Action } from "../state/actions";
 import { OsEventTypeList, type EvenHubEvent } from "@evenrealities/even_hub_sdk";
 
-/** Set true to show the win cascade animation on app start (for testing). Win animation disabled for now. */
-// const SHOW_WIN_ANIMATION_ON_START = true;
+// Link-pressure tuning: absorb bursty menu input and defer non-critical flushes while transport is degraded.
 const LINK_SLOW_DEFER_MENU_MOVE_MS = 72;
 const LINK_SLOW_DEFER_MENU_SELECT_MS = 96;
 const LINK_SLOW_DEFER_TOGGLE_MENU_MS = 120;
@@ -118,11 +117,6 @@ export async function initApp(): Promise<void> {
     recordPerfDispatch(source, action);
     store.dispatch(action);
   }
-
-  // Win animation disabled for now; may re-enable later.
-  // if (SHOW_WIN_ANIMATION_ON_START) {
-  //   store.dispatch({ type: "DEMO_WIN_ANIMATION" });
-  // }
 
   let perfLastInputAtMs = 0;
   let perfLastInputSeq = 0;
@@ -232,8 +226,6 @@ export async function initApp(): Promise<void> {
     });
   }
 
-  // Win animation disabled for now; may re-enable later.
-  // const WIN_ANIMATION_TICK_MS = 32;
   type FlushResult = Awaited<ReturnType<typeof flushDisplayUpdate>>;
   type LastSent = FlushResult["lastSent"];
   let lastSent: LastSent = {
@@ -266,8 +258,6 @@ export async function initApp(): Promise<void> {
   let completedFlushVersion = 0;
   let startupPageReadyForAssetRefresh = false;
   let pendingStartupAssetRefresh = false;
-  // let winAnimationInterval: ReturnType<typeof setInterval> | null = null;
-  // let hasOverlayContainer = true;
 
   function armFlushLoopAfterStartup(): void {
     if (flushLoopArmed) return;
@@ -523,12 +513,6 @@ export async function initApp(): Promise<void> {
             `intr=${healthEnd.interrupted ? "y" : "n"} ` +
             `busy=${healthStart.busy ? "y" : "n"}->${healthEnd.busy ? "y" : "n"}`
         );
-        // Win animation disabled for now; may re-enable later.
-        // if (result.didClearOverlay) {
-        //   await hub.rebuildPage(composeGameplayPage());
-        //   hasOverlayContainer = false;
-        //   await sendBoardImages(hub, store.getState());
-        // }
       }
     } finally {
       flushInProgress = false;
@@ -544,31 +528,6 @@ export async function initApp(): Promise<void> {
   function subscribeStoreEffects(): void {
     store.subscribe((state, prevState) => {
       if (state === prevState) return;
-
-      // Win animation disabled for now; may re-enable later.
-      // if (state.game.won && !state.ui.winAnimation) {
-      //   if (!hasOverlayContainer) {
-      //     (async () => {
-      //       await hub.rebuildPage(composeStartupPage());
-      //       hasOverlayContainer = true;
-      //       store.dispatch({ type: "WIN_ANIMATION_START" });
-      //     })();
-      //     return;
-      //   }
-      //   store.dispatch({ type: "WIN_ANIMATION_START" });
-      // }
-      // if (state.game.won && state.ui.winAnimation?.phase === "playing") {
-      //   if (!winAnimationInterval) {
-      //     winAnimationInterval = setInterval(() => {
-      //       store.dispatch({ type: "WIN_ANIMATION_TICK" });
-      //     }, WIN_ANIMATION_TICK_MS);
-      //   }
-      // } else {
-      //   if (winAnimationInterval) {
-      //     clearInterval(winAnimationInterval);
-      //     winAnimationInterval = null;
-      //   }
-      // }
 
       const gameOrSettingsChanged =
         state.game !== prevState.game || state.ui.moveAssist !== prevState.ui.moveAssist;

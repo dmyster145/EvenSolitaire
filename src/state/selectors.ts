@@ -139,6 +139,17 @@ const RANK_NAMES: Record<Rank, string> = {
   12: "Queen",
   13: "King",
 };
+
+// Keep long pile lists readable in the fixed-height info panel. When the active marker line
+// would be below the fold, shift the visible card lines so it remains visible.
+const INFO_PANEL_CARD_WINDOW_LINES = 6;
+// With Move Assist and legal-count lines above the pile, cap selected-mode total lines so the
+// active "<" line remains visible without needing to scroll the HUD.
+const INFO_PANEL_MAX_TOTAL_LINES_WITH_SELECTION = 9;
+// In browse mode (no selected card), show only the first 3 cards plus an ellipsis line
+// so the Move Assist status and legal-move count remain visible without scrolling.
+const INFO_PANEL_CARD_WINDOW_LINES_NO_SELECTION = 4;
+
 function cardLabel(c: Card): string {
   return `${RANK_NAMES[c.rank]} ${SUIT_NAMES[c.suit]}`;
 }
@@ -157,22 +168,43 @@ export function getInfoPanelText(state: AppState): string {
   } else {
     const pileIdx = focusIdx;
     const pileCards = getFocusedPileCards(state, pileIdx);
-    lines.push(infoPanelPileLabelFromIndex(pileIdx));
-    if (pileIdx === FOCUS_INDEX_STOCK) {
-      lines.push(`Cards Left: ${g.stock.length}`);
-    }
-    if (pileCards.length > 0) {
-      for (const c of pileCards) lines.push(cardLabel(c));
-    } else if (pileIdx !== FOCUS_INDEX_STOCK) {
-      lines.push("(empty)");
-    }
+    const activeTableauCardIndex = getInfoPanelActiveTableauCardIndex(state, pileIdx, pileCards.length);
+    const selectedSection = getInfoPanelSelectedPileSection(state, pileIdx);
+    const hasSelectedCard = !!state.ui.selection.source;
+    const prePileCardLineCount =
+      1 + // Move Assist line
+      (state.ui.moveAssist ? 1 : 0) + // Legal moves line (only when Move Assist is on)
+      1 + // spacer line
+      1 + // pile label
+      (pileIdx === FOCUS_INDEX_STOCK ? 1 : 0); // stock count line
+    const maxCardLines = hasSelectedCard
+      ? Math.max(
+          1,
+          Math.min(INFO_PANEL_CARD_WINDOW_LINES, INFO_PANEL_MAX_TOTAL_LINES_WITH_SELECTION - prePileCardLineCount)
+        )
+      : INFO_PANEL_CARD_WINDOW_LINES_NO_SELECTION;
 
-    lines.push("");
     lines.push(state.ui.moveAssist ? "Move Assist: ON" : "Move Assist: OFF");
 
     if (state.ui.moveAssist) {
       const count = countLegalMovesForFocus(state, pileIdx);
       lines.push(`${count} Legal Move${count !== 1 ? "s" : ""}`);
+    }
+
+    lines.push("");
+    lines.push(infoPanelPileLabelFromIndex(pileIdx));
+    if (pileIdx === FOCUS_INDEX_STOCK) {
+      lines.push(`Cards Left: ${g.stock.length}`);
+    }
+    if (pileCards.length > 0) {
+      lines.push(...formatInfoPanelCardLines(pileCards, activeTableauCardIndex, maxCardLines));
+    } else if (pileIdx !== FOCUS_INDEX_STOCK) {
+      lines.push("(empty)");
+    }
+
+    if (selectedSection.length > 0) {
+      lines.push("");
+      lines.push(...selectedSection);
     }
   }
 
@@ -185,6 +217,59 @@ function infoPanelPileLabelFromIndex(index: number): string {
   if (index >= FOCUS_INDEX_FIRST_FOUNDATION && index < FOCUS_INDEX_FIRST_TABLEAU) return "Foundation Pile:";
   if (index >= FOCUS_INDEX_FIRST_TABLEAU) return "Tableau Pile:";
   return "Pile:";
+}
+
+function getInfoPanelActiveTableauCardIndex(
+  state: AppState,
+  focusIdx: number,
+  pileCardCount: number
+): number {
+  if (focusIdx < FOCUS_INDEX_FIRST_TABLEAU) return -1;
+  if (pileCardCount <= 0) return -1;
+  if (state.ui.mode !== "select_source" && state.ui.mode !== "select_destination") return -1;
+  const source = state.ui.selection.source;
+  if (!source || source.area !== "tableau") return -1;
+  if (focusIdx !== FOCUS_INDEX_FIRST_TABLEAU + source.index) return -1;
+  const count = state.ui.selection.selectedCardCount ?? 1;
+  const idx = pileCardCount - count;
+  if (idx < 0 || idx >= pileCardCount) return -1;
+  return idx;
+}
+
+function getInfoPanelSelectedPileSection(state: AppState, focusIdx: number): string[] {
+  if (state.ui.mode !== "select_destination") return [];
+  const source = state.ui.selection.source;
+  if (!source) return [];
+  const sourceIdx = focusTargetToIndex(source);
+  if (sourceIdx === focusIdx) return [];
+
+  const selectedCards = getFloatingCards(state);
+  const lines: string[] = ["Selected Pile:"];
+
+  if (selectedCards.length === 0) {
+    lines.push("(empty)");
+    return lines;
+  }
+
+  lines.push(...formatInfoPanelCardLines(selectedCards, 0, INFO_PANEL_CARD_WINDOW_LINES));
+
+  return lines;
+}
+
+function formatInfoPanelCardLines(cards: Card[], activeIndex: number, maxLines: number): string[] {
+  if (maxLines <= 0) return [];
+  const cardLines = cards.map((c, i) => `${cardLabel(c)}${i === activeIndex ? " <" : ""}`);
+  if (cardLines.length <= maxLines) return cardLines;
+
+  if (activeIndex < 0) {
+    if (maxLines === 1) return ["..."];
+    return [...cardLines.slice(0, maxLines - 1), "..."];
+  }
+  if (activeIndex < maxLines) return cardLines.slice(0, maxLines);
+
+  const visibleCardLines = Math.max(1, maxLines - 1); // reserve one line for "..."
+  const start = Math.max(0, activeIndex - (visibleCardLines - 1));
+  return ["...", ...cardLines.slice(start, start + visibleCardLines)];
 }
 
 function getFocusedPileCards(state: AppState, focusIdx: number): Card[] {
@@ -224,6 +309,19 @@ function countLegalMovesForFocus(state: AppState, focusIdx: number): number {
     const pileIndex = focusIdx - FOCUS_INDEX_FIRST_TABLEAU;
     const pile = g.tableau[pileIndex];
     if (pile.visible.length === 0) return 0;
+
+    // When a tableau source is actively selected on this pile, count legal destinations for the
+    // current selected stack only (based on the active "<" card), not the union of all sub-stacks.
+    const selectionSource = state.ui.selection.source;
+    const sourceFocusIdx = selectionSource ? focusTargetToIndex(selectionSource) : -1;
+    if (
+      (state.ui.mode === "select_source" || state.ui.mode === "select_destination") &&
+      selectionSource?.area === "tableau" &&
+      sourceFocusIdx === focusIdx
+    ) {
+      const count = Math.max(1, Math.min(state.ui.selection.selectedCardCount ?? 1, pile.visible.length));
+      return getLegalDests(g, { area: "tableau", pileIndex, count }).length;
+    }
 
     const destSet = new Set<string>();
     for (let c = 1; c <= pile.visible.length; c++) {

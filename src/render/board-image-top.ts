@@ -163,13 +163,14 @@ export function renderBoardTopToCanvas(
     ctx.clip();
     for (let j = 0; j < tableauFloats.length; j++) {
       const isRaisedCard = j === 0;
+      const isFrontCard = j === tableauFloats.length - 1;
       const cyScreen = isRaisedCard
         ? raisedYScreen
         : baseYScreen - (tableauFloats.length - 1 - j) * STACK_OFFSET_Y_PEEK;
       const cardBottom = cyScreen + CARD_TABLEAU_H;
       if (cyScreen >= 0 && cardBottom <= H) {
         drawFaceUpCard(ctx, fx, cyScreen, CARD_TABLEAU_W, CARD_TABLEAU_H, tableauFloats[j]!, {
-          highlight: isRaisedCard ? "focus" : undefined,
+          highlight: isRaisedCard || isFrontCard ? "focus" : undefined,
         });
       }
     }
@@ -273,7 +274,7 @@ export function renderBoardTop(view: TopRowViewModel, previousFramePng?: number[
   return canvasToPngBytes(canvas, "row-top");
 }
 
-/** Legacy placeholder for Phase 0 compatibility when no game state. */
+/** Deterministic placeholder frame used in tests and startup fallback paths. */
 export function renderBoardTopPlaceholder(focusIndex: number): Promise<number[]> {
   return renderBoardTop({
     stockCount: 24,

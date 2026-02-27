@@ -1,7 +1,7 @@
 import type { AppState } from "./types";
 import { FOCUS_COUNT, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU } from "./constants";
 import { MENU_OPTIONS, CONFIRM_RESET_OPTIONS } from "./constants";
-import { deal, wonGameState } from "../game/deal";
+import { deal } from "../game/deal";
 import {
   drawFromStock,
   drawThreeFromStock,
@@ -45,10 +45,75 @@ function isFoundationFocusIndex(index: number): boolean {
   return index >= FOCUS_INDEX_FIRST_FOUNDATION && index < FOCUS_INDEX_FIRST_TABLEAU;
 }
 
+function hasTopCardAtFocusIndex(state: AppState, index: number): boolean {
+  const g = state.game;
+  if (index === FOCUS_INDEX_STOCK) return g.stock.length > 0;
+  if (index === FOCUS_INDEX_WASTE) return g.waste.length > 0;
+  if (index >= FOCUS_INDEX_FIRST_FOUNDATION && index < FOCUS_INDEX_FIRST_TABLEAU) {
+    return g.foundations[index - FOCUS_INDEX_FIRST_FOUNDATION].cards.length > 0;
+  }
+  if (index >= FOCUS_INDEX_FIRST_TABLEAU && index < FOCUS_COUNT) {
+    return g.tableau[index - FOCUS_INDEX_FIRST_TABLEAU].visible.length > 0;
+  }
+  return false;
+}
+
+function nextFocusWithTopCard(state: AppState, startIndex: number): AppState["ui"]["focus"] {
+  for (let i = 1; i <= FOCUS_COUNT; i += 1) {
+    const next = (startIndex + i) % FOCUS_COUNT;
+    if (isFoundationFocusIndex(next)) continue;
+    if (hasTopCardAtFocusIndex(state, next)) return focusIndexToTarget(next);
+  }
+  return focusIndexToTarget(startIndex);
+}
+
+function resolveFocusAfterFoundationMove(state: AppState, sourceFocus: AppState["ui"]["focus"]): AppState["ui"]["focus"] {
+  const sourceIndex = focusTargetToIndex(sourceFocus);
+  if (hasTopCardAtFocusIndex(state, sourceIndex)) return sourceFocus;
+  return nextFocusWithTopCard(state, sourceIndex);
+}
+
 type LegalDestCacheEntry = {
   dests: Dest[];
   focusIndexes: Set<number>;
 };
+
+function getAutoDestinationFocusTarget(source: Source, dests: Dest[]): AppState["ui"]["focus"] | null {
+  // Waste assist: prefer tableau destinations and choose the first legal pile from the left.
+  if (source.area === "waste") {
+    const leftmostTableauDest = dests.find((d) => d.area === "tableau");
+    if (leftmostTableauDest && leftmostTableauDest.area === "tableau") {
+      return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + leftmostTableauDest.index);
+    }
+  }
+
+  // Tableau top-card assist: only auto-focus when there is exactly one legal destination.
+  // If there are multiple legal moves, keep focus on source so the player chooses.
+  if (source.area === "tableau") return null;
+
+  // Fallback: prefer foundation when legal.
+  const foundationDest = dests.find((d) => d.area === "foundation");
+  if (foundationDest && foundationDest.area === "foundation") {
+    return focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION + foundationDest.index);
+  }
+
+  return null;
+}
+
+function getTableauUniqueDestFocusIndexes(
+  game: AppState["game"],
+  pileIndex: number
+): Set<number> {
+  const pile = game.tableau[pileIndex];
+  const allFocusIndexes = new Set<number>();
+  for (let count = 1; count <= pile.visible.length; count += 1) {
+    const entry = getCachedLegalDestEntry(game, { area: "tableau", pileIndex, count });
+    for (const focusIndex of entry.focusIndexes) {
+      allFocusIndexes.add(focusIndex);
+    }
+  }
+  return allFocusIndexes;
+}
 
 // Cache legal destinations across focus navigation while the immutable game snapshot and
 // selection source/count remain unchanged. This removes repeated move-validation work in
@@ -220,11 +285,25 @@ export function rootReducer(
       const source = sourceFromTarget(state, action.target);
       if (!source) return state;
       const dests = getCachedLegalDestEntry(state.game, source).dests;
+      let autoDestinationFocus: AppState["ui"]["focus"] | null = null;
+      if (state.ui.moveAssist) {
+        autoDestinationFocus = getAutoDestinationFocusTarget(source, dests);
+        if (source.area === "tableau") {
+          const uniqueDestFocusIndexes = getTableauUniqueDestFocusIndexes(state.game, source.pileIndex);
+          if (uniqueDestFocusIndexes.size === 1) {
+            const [onlyFocusIndex] = uniqueDestFocusIndexes;
+            autoDestinationFocus = focusIndexToTarget(onlyFocusIndex);
+          } else {
+            autoDestinationFocus = null;
+          }
+        }
+      }
       return {
         ...state,
         ui: {
           ...state.ui,
           mode: "select_destination",
+          focus: autoDestinationFocus ?? state.ui.focus,
           selection: { source: action.target, selectedCardCount: 1 },
           message: dests.length === 0 ? "No legal move from selected pile" : undefined,
         },
@@ -276,7 +355,7 @@ export function rootReducer(
       if (isLegalMove(state.game, source, action.dest)) {
         pushUndo(state.game);
         const nextGame = checkWin(applyMove(state.game, source, action.dest));
-        return {
+        const baseAfterMove: AppState = {
           ...state,
           game: nextGame,
           ui: {
@@ -285,6 +364,15 @@ export function rootReducer(
             selection: {},
             selectionInvalidBlink: undefined,
             message: nextGame.won ? "You win!" : undefined,
+          },
+        };
+        const focus =
+          action.dest.area === "foundation" ? resolveFocusAfterFoundationMove(baseAfterMove, src) : state.ui.focus;
+        return {
+          ...baseAfterMove,
+          ui: {
+            ...baseAfterMove.ui,
+            focus,
           },
         };
       }
@@ -413,177 +501,6 @@ export function rootReducer(
       return { ...state, ui: { ...state.ui, message: action.message } };
     case "DISMISS_MESSAGE":
       return { ...state, ui: { ...state.ui, message: undefined } };
-
-    /* Win animation disabled for now; may re-enable later.
-    case "DEMO_WIN_ANIMATION": {
-      const game = wonGameState();
-      const foundationCards = game.foundations.map((f) => [...f.cards]);
-      return {
-        ...state,
-        game,
-        ui: {
-          ...state.ui,
-          winAnimation: {
-            phase: "playing",
-            foundationCards,
-            flyingCard: null,
-            flyX: 0,
-            flyY: 0,
-            flyVx: 0,
-            flyVy: 0,
-            nextFoundationIndex: 0,
-            bounceCount: 0,
-          },
-        },
-      };
-    }
-
-    case "WIN_ANIMATION_START": {
-      if (!state.game.won || state.ui.winAnimation) return state;
-      const foundationCards = state.game.foundations.map((f) => [...f.cards]);
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          winAnimation: {
-            phase: "playing",
-            foundationCards,
-            flyingCard: null,
-            flyX: 0,
-            flyY: 0,
-            flyVx: 0,
-            flyVy: 0,
-            nextFoundationIndex: 0,
-            bounceCount: 0,
-          },
-        },
-      };
-    }
-
-    case "WIN_ANIMATION_TICK": {
-      const wa = state.ui.winAnimation;
-      if (!state.game.won || wa?.phase !== "playing") return state;
-      const CARD_TOP_W = 62;
-      const CARD_TOP_H = 80;
-      const HALF_W = CARD_TOP_W / 2;
-      const BOTTOM_MARGIN = 20;
-      const GRAVITY = 1.1;
-      const BOUNCE_DAMP = 0.78;
-      const MIN_HORIZONTAL = 2.8;
-
-      const MAX_BOUNCES = 12;
-      if (wa.flyingCard) {
-        let flyX = wa.flyX + wa.flyVx;
-        let flyY = wa.flyY + wa.flyVy;
-        let flyVx = wa.flyVx;
-        let flyVy = wa.flyVy + GRAVITY;
-        let bounceCount = wa.bounceCount ?? 0;
-        if (flyY > 288 - CARD_TOP_H / 2 - BOTTOM_MARGIN) {
-          if (bounceCount >= MAX_BOUNCES) {
-            return {
-              ...state,
-              ui: {
-                ...state.ui,
-                winAnimation: {
-                  ...wa,
-                  flyingCard: null,
-                  flyX: 0,
-                  flyY: 0,
-                  flyVx: 0,
-                  flyVy: 0,
-                  bounceCount: 0,
-                },
-              },
-            };
-          }
-          flyY = 288 - CARD_TOP_H / 2 - BOTTOM_MARGIN;
-          flyVy *= -BOUNCE_DAMP;
-          if (Math.abs(flyVx) < MIN_HORIZONTAL) {
-            flyVx = flyVx >= 0 ? MIN_HORIZONTAL : -MIN_HORIZONTAL;
-          }
-          bounceCount += 1;
-        }
-        const offScreen = flyX < -HALF_W || flyX > 576 + HALF_W;
-        if (offScreen) {
-          return {
-            ...state,
-            ui: {
-              ...state.ui,
-              winAnimation: {
-                ...wa,
-                flyingCard: null,
-                flyX: 0,
-                flyY: 0,
-                flyVx: 0,
-                flyVy: 0,
-                bounceCount: 0,
-              },
-            },
-          };
-        }
-        return {
-          ...state,
-          ui: {
-            ...state.ui,
-            winAnimation: { ...wa, flyX, flyY, flyVx, flyVy, bounceCount },
-          },
-        };
-      }
-
-      const allEmpty = wa.foundationCards.every((p) => p.length === 0);
-      if (allEmpty) {
-        return {
-          ...state,
-          ui: {
-            ...state.ui,
-            winAnimation: { phase: "done", foundationCards: [], flyingCard: null, flyX: 0, flyY: 0, flyVx: 0, flyVy: 0, nextFoundationIndex: 0, bounceCount: 0 },
-          },
-        };
-      }
-
-      let idx = wa.nextFoundationIndex;
-      while (wa.foundationCards[idx].length === 0) idx = (idx + 1) % 4;
-      const piles = wa.foundationCards.map((p, i) => (i === idx ? p.slice(0, -1) : p));
-      const card = wa.foundationCards[idx][wa.foundationCards[idx].length - 1]!;
-      const slotIndex = idx + 2;
-      const centerX = slotIndex * 96 + 2 + 46;
-      const centerY = 12 + 60;
-      let flyVx = (Math.random() - 0.5) * 10;
-      const MIN_SPAWN_HORIZONTAL = 3.5;
-      if (Math.abs(flyVx) < MIN_SPAWN_HORIZONTAL) {
-        flyVx = flyVx >= 0 ? MIN_SPAWN_HORIZONTAL : -MIN_SPAWN_HORIZONTAL;
-      }
-      const flyVy = -8 - Math.random() * 5;
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          winAnimation: {
-            phase: "playing",
-            foundationCards: piles,
-            flyingCard: card,
-            flyX: centerX,
-            flyY: centerY,
-            flyVx,
-            flyVy,
-            nextFoundationIndex: (idx + 1) % 4,
-            bounceCount: 0,
-          },
-        },
-      };
-    }
-
-    case "WIN_ANIMATION_SKIP": {
-      if (!state.game.won || state.ui.winAnimation?.phase !== "playing") return state;
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          winAnimation: { phase: "done", foundationCards: [], flyingCard: null, flyX: 0, flyY: 0, flyVx: 0, flyVy: 0, nextFoundationIndex: 0, bounceCount: 0 },
-        },
-      };
-    }
-    */
 
     default:
       return state;

@@ -113,8 +113,6 @@ function tapAction(state: AppState): Action {
     return { type: "MENU_SELECT" };
   }
   if (state.game.won) {
-    // Win animation disabled for now; may re-enable later.
-    // if (state.ui.winAnimation?.phase === "playing") return { type: "WIN_ANIMATION_SKIP" };
     return { type: "NEW_GAME" };
   }
   if (state.ui.mode === "select_destination") {
