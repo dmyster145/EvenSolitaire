@@ -124,7 +124,7 @@ describe("source select auto-destination focus", () => {
     expect(next.game.foundations[0].cards).toHaveLength(1);
   });
 
-  it("auto-focuses the leftmost legal tableau pile for waste, even when foundation is also legal", () => {
+  it("auto-focuses foundation for waste when both foundation and tableau destinations are legal", () => {
     const game = emptyGame();
     game.waste = [card("w6c", 6, "C")];
     game.foundations[0].cards = [card("f5c", 5, "C")];
@@ -144,7 +144,7 @@ describe("source select auto-destination focus", () => {
     const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_WASTE) });
 
     expect(next.ui.mode).toBe("select_destination");
-    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + 1));
+    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION));
     expect(next.game.waste).toHaveLength(1);
     expect(next.game.foundations[0].cards).toHaveLength(1);
   });

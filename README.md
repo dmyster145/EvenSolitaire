@@ -108,7 +108,7 @@ Output is in `dist/`. Deploy that folder to any static host, then open the deplo
 - **Klondike Solitaire gameplay:** Standard tableau/foundation rules with automatic flip of newly exposed tableau cards.
 - **Stock draw behavior:** Tapping the stock draws **three** cards (or fewer if fewer remain).
 - **Menu assist draw:** The menu’s **Draw Card** option draws **one** card to help when you are stuck.
- - **Move Assist:** Optional destination filtering and legal-move counts in the info panel while navigating moves. With Move Assist ON, destination scroll skips illegal drops; waste selection auto-focuses the leftmost legal tableau destination (then foundation), and tableau auto-focuses only when exactly one legal destination exists.
+- **Move Assist:** Optional destination filtering and legal-move counts in the info panel while navigating moves. With Move Assist ON, destination scroll skips illegal drops; waste selection auto-focuses foundation first (then the leftmost legal tableau destination), and tableau auto-focuses only when exactly one legal destination exists.
 - **HUD-first menu:** Settings menu is shown in the HUD/info panel (not a board overlay) and includes Move Assist, Draw Card, Reset, and Exit.
 - **Save & resume:** Autosaves game state and Move Assist setting; restores on launch when valid data exists.
 - **Exit behavior:** Choosing **Exit** saves the current game state, then closes the app.

@@ -79,12 +79,17 @@ type LegalDestCacheEntry = {
 };
 
 function getAutoDestinationFocusTarget(source: Source, dests: Dest[]): AppState["ui"]["focus"] | null {
-  // Waste assist: prefer tableau destinations and choose the first legal pile from the left.
+  // Waste assist: prefer foundation first, then choose the first legal tableau pile from the left.
   if (source.area === "waste") {
+    const foundationDest = dests.find((d) => d.area === "foundation");
+    if (foundationDest && foundationDest.area === "foundation") {
+      return focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION + foundationDest.index);
+    }
     const leftmostTableauDest = dests.find((d) => d.area === "tableau");
     if (leftmostTableauDest && leftmostTableauDest.area === "tableau") {
       return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + leftmostTableauDest.index);
     }
+    return null;
   }
 
   // Tableau top-card assist: only auto-focus when there is exactly one legal destination.

@@ -452,10 +452,10 @@
           <summary>Getting Started</summary>
           <div class="section-content">
             <h3>Welcome</h3>
-            <p>EvenSolitaire is Klondike Solitaire built for Even Realities G2 gesture input: scroll, tap, and double-tap.</p>
+            <p>EvenSolitaire is classic Klondike tuned for Even Realities G2: scroll, tap, and double-tap. Tiny gesture set, big card energy.</p>
 
             <h3>Launch</h3>
-            <p>On launch, the app restores your last saved game when available. If no valid save is found, it deals a new shuffled game.</p>
+            <p>On launch, the app restores your latest valid save. If there is no save, it deals a fresh shuffle.</p>
             <ul>
               <li>Restores game state when a save exists</li>
               <li>Restores your <strong>Move Assist</strong> setting with the save</li>
@@ -463,7 +463,7 @@
             </ul>
 
             <h3>What This Covers</h3>
-            <p>This page documents the current user-facing behavior: controls, menus, prompts, save/resume behavior, and the Klondike rules used by this build.</p>
+            <p>This page mirrors current in-game behavior: controls, menus, prompts, save/resume, and Klondike rules as implemented in this build.</p>
           </div>
         </details>
       </section>
@@ -477,20 +477,19 @@
               <li><strong>Stock:</strong> Face-down draw pile. Tap to draw three cards.</li>
               <li><strong>Waste:</strong> Face-up draw pile. Only the top card is playable.</li>
               <li><strong>Foundations (4):</strong> Build each suit from Ace to King.</li>
-              <li><strong>Tableau (7):</strong> Main play columns built downward in alternating colors.</li>
+              <li><strong>Tableau (7):</strong> Main play columns, built downward in alternating colors.</li>
             </ul>
 
             <h3>Focus Navigation</h3>
-            <p>The app is gesture-driven, so a focus cursor moves between pile targets:</p>
+            <p>Focus is your cursor. It moves by mode:</p>
             <ul>
-              <li>Browse mode skips empty non-stock piles</li>
-              <li>Browse mode also skips foundations</li>
+              <li>Browse mode skips empty non-stock piles and skips foundations</li>
               <li>Destination mode moves across tableau and foundation drop targets</li>
               <li>With Move Assist ON, illegal destinations are skipped</li>
             </ul>
 
             <div class="tip">
-              <strong>Note:</strong> Foundations can be focused during placement, even though browse mode skips them.
+              <strong>Note:</strong> Foundations are skipped during browse mode, but are available during placement.
             </div>
           </div>
         </details>
@@ -500,22 +499,22 @@
         <details>
           <summary>Controls</summary>
           <div class="section-content">
-            <p>Use three gestures on the G2 touchpad:</p>
+            <p>Three gestures run the whole table:</p>
 
             <div class="gesture-grid">
               <div class="gesture-card">
                 <strong>Scroll</strong>
-                Move focus between piles, destinations, or menu items.
+                Navigate focus between piles, destinations, and menu items.
               </div>
 
               <div class="gesture-card">
                 <strong>Tap</strong>
-                Draw from stock, select a source pile, place cards, or confirm a menu option.
+                Select, place, draw, or confirm. Context decides.
               </div>
 
               <div class="gesture-card">
                 <strong>Double Tap</strong>
-                Open or close the menu, or cancel an active selection. On win, open the menu.
+                Open/close menu, or cancel an active selection. On win, it opens menu.
               </div>
             </div>
 
@@ -528,11 +527,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr><td>Stock</td><td>Draw three cards. If stock is empty and waste has cards, recycle the waste and continue.</td></tr>
-                <tr><td>Waste</td><td>Select top waste card as the source. With Move Assist ON, focus auto-jumps to the leftmost legal tableau destination; if none exists, it jumps to a legal foundation.</td></tr>
-                <tr><td>Tableau</td><td>Select as source, or place a carried card/run. With Move Assist ON, if the face-up run has exactly one legal destination across run sizes, focus auto-jumps there. If there are multiple legal moves, focus stays on the source.</td></tr>
-                <tr><td>Foundation</td><td>Destination during placement (legal moves only).</td></tr>
-                <tr><td>Menu Open</td><td>Select the highlighted menu option.</td></tr>
+                <tr><td>Stock</td><td>Draw three cards. If stock is empty and waste has cards, waste recycles first, then draw continues.</td></tr>
+                <tr><td>Waste</td><td>Select waste top as source. With Move Assist ON, focus auto-jumps to a legal foundation first; if none exists, it jumps to the leftmost legal tableau destination.</td></tr>
+                <tr><td>Tableau</td><td>Select as source, or place a carried run. With Move Assist ON, focus auto-jumps only when the face-up run has exactly one legal destination across run sizes.</td></tr>
+                <tr><td>Foundation</td><td>While carrying cards, attempts placement to that foundation (legal moves only).</td></tr>
+                <tr><td>Menu Open</td><td>Activates the highlighted menu option.</td></tr>
                 <tr><td>Win State</td><td>Start a new game.</td></tr>
               </tbody>
             </table>
@@ -546,19 +545,19 @@
           <div class="section-content">
             <h3>Basic Move Flow</h3>
             <ol>
-              <li><strong>Scroll</strong> to the pile you want to use (stock, waste, or tableau)</li>
-              <li><strong>Tap</strong> to select the source (or draw from stock)</li>
-              <li>With Move Assist ON, if an auto-destination is available, focus jumps there. Waste prefers the leftmost legal tableau (then foundation). Tableau only auto-jumps when the face-up run has exactly one legal destination.</li>
-              <li><strong>Tap</strong> to place</li>
+              <li><strong>Scroll</strong> to the source pile (stock, waste, or tableau)</li>
+              <li><strong>Tap</strong> to draw or pick up cards</li>
+              <li>With Move Assist ON, focus may auto-jump to a legal destination (waste prefers foundation, then leftmost legal tableau; tableau jumps only with exactly one legal destination)</li>
+              <li><strong>Tap</strong> again to place</li>
             </ol>
 
             <h3>Selecting Tableau Runs (Multi-card Moves)</h3>
-            <p>In destination mode, tapping the <strong>same tableau column</strong> cycles the carried run size (1, 2, 3, and so on up to the visible count, then back to 1).</p>
-            <p>This is how the app supports moving tableau runs without an extra gesture.</p>
+            <p>In destination mode, tapping the <strong>same tableau column</strong> cycles carried run size (1, 2, 3, ... up to visible count, then back to 1).</p>
+            <p>Think of it as a built-in run-size dial, no extra gesture required.</p>
 
             <h3>Invalid Moves and Canceling</h3>
             <ul>
-              <li>Illegal placements blink briefly and return focus to the source</li>
+              <li>Illegal placements blink briefly, then focus snaps back to source</li>
               <li>If a selected source has no legal moves, the HUD may show <code>0 Legal Moves</code></li>
               <li><strong>Double-tap</strong> cancels the current selection and returns to browsing</li>
             </ul>
@@ -572,7 +571,7 @@
           <summary>Rules (Klondike Solitaire)</summary>
           <div class="section-content">
             <h3>Official Rules Reference</h3>
-            <p>Baseline reference: Bicycle Cards' standard Klondike Solitaire rules. EvenSolitaire follows that structure, with G2-specific interaction notes below.</p>
+            <p>Baseline reference: Standard Klondike. EvenSolitaire keeps that rule core and adapts interaction for G2 gestures.</p>
 
             <h3>Objective</h3>
             <p>Move all cards to the four foundations, building each suit from Ace to King.</p>
@@ -601,8 +600,8 @@
             <h3>App-Specific Clarifications</h3>
             <ul>
               <li><strong>Board draw:</strong> Tapping the stock draws <strong>three cards</strong> (or fewer when fewer cards remain)</li>
-              <li><strong>Menu draw assist:</strong> The menu’s <strong>Draw Card</strong> option draws <strong>one card</strong> to help when you are stuck</li>
-              <li><strong>Auto-destination priority (Move Assist ON):</strong> Selecting from waste auto-focuses the leftmost legal tableau destination, then foundation if needed. Selecting from tableau auto-focuses only when the face-up run has exactly one legal destination. The move is not placed until you tap.</li>
+              <li><strong>Menu draw assist:</strong> The menu’s <strong>Draw Card</strong> option draws <strong>one card</strong> (and handles recycle first when needed)</li>
+              <li><strong>Auto-destination priority (Move Assist ON):</strong> Selecting from waste auto-focuses foundation first, then the leftmost legal tableau destination if no legal foundation exists. Selecting from tableau auto-focuses only when the face-up run has exactly one legal destination. The move is not placed until you tap.</li>
               <li><strong>Recycle:</strong> The waste can be recycled when the stock is empty</li>
               <li><strong>Win condition:</strong> You win when all four foundations have 13 cards</li>
             </ul>
@@ -618,23 +617,23 @@
         <details>
           <summary>Menu Options</summary>
           <div class="section-content">
-            <p>Double-tap during normal play to open the menu. Scroll to browse. Tap to select. Double-tap again to close the menu.</p>
+            <p>Double-tap in normal play to open menu. Scroll to choose, tap to confirm, double-tap to close.</p>
 
             <h3>Move Assist</h3>
-            <p>Toggles destination filtering and legal move counts in the info panel.</p>
+            <p>Toggles destination filtering and legal-move counts in the info panel.</p>
             <ul>
               <li><strong>On:</strong> Destination scrolling skips illegal drops while carrying cards</li>
               <li><strong>Off:</strong> You can scroll to any tableau or foundation destination</li>
             </ul>
 
             <h3>Draw Card</h3>
-            <p>Draws one card from the stock as an assist action when you are stuck. This is separate from the board stock draw, which draws three cards.</p>
+            <p>Draws one card from stock as an assist action. This is separate from board stock draw, which draws three.</p>
 
             <h3>Reset</h3>
             <p>Shows a <code>Yes</code>/<code>No</code> confirmation before starting a new game.</p>
 
             <h3>Exit</h3>
-            <p>Closes the app and saves the current game state before exit. Use double-tap if you only want to close the menu.</p>
+            <p>Saves current game state, then exits the app. Use double-tap if you only want to close menu.</p>
           </div>
         </details>
       </section>
@@ -644,13 +643,13 @@
           <summary>Status &amp; Feedback</summary>
           <div class="section-content">
             <h3>HUD Prompts</h3>
-            <p>The HUD changes by mode and may show prompts such as:</p>
+            <p>The HUD changes by mode. Common lines include:</p>
             <ul>
               <li><code>Select source pile</code></li>
               <li><code>Focus: Stock</code>, <code>Focus: Waste</code>, <code>Focus: T1</code> ... <code>Focus: T7</code></li>
-              <li><code>[Menu]</code> plus the current menu items</li>
+              <li><code>MENU</code> with the selected option marked by <code>&gt;</code></li>
               <li><code>You win! Tap for new game</code></li>
-              <li><code>Status Message</code> and other short messages</li>
+              <li>Short state messages such as <code>0 Legal Moves</code></li>
             </ul>
 
             <h3>Info Panel / Focus Details</h3>
@@ -661,7 +660,7 @@
             </ul>
 
             <h3>Menu in HUD</h3>
-            <p>The menu renders in the HUD panel with the selected line highlighted. Reset switches the HUD menu to a confirmation prompt.</p>
+            <p>The menu lives in the HUD panel. Reset swaps options to a <code>Yes</code>/<code>No</code> confirmation prompt.</p>
           </div>
         </details>
       </section>
@@ -671,7 +670,7 @@
           <summary>Save &amp; Resume</summary>
           <div class="section-content">
             <h3>Autosave</h3>
-            <p>The app autosaves your game state and Move Assist setting. Saves are queued and debounced so rendering stays responsive under load.</p>
+            <p>The app autosaves game state and Move Assist. Saves are queued and debounced so gameplay stays responsive under load.</p>
 
             <h3>Persistence</h3>
             <ul>
@@ -680,7 +679,7 @@
             </ul>
 
             <h3>Resume on Launch</h3>
-            <p>On startup, the app restores a saved game and Move Assist before creating the initial state when valid save data exists.</p>
+            <p>On startup, valid save data restores both game state and Move Assist before initial state is finalized.</p>
           </div>
         </details>
       </section>
@@ -711,14 +710,11 @@
           <div class="section-content">
             <h3>Playing Efficiently</h3>
             <ul>
-              <li>Use <strong>Move Assist</strong> while learning. It reduces destination scrolling noise.</li>
+              <li>Use <strong>Move Assist</strong> while learning. It cuts destination-scrolling noise.</li>
               <li>If a tableau selection looks wrong, double-tap to cancel and reselect.</li>
               <li>Tapping the same tableau column while carrying cards changes the run size.</li>
               <li>Watch for newly exposed tableau cards. The app flips them automatically.</li>
             </ul>
-            <div class="tip">
-              <strong>Rule reference:</strong> Klondike rules are the baseline. EvenSolitaire adapts them to G2 gestures and visual overlays.
-            </div>
           </div>
         </details>
       </section>
