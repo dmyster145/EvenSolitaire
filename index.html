@@ -529,7 +529,7 @@
               <tbody>
                 <tr><td>Stock</td><td>Draw three cards. If stock is empty and waste has cards, waste recycles first, then draw continues.</td></tr>
                 <tr><td>Waste</td><td>Select waste top as source. With Move Assist ON, focus auto-jumps to a legal foundation first; if none exists, it jumps to the leftmost legal tableau destination.</td></tr>
-                <tr><td>Tableau</td><td>Select as source, or place a carried run. With Move Assist ON, tapping a tableau Ace auto-places it to foundation; otherwise focus auto-jumps only when the face-up run has exactly one legal destination across run sizes.</td></tr>
+                <tr><td>Tableau</td><td>Select as source, or place a carried run. With Move Assist ON, tapping a tableau Ace auto-places it to foundation; otherwise focus auto-jumps only when the currently selected stack has exactly one legal destination.</td></tr>
                 <tr><td>Foundation</td><td>While carrying cards, attempts placement to that foundation (legal moves only).</td></tr>
                 <tr><td>Menu Open</td><td>Activates the highlighted menu option.</td></tr>
                 <tr><td>Win State</td><td>Start a new game.</td></tr>
@@ -547,7 +547,7 @@
             <ol>
               <li><strong>Scroll</strong> to the source pile (stock, waste, or tableau)</li>
               <li><strong>Tap</strong> to draw or pick up cards</li>
-              <li>With Move Assist ON, focus may auto-jump to a legal destination (waste prefers foundation, then leftmost legal tableau; tableau jumps only with exactly one legal destination), and tapping a tableau Ace auto-places it to foundation</li>
+              <li>With Move Assist ON, focus may auto-jump to a legal destination (waste prefers foundation, then leftmost legal tableau; tableau jumps only when the currently selected stack has exactly one legal destination), and tapping a tableau Ace auto-places it to foundation</li>
               <li><strong>Tap</strong> again to place</li>
             </ol>
 
@@ -601,7 +601,7 @@
             <ul>
               <li><strong>Board draw:</strong> Tapping the stock draws <strong>three cards</strong> (or fewer when fewer cards remain)</li>
               <li><strong>Menu draw assist:</strong> The menu’s <strong>Draw Card</strong> option draws <strong>one card</strong> (and handles recycle first when needed)</li>
-              <li><strong>Auto-destination priority (Move Assist ON):</strong> Selecting from waste auto-focuses foundation first, then the leftmost legal tableau destination if no legal foundation exists. Selecting from tableau auto-focuses only when the face-up run has exactly one legal destination, except tableau Aces, which auto-place to foundation on tap even if other moves exist.</li>
+              <li><strong>Auto-destination priority (Move Assist ON):</strong> Selecting from waste auto-focuses foundation first, then the leftmost legal tableau destination if no legal foundation exists. Selecting from tableau auto-focuses only when the currently selected stack has exactly one legal destination, except tableau Aces, which auto-place to foundation on tap even if other moves exist.</li>
               <li><strong>Recycle:</strong> The waste can be recycled when the stock is empty</li>
               <li><strong>Win condition:</strong> You win when all four foundations have 13 cards</li>
             </ul>

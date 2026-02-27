@@ -134,32 +134,15 @@ function getAutoDestinationFocusTarget(source: Source, dests: Dest[]): AppState[
   return null;
 }
 
-function getTableauSingleLegalDestFocusIndex(
+function getSingleLegalDestFocusForSource(
   game: AppState["game"],
-  pileIndex: number
-): number | null {
-  const pile = game.tableau[pileIndex];
-  let onlyFocusIndex: number | null = null;
-
-  // We only need to know whether there is exactly one unique destination across all
-  // selectable stack sizes. Exit as soon as a second unique destination appears.
-  for (let count = 1; count <= pile.visible.length; count += 1) {
-    const focusIndexes = getCachedLegalDestEntry(game, { area: "tableau", pileIndex, count }).focusIndexes;
-    if (focusIndexes.size === 0) continue;
-
-    if (onlyFocusIndex === null) {
-      if (focusIndexes.size > 1) return null;
-      const first = focusIndexes.values().next();
-      if (first.done) continue;
-      onlyFocusIndex = first.value;
-      continue;
-    }
-
-    if (focusIndexes.size === 1 && focusIndexes.has(onlyFocusIndex)) continue;
-    return null;
-  }
-
-  return onlyFocusIndex;
+  source: Source
+): AppState["ui"]["focus"] | null {
+  const focusIndexes = getCachedLegalDestEntry(game, source).focusIndexes;
+  if (focusIndexes.size !== 1) return null;
+  const first = focusIndexes.values().next();
+  if (first.done) return null;
+  return focusIndexToTarget(first.value);
 }
 
 // Cache legal destinations across focus navigation while the immutable game snapshot and
@@ -263,7 +246,10 @@ function sourceFromTarget(state: AppState, target: AppState["ui"]["focus"]): Sou
   if (target.area === "waste") return { area: "waste" };
   if (target.area === "tableau") {
     const pile = state.game.tableau[target.index];
-    const count = state.ui.selection.selectedCardCount ?? 1;
+    const count =
+      state.ui.mode === "select_source" || state.ui.mode === "select_destination"
+        ? state.ui.selection.selectedCardCount ?? 1
+        : 1;
     if (!pile.visible.length || count > pile.visible.length) return null;
     return { area: "tableau", pileIndex: target.index, count };
   }
@@ -346,8 +332,7 @@ export function rootReducer(
       let autoDestinationFocus: AppState["ui"]["focus"] | null = null;
       if (state.ui.moveAssist) {
         if (source.area === "tableau") {
-          const onlyFocusIndex = getTableauSingleLegalDestFocusIndex(state.game, source.pileIndex);
-          autoDestinationFocus = onlyFocusIndex === null ? null : focusIndexToTarget(onlyFocusIndex);
+          autoDestinationFocus = getSingleLegalDestFocusForSource(state.game, source);
         } else {
           autoDestinationFocus = getAutoDestinationFocusTarget(source, dests);
         }

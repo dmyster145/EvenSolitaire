@@ -218,11 +218,10 @@ describe("source select auto-destination focus", () => {
     expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU));
   });
 
-  it("does not auto-focus for tableau source when run-size options create multiple legal destinations", () => {
+  it("does not auto-focus tableau source when only deeper run sizes have legal moves", () => {
     const game = emptyGame();
-    game.tableau[0].visible = [card("t7h", 7, "H"), card("t6c", 6, "C"), card("t5h", 5, "H")];
-    game.tableau[1].visible = [card("t6s", 6, "S")];
-    game.tableau[2].visible = [card("t8c", 8, "C")];
+    game.tableau[0].visible = [card("tkc", 13, "C"), card("tqh", 12, "H")];
+    game.tableau[6].visible = [];
 
     const state: AppState = {
       ...withGame(game),
@@ -238,6 +237,7 @@ describe("source select auto-destination focus", () => {
 
     expect(next.ui.mode).toBe("select_destination");
     expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU));
+    expect(next.ui.message).toBe("No legal move from selected pile");
   });
 
   it("does not auto-focus for tableau source when multiple legal tableau destinations exist", () => {
