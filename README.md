@@ -6,7 +6,9 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE).
 
 ## Screenshots
 
-Screenshots are not checked into this repo yet. Add images under `assets/` if you want a gallery here like the `EvenChess` README.
+| Main View | Gameplay | Menu |
+|:---------:|:--------:|:----:|
+| ![Main view on G2 glasses](assets/screenshot-main.png) | ![Gameplay with Move Assist](assets/screenshot-gameplay.png) | ![In-game menu](assets/screenshot-menu.png) |
 
 ## Quick links
 
