@@ -932,6 +932,7 @@ type FullBoard3TilePreRenderHint = {
 };
 const BACKLOG_RENDER_SKIP_QUEUE_DEPTH = 2;
 const BURST_STALE_SKIP_AVG_QWAIT_MS = 200;
+const ALL_FULL_BOARD_3_TILE_REGIONS: FullBoard3TileRegion[] = ["top", "bottomLeft", "bottomRight"];
 
 type StaleRenderSkipContext = {
   phase: "pre" | "post";
@@ -1323,6 +1324,61 @@ function cacheFullBoard3TileImages(
   lastSent.last3TileTopPng = images.topPng;
   lastSent.last3TileBottomLeftPng = images.bottomLeftPng;
   lastSent.last3TileBottomRightPng = images.bottomRightPng;
+}
+
+function resolveFullBoard3TileImagesWithCacheFallback(
+  images: FullBoard3TileImages,
+  lastSent: {
+    last3TileTopPng?: Uint8Array;
+    last3TileBottomLeftPng?: Uint8Array;
+    last3TileBottomRightPng?: Uint8Array;
+  }
+): {
+  images: FullBoard3TileImages;
+  fallbackRegions: FullBoard3TileRegion[];
+  unrecoverableMissing: boolean;
+} {
+  const fallbackRegions: FullBoard3TileRegion[] = [];
+  let unrecoverableMissing = false;
+
+  const topPng = (() => {
+    if (images.topPng.length > 0) return images.topPng;
+    const cached = lastSent.last3TileTopPng;
+    if (cached && cached.length > 0) {
+      fallbackRegions.push("top");
+      return cached;
+    }
+    unrecoverableMissing = true;
+    return images.topPng;
+  })();
+
+  const bottomLeftPng = (() => {
+    if (images.bottomLeftPng.length > 0) return images.bottomLeftPng;
+    const cached = lastSent.last3TileBottomLeftPng;
+    if (cached && cached.length > 0) {
+      fallbackRegions.push("bottomLeft");
+      return cached;
+    }
+    unrecoverableMissing = true;
+    return images.bottomLeftPng;
+  })();
+
+  const bottomRightPng = (() => {
+    if (images.bottomRightPng.length > 0) return images.bottomRightPng;
+    const cached = lastSent.last3TileBottomRightPng;
+    if (cached && cached.length > 0) {
+      fallbackRegions.push("bottomRight");
+      return cached;
+    }
+    unrecoverableMissing = true;
+    return images.bottomRightPng;
+  })();
+
+  return {
+    images: { topPng, bottomLeftPng, bottomRightPng },
+    fallbackRegions,
+    unrecoverableMissing,
+  };
 }
 
 async function sendFullBoard3Tiles(
@@ -1756,6 +1812,7 @@ export async function flushDisplayUpdate(
   const selectedCardCount = state.ui.selection.selectedCardCount ?? 0;
   const uiMode = state.ui.mode;
   const burstyVisualState = menuOpen || selectionInvalidBlinkRemaining > 0;
+  const focusChanged = focusIdx !== lastSent.focusIndex;
   const selectionVisualTransition =
     sourceArea !== lastSent.sourceArea ||
     selectionInvalidBlinkRemaining !== lastSent.selectionInvalidBlinkRemaining ||
@@ -1766,6 +1823,8 @@ export async function flushDisplayUpdate(
     menuOpen || lastSent.menuOpen || menuSelectedIndex !== lastSent.menuSelectedIndex;
   const menuOpenTransition = menuOpen !== lastSent.menuOpen;
   const imageHealth = hub.getImageSendHealth();
+  const transportUnderPressure =
+    imageHealth.interrupted || imageHealth.linkSlow || imageHealth.backlogged;
   const menuTransitionUnderPressure = menuOpenTransition && (imageHealth.linkSlow || imageHealth.interrupted);
   const menuTransitionProtectedRegions: FullBoard3TileRegion[] | undefined = menuOpenTransition
     ? imageHealth.interrupted
@@ -1783,6 +1842,12 @@ export async function flushDisplayUpdate(
     : undefined;
   const prevFocusRegion = focusIndexTo3TileRegion(lastSent.focusIndex);
   const nextFocusRegion = focusIndexTo3TileRegion(focusIdx);
+  const crossBottomFocusTransition =
+    prevFocusRegion != null &&
+    nextFocusRegion != null &&
+    prevFocusRegion !== nextFocusRegion &&
+    prevFocusRegion !== "top" &&
+    nextFocusRegion !== "top";
   const interruptCrossContainerFocusSuppression =
     imageHealth.interrupted &&
     sourceArea == null &&
@@ -1797,8 +1862,29 @@ export async function flushDisplayUpdate(
   const renderFocusIdxOverride = interruptCrossContainerFocusSuppression ? -1 : undefined;
   const extraHighPriorityVisualTransition = interruptCrossContainerFocusSuppression;
   const interruptFocusHintSuffix = interruptCrossContainerFocusSuppression ? "+intr-focus-suppress" : "";
+  const coherentFrameRequired =
+    transportUnderPressure ||
+    selectionVisualTransition ||
+    menuOpenTransition ||
+    crossBottomFocusTransition;
   const selectionClearSourceArea =
     sourceArea === null && lastSent.sourceArea != null ? lastSent.sourceArea : null;
+  const full3TilePreferredOrder =
+    menuTransitionPreferredOrder ??
+    preferred3TileSendOrderForFlush({
+      focusIdx,
+      menuPriority: menuPrioritySendOrder,
+      selectionClearSourceArea,
+      previousFocusIdx: lastSent.focusIndex,
+      sourceArea,
+      previousSourceArea: lastSent.sourceArea,
+    });
+  const full3TileInterruptProtectedRegions =
+    coherentFrameRequired && transportUnderPressure
+      ? ALL_FULL_BOARD_3_TILE_REGIONS
+      : menuTransitionProtectedRegions;
+  const full3TileForceHighPriority =
+    coherentFrameRequired || focusChanged || extraHighPriorityVisualTransition;
   if (
     focusIdx !== lastSent.focusIndex ||
     sourceArea !== lastSent.sourceArea ||
@@ -1840,7 +1926,7 @@ export async function flushDisplayUpdate(
             return logSkippedVisualFlush(burstyVisualState ? "stale-burst-pre" : "stale-backlog-pre");
           }
 
-          const preRenderHint =
+          const predictedPreRenderHint =
             predictMenuNavigation3TileHint({
               focusIdx,
               sourceArea,
@@ -1870,6 +1956,12 @@ export async function flushDisplayUpdate(
               uiMode,
               lastSent,
             });
+          const preRenderHint = coherentFrameRequired
+            ? {
+                mode: "full" as const,
+                reason: transportUnderPressure ? "coherent-pressure" : "coherent-transition",
+              }
+            : predictedPreRenderHint;
           perfHint = `${preRenderHint.reason}${interruptFocusHintSuffix}`;
 
           if (preRenderHint.mode === "topOnly") {
@@ -1890,32 +1982,30 @@ export async function flushDisplayUpdate(
               bottomLeftPng: lastSent.last3TileBottomLeftPng ?? EMPTY_PNG_U8,
               bottomRightPng: lastSent.last3TileBottomRightPng ?? EMPTY_PNG_U8,
             };
-            const { dirty, changedCount } = diffFullBoard3TileImages(partialImages, lastSent);
-            record3TilePerfBytes(partialImages, dirty);
+            const resolved = resolveFullBoard3TileImagesWithCacheFallback(partialImages, lastSent);
+            if (resolved.unrecoverableMissing) {
+              return logSkippedVisualFlush("render-empty-no-cache");
+            }
+            if (resolved.fallbackRegions.length > 0) {
+              perfHint = `${perfHint}+fallback:${resolved.fallbackRegions.join(",")}`;
+            }
+            const { dirty, changedCount } = diffFullBoard3TileImages(resolved.images, lastSent);
+            record3TilePerfBytes(resolved.images, dirty);
             perfSkippedImages = 3 - changedCount;
             if (changedCount > 0) {
               perfSentImages = await sendFullBoard3Tiles(
                 hub,
-                partialImages,
+                resolved.images,
                 runtimeImageSendBehavior,
                 {
                   dirty,
-                  preferredOrder:
-                    menuTransitionPreferredOrder ??
-                    preferred3TileSendOrderForFlush({
-                      focusIdx,
-                      menuPriority: menuPrioritySendOrder,
-                      selectionClearSourceArea,
-                      previousFocusIdx: lastSent.focusIndex,
-                      sourceArea,
-                      previousSourceArea: lastSent.sourceArea,
-                    }),
-                  forceHighPriority: selectionVisualTransition || extraHighPriorityVisualTransition,
-                  interruptProtectedRegions: menuTransitionProtectedRegions,
+                  preferredOrder: full3TilePreferredOrder,
+                  forceHighPriority: full3TileForceHighPriority,
+                  interruptProtectedRegions: full3TileInterruptProtectedRegions,
                 }
               );
             }
-            lastSent.last3TileTopPng = topTilePng;
+            cacheFullBoard3TileImages(lastSent, resolved.images);
           } else if (preRenderHint.mode === "bottomOnly") {
             perfPath = "dynamic-3tile-bottomonly";
             const { bottomLeftPng, bottomRightPng } = await renderFullBoard3BottomTilesOnly(state, {
@@ -1934,33 +2024,30 @@ export async function flushDisplayUpdate(
               bottomLeftPng,
               bottomRightPng,
             };
-            const { dirty, changedCount } = diffFullBoard3TileImages(partialImages, lastSent);
-            record3TilePerfBytes(partialImages, dirty);
+            const resolved = resolveFullBoard3TileImagesWithCacheFallback(partialImages, lastSent);
+            if (resolved.unrecoverableMissing) {
+              return logSkippedVisualFlush("render-empty-no-cache");
+            }
+            if (resolved.fallbackRegions.length > 0) {
+              perfHint = `${perfHint}+fallback:${resolved.fallbackRegions.join(",")}`;
+            }
+            const { dirty, changedCount } = diffFullBoard3TileImages(resolved.images, lastSent);
+            record3TilePerfBytes(resolved.images, dirty);
             perfSkippedImages = 3 - changedCount;
             if (changedCount > 0) {
               perfSentImages = await sendFullBoard3Tiles(
                 hub,
-                partialImages,
+                resolved.images,
                 runtimeImageSendBehavior,
                 {
                   dirty,
-                  preferredOrder:
-                    menuTransitionPreferredOrder ??
-                    preferred3TileSendOrderForFlush({
-                      focusIdx,
-                      menuPriority: menuPrioritySendOrder,
-                      selectionClearSourceArea,
-                      previousFocusIdx: lastSent.focusIndex,
-                      sourceArea,
-                      previousSourceArea: lastSent.sourceArea,
-                    }),
-                  forceHighPriority: selectionVisualTransition || extraHighPriorityVisualTransition,
-                  interruptProtectedRegions: menuTransitionProtectedRegions,
+                  preferredOrder: full3TilePreferredOrder,
+                  forceHighPriority: full3TileForceHighPriority,
+                  interruptProtectedRegions: full3TileInterruptProtectedRegions,
                 }
               );
             }
-            lastSent.last3TileBottomLeftPng = bottomLeftPng;
-            lastSent.last3TileBottomRightPng = bottomRightPng;
+            cacheFullBoard3TileImages(lastSent, resolved.images);
           } else {
             const images = await renderFullBoard3Tiles(state, {
               focusIdxOverride: renderFocusIdxOverride,
@@ -1973,27 +2060,25 @@ export async function flushDisplayUpdate(
             ) {
               return logSkippedVisualFlush(burstyVisualState ? "stale-burst-post" : "stale-backlog-post");
             }
-            const { dirty, changedCount } = diffFullBoard3TileImages(images, lastSent);
-            record3TilePerfBytes(images, dirty);
+            const resolved = resolveFullBoard3TileImagesWithCacheFallback(images, lastSent);
+            if (resolved.unrecoverableMissing) {
+              return logSkippedVisualFlush("render-empty-no-cache");
+            }
+            if (resolved.fallbackRegions.length > 0) {
+              perfHint = `${perfHint}+fallback:${resolved.fallbackRegions.join(",")}`;
+            }
+            const { dirty, changedCount } = diffFullBoard3TileImages(resolved.images, lastSent);
+            record3TilePerfBytes(resolved.images, dirty);
             perfSkippedImages = 3 - changedCount;
             if (changedCount > 0) {
-              perfSentImages = await sendFullBoard3Tiles(hub, images, runtimeImageSendBehavior, {
+              perfSentImages = await sendFullBoard3Tiles(hub, resolved.images, runtimeImageSendBehavior, {
                 dirty,
-                preferredOrder:
-                  menuTransitionPreferredOrder ??
-                  preferred3TileSendOrderForFlush({
-                    focusIdx,
-                    menuPriority: menuPrioritySendOrder,
-                    selectionClearSourceArea,
-                    previousFocusIdx: lastSent.focusIndex,
-                    sourceArea,
-                    previousSourceArea: lastSent.sourceArea,
-                  }),
-                forceHighPriority: selectionVisualTransition || extraHighPriorityVisualTransition,
-                interruptProtectedRegions: menuTransitionProtectedRegions,
+                preferredOrder: full3TilePreferredOrder,
+                forceHighPriority: full3TileForceHighPriority,
+                interruptProtectedRegions: full3TileInterruptProtectedRegions,
               });
             }
-            cacheFullBoard3TileImages(lastSent, images);
+            cacheFullBoard3TileImages(lastSent, resolved.images);
           }
         } else {
           perfPath = "dynamic-swap";

@@ -367,6 +367,45 @@ describe("composer integration/runtime behavior", () => {
     expect(next.lastSent.focusIndex).toBe(FOCUS_INDEX_WASTE);
   });
 
+  it("forces coherent full-frame high-priority sends under transport pressure", async () => {
+    const { flushDisplayUpdate } = await import("../../src/render/composer");
+    const hub = createHubStub();
+    const first = await flushDisplayUpdate(hub as never, initialState, defaultLastSent());
+    hub.enqueueImage.mockClear();
+    h.renderBoardTopToCanvas.mockClear();
+    h.renderBoardTableauToCanvas.mockClear();
+    hub.getImageSendHealth.mockReturnValue({
+      interrupted: true,
+      linkSlow: true,
+      backlogged: true,
+      busy: true,
+      survivalMode: false,
+      avgQueueWaitMs: 280,
+      avgSendMs: 950,
+      degraded: true,
+    });
+
+    const nextState: AppState = {
+      ...initialState,
+      ui: {
+        ...initialState.ui,
+        focus: focusIndexToTarget(FOCUS_INDEX_WASTE),
+      },
+    };
+    await flushDisplayUpdate(hub as never, nextState, first.lastSent);
+
+    expect(h.renderBoardTopToCanvas).toHaveBeenCalledTimes(1);
+    expect(h.renderBoardTableauToCanvas).toHaveBeenCalledTimes(1);
+    expect(hub.enqueueImage).toHaveBeenCalledTimes(3);
+    for (const call of hub.enqueueImage.mock.calls as unknown as Array<
+      [unknown, { priority?: string; interruptProtected?: boolean }]
+    >) {
+      const sendOpts = call[1];
+      expect(sendOpts.priority).toBe("high");
+      expect(sendOpts.interruptProtected).toBe(true);
+    }
+  });
+
   it("performs display-input swap cycle in expected sequence", async () => {
     const { performSwapCycle } = await import("../../src/render/composer");
     const hub = createHubStub();

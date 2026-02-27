@@ -285,6 +285,15 @@ export function rootReducer(
       };
     }
 
+    case "RESTORE_SAVED_STATE": {
+      clearUndo();
+      return {
+        ...initialState,
+        game: action.game,
+        ui: { ...initialState.ui, moveAssist: action.moveAssist },
+      };
+    }
+
     case "DRAW_STOCK": {
       if (state.game.won) return state;
       pushUndo(state.game);

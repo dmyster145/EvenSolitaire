@@ -8,6 +8,7 @@ This document captures the concrete design choices from our performance/responsi
   - `1fc0896` (2026-02-25) — major queueing/render/PNG instrumentation pass.
   - `22b3c2e` (2026-02-26) — adaptive pressure handling, input tuning, autosave deferral, and recovery hardening.
 - Follow-up fixes and tests were added in `ff211b9` (2026-02-26) and current `main`.
+- Additional hardening in current `main` adds coherent 3-tile frame delivery under pressure and flush-hang watchdog recovery with state restore.
 
 ## Core Design Choices
 
@@ -65,21 +66,30 @@ In full-board 3-tile mode:
 - Tile bytes are diffed against last sent bytes; unchanged tiles are not resent.
 - Tile send order is focus-aware and can prioritize the source region during selection clears.
 
-### 8) Async send mode with per-tile priorities
+### 8) Coherent-frame escalation in volatile/degraded states (3-tile mode)
+
+`src/render/composer.ts` now promotes safety over micro-optimizations when desync risk is high.
+
+- When transport is degraded (`interrupted`/`linkSlow`/`backlogged`) or visual transitions are volatile (selection/menu/cross-bottom focus transitions), hint-driven partial renders are overridden to `full`.
+- Full-frame sends are elevated to high priority and can mark all 3 tile regions as `interruptProtected`.
+- If any newly rendered tile bytes are unexpectedly empty, cached bytes for that region are used as fallback; if no fallback exists, that flush is skipped instead of committing a partial frame.
+- Goal: prevent mixed-frame commits that can produce duplicate selection outlines or partially rendered cards under pressure.
+
+### 9) Async send mode with per-tile priorities
 
 Runtime send behavior uses queue enqueue mode (not synchronous await-per-tile sends).
 
 - Top/active-focus regions can be forced to higher priority during visual transitions.
 - `interruptProtectedRegions` keeps the currently meaningful frame parts alive during degradation.
 
-### 9) Serialized PNG encoding to reduce encode jitter
+### 10) Serialized PNG encoding to reduce encode jitter
 
 `src/render/png-utils.ts` serializes canvas PNG encodes through a single async queue.
 
 - Reduces `toBlob` contention in constrained runtimes/WebViews.
 - Tracks queue wait, encode cost, and slow samples via perf logs.
 
-### 10) Input-side noise reduction
+### 11) Input-side noise reduction
 
 `src/input/debounce.ts` and `src/input/gestures.ts` suppress duplicate/accidental input bursts.
 
@@ -87,14 +97,23 @@ Runtime send behavior uses queue enqueue mode (not synchronous await-per-tile se
 - Tap/double-tap duplicate windows.
 - Short scroll suppression after tap to prevent unintended scroll-after-tap sequences.
 
-### 11) Autosave is intentionally backpressure-aware
+### 12) Autosave is intentionally backpressure-aware
 
 Autosave is debounced, then deferred further if image transport is under pressure.
 
 - Save writes are postponed within a max defer window so rendering remains responsive.
 - This avoids storage activity competing with interactive frame delivery during stress.
 
-### 12) Reducer-side legal-destination cache
+### 13) Flush-hang watchdog and container rebuild recovery
+
+`src/app/bootstrap.ts` now includes app-level flush hang recovery (separate from bridge send watchdogs).
+
+- Each flush runner arms a watchdog (`FLUSH_HANG_WATCHDOG_MS`).
+- If a flush appears stuck past the watchdog threshold, the active runner is invalidated and a guarded recovery path runs.
+- Recovery restores the store from the most recently persisted snapshot (`RESTORE_SAVED_STATE`), rebuilds gameplay containers, invalidates render caches, and schedules a fresh flush.
+- A cooldown (`FLUSH_HANG_RECOVERY_COOLDOWN_MS`) prevents repeated rapid recovery loops.
+
+### 14) Reducer-side legal-destination cache
 
 `src/state/reducer.ts` caches legal destinations by immutable game snapshot + source selection in a `WeakMap`.
 
@@ -114,10 +133,12 @@ When refactoring, preserve these properties unless you have profiling proof and 
 1. Keep image update coalescing by container key.
 2. Keep watchdog + hard-timeout recovery paths.
 3. Keep stale-render skip gates under backlog/burst pressure.
-4. Keep partial tile diff/send behavior in 3-tile mode.
-5. Keep serialized PNG encode queue (or replace with equivalent anti-contention strategy).
-6. Keep input debouncing and tap/scroll suppression semantics.
-7. Keep autosave defer-on-pressure behavior and max defer cap.
+4. Keep coherent-frame escalation and cached-tile fallback behavior in 3-tile mode.
+5. Keep partial tile diff/send behavior for stable states in 3-tile mode.
+6. Keep app-level flush-hang watchdog recovery and cooldown behavior.
+7. Keep serialized PNG encode queue (or replace with equivalent anti-contention strategy).
+8. Keep input debouncing and tap/scroll suppression semantics.
+9. Keep autosave defer-on-pressure behavior and max defer cap.
 
 ## Test Coverage Areas
 

@@ -215,4 +215,33 @@ describe("state reducer runtime flows", () => {
     expect(next.ui.menuOpen).toBe(false);
     expect(next.ui.pendingResetConfirm).toBe(false);
   });
+
+  it("restore saved state resets transient ui and preserves saved move assist", () => {
+    const saved = emptyGame();
+    saved.stock = [card("s1", 1, "S", false)];
+    const state: AppState = {
+      ...withGame(emptyGame()),
+      ui: {
+        ...initialState.ui,
+        mode: "select_destination",
+        menuOpen: true,
+        pendingResetConfirm: true,
+        selection: { source: focusIndexToTarget(FOCUS_INDEX_WASTE), selectedCardCount: 1 },
+        moveAssist: false,
+      },
+    };
+
+    const next = rootReducer(state, {
+      type: "RESTORE_SAVED_STATE",
+      game: saved,
+      moveAssist: true,
+    });
+
+    expect(next.game).toBe(saved);
+    expect(next.ui.mode).toBe("browse");
+    expect(next.ui.selection).toEqual({});
+    expect(next.ui.menuOpen).toBe(false);
+    expect(next.ui.pendingResetConfirm).toBeUndefined();
+    expect(next.ui.moveAssist).toBe(true);
+  });
 });

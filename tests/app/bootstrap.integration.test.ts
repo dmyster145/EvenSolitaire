@@ -12,6 +12,9 @@ const h = vi.hoisted(() => {
     storageBridge,
     composeStartupPage: vi.fn(() => ({ page: "startup" })),
     composeSwapModeStartupPage: vi.fn(() => ({ page: "swap-startup" })),
+    composeInputModePage: vi.fn(() => ({ page: "input" })),
+    composeGameplayPage: vi.fn(() => ({ page: "gameplay" })),
+    setContainerMode: vi.fn(),
     sendInitialImages: vi.fn<(hub: unknown, state: AppState) => Promise<void>>(async () => {}),
     flushDisplayUpdate: vi.fn<
       (hub: unknown, state: AppState, lastSent: unknown) => Promise<{ lastSent: unknown }>
@@ -34,6 +37,9 @@ const h = vi.hoisted(() => {
 vi.mock("../../src/render/composer", () => ({
   composeStartupPage: h.composeStartupPage,
   composeSwapModeStartupPage: h.composeSwapModeStartupPage,
+  composeInputModePage: h.composeInputModePage,
+  composeGameplayPage: h.composeGameplayPage,
+  setContainerMode: h.setContainerMode,
   sendInitialImages: h.sendInitialImages,
   flushDisplayUpdate: h.flushDisplayUpdate,
   DYNAMIC_SWAP_MODE: true,
@@ -150,6 +156,7 @@ async function getLatestHub(): Promise<{
   emitEvent: (event: unknown) => void;
   shutdown: ReturnType<typeof vi.fn>;
   notifySystemLifecycleEvent: ReturnType<typeof vi.fn>;
+  rebuildPage: ReturnType<typeof vi.fn>;
 }> {
   const bridgeMod = (await import("../../src/evenhub/bridge")) as unknown as {
     __MockEvenHubBridge: { instances: unknown[] };
@@ -158,6 +165,7 @@ async function getLatestHub(): Promise<{
     emitEvent: (event: unknown) => void;
     shutdown: ReturnType<typeof vi.fn>;
     notifySystemLifecycleEvent: ReturnType<typeof vi.fn>;
+    rebuildPage: ReturnType<typeof vi.fn>;
   }>;
   return instances[instances.length - 1]!;
 }
@@ -241,5 +249,36 @@ describe("bootstrap integration (mocked bridge/runtime)", () => {
     await vi.advanceTimersByTimeAsync(800);
 
     expect(h.saveGame).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers from a 5s flush hang by rebuilding containers and restoring last saved state", async () => {
+    const saved = savedGameSample();
+    h.loadGame.mockResolvedValue({ game: saved, moveAssist: true });
+    let flushCalls = 0;
+    h.flushDisplayUpdate.mockImplementation(async (_hub: unknown, _state: AppState, lastSent: unknown) => {
+      flushCalls += 1;
+      if (flushCalls === 1) {
+        return await new Promise<{ lastSent: unknown }>(() => {});
+      }
+      return { lastSent };
+    });
+    h.mapEvenHubEvent.mockReturnValue({ type: "DRAW_STOCK" });
+
+    const { initApp } = await import("../../src/app/bootstrap");
+    await initApp();
+
+    const hub = await getLatestHub();
+    hub.emitEvent(defaultInputEvent());
+    await vi.advanceTimersByTimeAsync(7000);
+
+    expect(hub.rebuildPage).toHaveBeenCalledTimes(1);
+    expect(h.flushDisplayUpdate.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(h.recordPerfDispatch).toHaveBeenCalledWith(
+      "app",
+      expect.objectContaining({ type: "RESTORE_SAVED_STATE" })
+    );
+    const latestState = h.flushDisplayUpdate.mock.calls[h.flushDisplayUpdate.mock.calls.length - 1]?.[1];
+    expect(latestState).toBeDefined();
+    expect(latestState!.ui.moveAssist).toBe(true);
   });
 });

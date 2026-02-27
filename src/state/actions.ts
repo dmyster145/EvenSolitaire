@@ -2,6 +2,7 @@
  * App action types (Phase 2: full game + UI).
  */
 import type { FocusTarget } from "./types";
+import type { GameState } from "./types";
 import type { Dest } from "../game/validation";
 
 export type Action =
@@ -30,4 +31,5 @@ export type Action =
   | { type: "WIN_ANIMATION_START" }
   | { type: "WIN_ANIMATION_TICK" }
   | { type: "WIN_ANIMATION_SKIP" }
-  | { type: "DEMO_WIN_ANIMATION" };
+  | { type: "DEMO_WIN_ANIMATION" }
+  | { type: "RESTORE_SAVED_STATE"; game: GameState; moveAssist: boolean };

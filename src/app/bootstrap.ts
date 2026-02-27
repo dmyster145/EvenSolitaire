@@ -6,6 +6,9 @@ import { initialState } from "../state/reducer";
 import {
   composeStartupPage,
   composeSwapModeStartupPage,
+  composeInputModePage,
+  composeGameplayPage,
+  setContainerMode,
   sendInitialImages,
   flushDisplayUpdate,
   DYNAMIC_SWAP_MODE,
@@ -42,6 +45,8 @@ const AUTOSAVE_MAX_DEFER_MS = 12000;
 const SYS_EVENT_UNDEFINED_BURST_WINDOW_MS = 6000;
 const SYS_EVENT_UNDEFINED_BURST_THRESHOLD = 2;
 const SYS_EVENT_UNDEFINED_SYNTHETIC_ENTER_COOLDOWN_MS = 2000;
+const FLUSH_HANG_WATCHDOG_MS = 5000;
+const FLUSH_HANG_RECOVERY_COOLDOWN_MS = 3000;
 
 function getLinkSlowFlushDeferMs(actionType: Action["type"] | "-"): number {
   switch (actionType) {
@@ -112,6 +117,9 @@ export async function initApp(): Promise<void> {
     ? { ...initialState, game: saved.game, ui: { ...initialState.ui, moveAssist: saved.moveAssist } }
     : undefined;
   const store = createStore(initial);
+  let lastPersistedSnapshot: { game: typeof initialState.game; moveAssist: boolean } | null = saved
+    ? { game: saved.game, moveAssist: saved.moveAssist }
+    : null;
 
   function dispatchWithPerfSource(source: PerfDispatchSource, action: Action): void {
     recordPerfDispatch(source, action);
@@ -258,6 +266,12 @@ export async function initApp(): Promise<void> {
   let completedFlushVersion = 0;
   let startupPageReadyForAssetRefresh = false;
   let pendingStartupAssetRefresh = false;
+  let nextFlushRunnerId = 0;
+  let activeFlushRunnerId = 0;
+  let flushWatchdog: ReturnType<typeof setTimeout> | null = null;
+  let flushWatchdogSeq = 0;
+  let flushRecoveryInProgress = false;
+  let lastFlushRecoveryAtMs = 0;
 
   function armFlushLoopAfterStartup(): void {
     if (flushLoopArmed) return;
@@ -268,6 +282,94 @@ export async function initApp(): Promise<void> {
         void runFlushLoop();
       }, 0);
     }
+  }
+
+  function disarmFlushWatchdog(): void {
+    if (flushWatchdog) {
+      clearTimeout(flushWatchdog);
+      flushWatchdog = null;
+    }
+    flushWatchdogSeq += 1;
+  }
+
+  function invalidateActiveFlushRunner(reason: string): void {
+    if (!flushInProgress) return;
+    activeFlushRunnerId += 1;
+    if (nextFlushRunnerId < activeFlushRunnerId) {
+      nextFlushRunnerId = activeFlushRunnerId;
+    }
+    flushInProgress = false;
+    disarmFlushWatchdog();
+    perfLog(`[Perf][Flush][Hang] invalidate reason=${reason}`);
+  }
+
+  function getRecoverySnapshot(): { game: typeof initialState.game; moveAssist: boolean } {
+    if (lastPersistedSnapshot) return lastPersistedSnapshot;
+    const current = store.getState();
+    return { game: current.game, moveAssist: current.ui.moveAssist };
+  }
+
+  async function rebuildContainersForRecovery(): Promise<void> {
+    const page = DYNAMIC_SWAP_MODE ? composeInputModePage() : composeGameplayPage();
+    const rebuilt = await hub.rebuildPage(page);
+    if (rebuilt && DYNAMIC_SWAP_MODE) {
+      setContainerMode("input");
+    }
+    perfLog(`[Perf][Flush][Hang] rebuild ok=${rebuilt ? "y" : "n"} mode=${DYNAMIC_SWAP_MODE ? "input" : "gameplay"}`);
+  }
+
+  async function recoverFromFlushHang(reason: string): Promise<void> {
+    if (exitInProgress || flushRecoveryInProgress) return;
+    const nowMs = perfNowMs();
+    if (nowMs - lastFlushRecoveryAtMs < FLUSH_HANG_RECOVERY_COOLDOWN_MS) return;
+    flushRecoveryInProgress = true;
+    lastFlushRecoveryAtMs = nowMs;
+    try {
+      const health = hub.getImageSendHealth();
+      perfLog(
+        `[Perf][Flush][Hang] trigger reason=${reason} q=${hub.getImageQueueDepth()} ` +
+          `busy=${health.busy ? "y" : "n"} intr=${health.interrupted ? "y" : "n"} ` +
+          `link=${health.linkSlow ? "y" : "n"} backlog=${health.backlogged ? "y" : "n"}`
+      );
+      invalidateActiveFlushRunner(reason);
+      if (pendingFlush) {
+        clearTimeout(pendingFlush);
+        pendingFlush = null;
+      }
+      if (pendingSave) {
+        clearTimeout(pendingSave);
+        pendingSave = null;
+      }
+      pendingSavePayload = null;
+      pendingSaveFirstQueuedAtMs = 0;
+      pendingRecoveryRefresh = false;
+      pendingRecoveryCacheInvalidate = true;
+      const snapshot = getRecoverySnapshot();
+      dispatchWithPerfSource("app", {
+        type: "RESTORE_SAVED_STATE",
+        game: snapshot.game,
+        moveAssist: snapshot.moveAssist,
+      });
+      if (startupPageReadyForAssetRefresh) {
+        await rebuildContainersForRecovery();
+      }
+      scheduleFlush();
+    } catch (err) {
+      console.error("[EvenSolitaire] Flush hang recovery failed:", err);
+    } finally {
+      flushRecoveryInProgress = false;
+    }
+  }
+
+  function armFlushWatchdog(runnerId: number, targetVersion: number): void {
+    disarmFlushWatchdog();
+    const seq = flushWatchdogSeq;
+    flushWatchdog = setTimeout(() => {
+      if (seq !== flushWatchdogSeq) return;
+      if (!flushInProgress) return;
+      if (runnerId !== activeFlushRunnerId) return;
+      void recoverFromFlushHang(`runner=${runnerId} req=${targetVersion}`);
+    }, FLUSH_HANG_WATCHDOG_MS);
   }
 
   subscribeStoreEffects();
@@ -285,6 +387,7 @@ export async function initApp(): Promise<void> {
         clearTimeout(pendingBlink);
         pendingBlink = null;
       }
+      disarmFlushWatchdog();
       if (pendingSave) {
         clearTimeout(pendingSave);
         pendingSave = null;
@@ -294,6 +397,7 @@ export async function initApp(): Promise<void> {
 
       const snapshot = store.getState();
       await saveGame(snapshot.game, snapshot.ui.moveAssist);
+      lastPersistedSnapshot = { game: snapshot.game, moveAssist: snapshot.ui.moveAssist };
       hub.notifySystemLifecycleEvent("foreground-exit");
       await hub.shutdown();
     } catch (err) {
@@ -420,6 +524,7 @@ export async function initApp(): Promise<void> {
         pendingSavePayload = null;
         const startedAtMs = perfNowMs();
         await saveGame(payload.game, payload.moveAssist);
+        lastPersistedSnapshot = { game: payload.game, moveAssist: payload.moveAssist };
         const durMs = perfNowMs() - startedAtMs;
         perfLog(
           `[Perf][Save] dur=${durMs.toFixed(1)}ms age=${queuedAgeMs.toFixed(1)}ms ` +
@@ -470,8 +575,11 @@ export async function initApp(): Promise<void> {
     if (!flushLoopArmed) return;
     if (flushInProgress) return;
     flushInProgress = true;
+    const runnerId = ++nextFlushRunnerId;
+    activeFlushRunnerId = runnerId;
     try {
       while (completedFlushVersion < requestedFlushVersion) {
+        if (runnerId !== activeFlushRunnerId) return;
         if (pendingRecoveryCacheInvalidate) {
           pendingRecoveryCacheInvalidate = false;
           invalidateLastSentVisualCachesForRecovery();
@@ -485,9 +593,12 @@ export async function initApp(): Promise<void> {
         const perfDispatch = getLastPerfDispatchTrace();
         const queueDepthStart = hub.getImageQueueDepth();
         const healthStart = hub.getImageSendHealth();
+        armFlushWatchdog(runnerId, targetVersion);
         const result = await flushDisplayUpdate(hub, store.getState(), lastSent, {
           shouldSkipStaleImageRender: () => requestedFlushVersion > targetVersion,
         });
+        if (runnerId !== activeFlushRunnerId) return;
+        disarmFlushWatchdog();
         const flushEndedAtMs = perfNowMs();
         lastSent = result.lastSent;
         completedFlushVersion = targetVersion;
@@ -515,12 +626,15 @@ export async function initApp(): Promise<void> {
         );
       }
     } finally {
-      flushInProgress = false;
-      if (flushLoopArmed && completedFlushVersion < requestedFlushVersion && !pendingFlush) {
-        pendingFlush = setTimeout(() => {
-          pendingFlush = null;
-          void runFlushLoop();
-        }, 0);
+      if (runnerId === activeFlushRunnerId) {
+        flushInProgress = false;
+        disarmFlushWatchdog();
+        if (flushLoopArmed && completedFlushVersion < requestedFlushVersion && !pendingFlush) {
+          pendingFlush = setTimeout(() => {
+            pendingFlush = null;
+            void runFlushLoop();
+          }, 0);
+        }
       }
     }
   }
@@ -531,7 +645,11 @@ export async function initApp(): Promise<void> {
 
       const gameOrSettingsChanged =
         state.game !== prevState.game || state.ui.moveAssist !== prevState.ui.moveAssist;
-      if (gameOrSettingsChanged) {
+      const matchesLastPersisted =
+        lastPersistedSnapshot != null &&
+        state.game === lastPersistedSnapshot.game &&
+        state.ui.moveAssist === lastPersistedSnapshot.moveAssist;
+      if (gameOrSettingsChanged && !matchesLastPersisted) {
         queueAutosave(state.game, state.ui.moveAssist);
       }
       scheduleFlush();
