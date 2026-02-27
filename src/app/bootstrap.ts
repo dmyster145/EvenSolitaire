@@ -47,6 +47,10 @@ const SYS_EVENT_UNDEFINED_BURST_THRESHOLD = 2;
 const SYS_EVENT_UNDEFINED_SYNTHETIC_ENTER_COOLDOWN_MS = 2000;
 const FLUSH_HANG_WATCHDOG_MS = 5000;
 const FLUSH_HANG_RECOVERY_COOLDOWN_MS = 3000;
+const FLUSH_HANG_SOFT_RECOVERY_THRESHOLD = 1;
+const FLUSH_HANG_HARD_RECOVERY_THRESHOLD = 2;
+
+type FlushHangRecoveryLevel = "soft" | "hard" | "restore";
 
 function getLinkSlowFlushDeferMs(actionType: Action["type"] | "-"): number {
   switch (actionType) {
@@ -272,6 +276,7 @@ export async function initApp(): Promise<void> {
   let flushWatchdogSeq = 0;
   let flushRecoveryInProgress = false;
   let lastFlushRecoveryAtMs = 0;
+  let flushRecoveryConsecutiveCount = 0;
 
   function armFlushLoopAfterStartup(): void {
     if (flushLoopArmed) return;
@@ -325,9 +330,16 @@ export async function initApp(): Promise<void> {
     flushRecoveryInProgress = true;
     lastFlushRecoveryAtMs = nowMs;
     try {
+      flushRecoveryConsecutiveCount += 1;
+      const recoveryLevel: FlushHangRecoveryLevel =
+        flushRecoveryConsecutiveCount <= FLUSH_HANG_SOFT_RECOVERY_THRESHOLD
+          ? "soft"
+          : flushRecoveryConsecutiveCount <= FLUSH_HANG_HARD_RECOVERY_THRESHOLD
+            ? "hard"
+            : "restore";
       const health = hub.getImageSendHealth();
       perfLog(
-        `[Perf][Flush][Hang] trigger reason=${reason} q=${hub.getImageQueueDepth()} ` +
+        `[Perf][Flush][Hang] trigger reason=${reason} level=${recoveryLevel} n=${flushRecoveryConsecutiveCount} q=${hub.getImageQueueDepth()} ` +
           `busy=${health.busy ? "y" : "n"} intr=${health.interrupted ? "y" : "n"} ` +
           `link=${health.linkSlow ? "y" : "n"} backlog=${health.backlogged ? "y" : "n"}`
       );
@@ -344,13 +356,15 @@ export async function initApp(): Promise<void> {
       pendingSaveFirstQueuedAtMs = 0;
       pendingRecoveryRefresh = false;
       pendingRecoveryCacheInvalidate = true;
-      const snapshot = getRecoverySnapshot();
-      dispatchWithPerfSource("app", {
-        type: "RESTORE_SAVED_STATE",
-        game: snapshot.game,
-        moveAssist: snapshot.moveAssist,
-      });
-      if (startupPageReadyForAssetRefresh) {
+      if (recoveryLevel === "restore") {
+        const snapshot = getRecoverySnapshot();
+        dispatchWithPerfSource("app", {
+          type: "RESTORE_SAVED_STATE",
+          game: snapshot.game,
+          moveAssist: snapshot.moveAssist,
+        });
+      }
+      if (startupPageReadyForAssetRefresh && (recoveryLevel === "hard" || recoveryLevel === "restore")) {
         await rebuildContainersForRecovery();
       }
       scheduleFlush();
@@ -602,6 +616,7 @@ export async function initApp(): Promise<void> {
         const flushEndedAtMs = perfNowMs();
         lastSent = result.lastSent;
         completedFlushVersion = targetVersion;
+        flushRecoveryConsecutiveCount = 0;
         const queueDepthEnd = hub.getImageQueueDepth();
         const healthEnd = hub.getImageSendHealth();
         const inputToFlushStartMs =

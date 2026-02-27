@@ -251,7 +251,7 @@ describe("bootstrap integration (mocked bridge/runtime)", () => {
     expect(h.saveGame).toHaveBeenCalledTimes(1);
   });
 
-  it("recovers from a 5s flush hang by rebuilding containers and restoring last saved state", async () => {
+  it("uses soft recovery first for a single flush hang (no rebuild, no state restore)", async () => {
     const saved = savedGameSample();
     h.loadGame.mockResolvedValue({ game: saved, moveAssist: true });
     let flushCalls = 0;
@@ -271,14 +271,38 @@ describe("bootstrap integration (mocked bridge/runtime)", () => {
     hub.emitEvent(defaultInputEvent());
     await vi.advanceTimersByTimeAsync(7000);
 
-    expect(hub.rebuildPage).toHaveBeenCalledTimes(1);
+    expect(hub.rebuildPage).toHaveBeenCalledTimes(0);
     expect(h.flushDisplayUpdate.mock.calls.length).toBeGreaterThanOrEqual(2);
-    expect(h.recordPerfDispatch).toHaveBeenCalledWith(
-      "app",
-      expect.objectContaining({ type: "RESTORE_SAVED_STATE" })
+    const restored = h.recordPerfDispatch.mock.calls.some(
+      ([source, action]) => source === "app" && (action as Action).type === "RESTORE_SAVED_STATE"
     );
-    const latestState = h.flushDisplayUpdate.mock.calls[h.flushDisplayUpdate.mock.calls.length - 1]?.[1];
-    expect(latestState).toBeDefined();
-    expect(latestState!.ui.moveAssist).toBe(true);
+    expect(restored).toBe(false);
+  });
+
+  it("escalates repeated flush hangs to rebuild then saved-state restore", async () => {
+    const saved = savedGameSample();
+    h.loadGame.mockResolvedValue({ game: saved, moveAssist: true });
+    let flushCalls = 0;
+    h.flushDisplayUpdate.mockImplementation(async (_hub: unknown, _state: AppState, lastSent: unknown) => {
+      flushCalls += 1;
+      if (flushCalls <= 3) {
+        return await new Promise<{ lastSent: unknown }>(() => {});
+      }
+      return { lastSent };
+    });
+    h.mapEvenHubEvent.mockReturnValue({ type: "DRAW_STOCK" });
+
+    const { initApp } = await import("../../src/app/bootstrap");
+    await initApp();
+
+    const hub = await getLatestHub();
+    hub.emitEvent(defaultInputEvent());
+    await vi.advanceTimersByTimeAsync(17000);
+
+    expect(hub.rebuildPage).toHaveBeenCalledTimes(2);
+    const restored = h.recordPerfDispatch.mock.calls.some(
+      ([source, action]) => source === "app" && (action as Action).type === "RESTORE_SAVED_STATE"
+    );
+    expect(restored).toBe(true);
   });
 });

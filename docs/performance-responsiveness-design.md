@@ -110,7 +110,10 @@ Autosave is debounced, then deferred further if image transport is under pressur
 
 - Each flush runner arms a watchdog (`FLUSH_HANG_WATCHDOG_MS`).
 - If a flush appears stuck past the watchdog threshold, the active runner is invalidated and a guarded recovery path runs.
-- Recovery restores the store from the most recently persisted snapshot (`RESTORE_SAVED_STATE`), rebuilds gameplay containers, invalidates render caches, and schedules a fresh flush.
+- Recovery is tiered to preserve responsiveness and avoid unnecessary gameplay rollback:
+  - First hang: soft recovery (invalidate runner, invalidate visual caches, force fresh flush).
+  - Repeated hang: hard recovery (container rebuild + fresh flush).
+  - Persistent repeated hang: restore from most recently persisted snapshot (`RESTORE_SAVED_STATE`) + rebuild + fresh flush.
 - A cooldown (`FLUSH_HANG_RECOVERY_COOLDOWN_MS`) prevents repeated rapid recovery loops.
 
 ### 14) Reducer-side legal-destination cache
