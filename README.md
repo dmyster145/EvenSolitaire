@@ -120,7 +120,7 @@ Full behavior, controls, and app-specific rule notes are on the in-app help page
 
 ## Performance and responsiveness
 
-This project contains explicit transport-pressure handling, stale-render skipping, tile-level partial updates, and input/autosave debouncing tuned for Even Hub + G2 constraints. See [docs/performance-responsiveness-design.md](docs/performance-responsiveness-design.md) for the implementation rationale and guardrails.
+This project contains explicit transport-pressure handling, stale-render skipping, full-frame render by default with tile-level diff/partial sends, and input/autosave debouncing tuned for Even Hub + G2 constraints. See [docs/performance-responsiveness-design.md](docs/performance-responsiveness-design.md) for the implementation rationale and guardrails.
 
 Current default runtime profile is the full-board **3-tile** layout (top + bottom-left + bottom-right image tiles) with the left info panel as the event-capture text container.
 
