@@ -19,8 +19,6 @@ const h = vi.hoisted(() => {
     renderBoardTopToCanvas: vi.fn((_view: unknown, canvas: unknown) => canvas as HTMLCanvasElement),
     renderBoardTableau: vi.fn(async () => [4, 5, 6]),
     renderBoardTableauToCanvas: vi.fn((_view: unknown, canvas: unknown) => canvas as HTMLCanvasElement),
-    renderBoardTopMini: vi.fn(async () => [7, 8]),
-    renderBoardTableauMini: vi.fn(async () => [9, 10]),
     renderFullscreenBoardText: vi.fn(() => "text-render"),
     drawFaceUpCard: vi.fn(),
     canvasToPngBytes: vi.fn(async (_canvas: unknown, label = "png") => Array.from(nextBytes(String(label)))),
@@ -61,11 +59,6 @@ vi.mock("../../src/render/board-image-top", () => ({
 vi.mock("../../src/render/board-image-tableau", () => ({
   renderBoardTableau: h.renderBoardTableau,
   renderBoardTableauToCanvas: h.renderBoardTableauToCanvas,
-}));
-
-vi.mock("../../src/render/board-image-minis", () => ({
-  renderBoardTopMini: h.renderBoardTopMini,
-  renderBoardTableauMini: h.renderBoardTableauMini,
 }));
 
 vi.mock("../../src/render/fullscreen-text-board", () => ({
@@ -183,15 +176,11 @@ describe("composer integration/runtime behavior", () => {
     };
   });
 
-  it("matches startup/input/display container layouts", async () => {
-    const {
-      composeSwapModeStartupPage,
-      composeInputModePage,
-      composeDisplayModePage,
-    } = await import("../../src/render/composer");
+  it("matches startup/input container layouts", async () => {
+    const { composeStartupPage, composeInputModePage } = await import("../../src/render/composer");
 
     expect(
-      summarizePage(composeSwapModeStartupPage())
+      summarizePage(composeStartupPage())
     ).toMatchInlineSnapshot(`
       {
         "containerTotalNum": 4,
@@ -276,48 +265,6 @@ describe("composer integration/runtime behavior", () => {
       }
     `);
 
-    expect(
-      summarizePage(composeDisplayModePage())
-    ).toMatchInlineSnapshot(`
-      {
-        "containerTotalNum": 4,
-        "imageObject": [
-          {
-            "height": 100,
-            "id": 1,
-            "name": "tile-tl",
-            "width": 200,
-            "x": 88,
-            "y": 44,
-          },
-          {
-            "height": 100,
-            "id": 2,
-            "name": "tile-tr",
-            "width": 200,
-            "x": 288,
-            "y": 44,
-          },
-          {
-            "height": 100,
-            "id": 3,
-            "name": "tile-bl",
-            "width": 200,
-            "x": 88,
-            "y": 144,
-          },
-          {
-            "height": 100,
-            "id": 4,
-            "name": "tile-br",
-            "width": 200,
-            "x": 288,
-            "y": 144,
-          },
-        ],
-        "textObject": [],
-      }
-    `);
   });
 
   it("sends initial 3-tile images and HUD text in dynamic full-board mode", async () => {
@@ -404,21 +351,5 @@ describe("composer integration/runtime behavior", () => {
       expect(sendOpts.priority).toBe("high");
       expect(sendOpts.interruptProtected).toBe(true);
     }
-  });
-
-  it("performs display-input swap cycle in expected sequence", async () => {
-    const { performSwapCycle } = await import("../../src/render/composer");
-    const hub = createHubStub();
-
-    const ok = await performSwapCycle(hub as never, {
-      tileTlPng: [1],
-      tileTrPng: [2],
-      tileBlPng: [3],
-      tileBrPng: [4],
-    });
-
-    expect(ok).toBe(true);
-    expect(hub.rebuildPage).toHaveBeenCalledTimes(2);
-    expect(hub.updateImage).toHaveBeenCalledTimes(7);
   });
 });

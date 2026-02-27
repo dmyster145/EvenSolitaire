@@ -44,7 +44,6 @@ let dirtySinceTs = 0;
 let lastEntryTs = 0;
 let initialized = false;
 let domInitialized = false;
-let domLineCount = 0;
 let domRenderedLines: string[] = [];
 let domPendingLines: string[] = [];
 let domFlushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -175,7 +174,6 @@ function clearDomOutput(): void {
   domPendingLines = [];
   domRenderedLines = [];
   const output = getDomOutput();
-  domLineCount = 0;
   if (!output) return;
   output.textContent = "";
 }
@@ -194,7 +192,6 @@ function flushDomOutput(): void {
   if (domRenderedLines.length > DOM_MAX_LINES) {
     domRenderedLines.splice(0, domRenderedLines.length - DOM_MAX_LINES);
   }
-  domLineCount = domRenderedLines.length;
   output.textContent = domRenderedLines.join("\n");
   output.scrollTop = output.scrollHeight;
 }

@@ -23,26 +23,6 @@ export const G2_IMAGE_MAX_W = 200;
 export const G2_IMAGE_MAX_H = 100;
 export const G2_MAX_CONTAINER_TOTAL = 4;
 
-/** Invisible full-screen text container for event capture only (scroll/tap). */
-export const HUD_TEXT_CONTAINER = {
-  id: 1,
-  name: "evt",
-  x: 0,
-  y: 0,
-  width: CANVAS_W,
-  height: CANVAS_H,
-};
-
-/** Visible full-screen text container for text-mode gameplay rendering. */
-export const SCREEN_TEXT_CONTAINER = {
-  id: 2,
-  name: "screen",
-  x: 0,
-  y: 0,
-  width: CANVAS_W,
-  height: CANVAS_H,
-};
-
 /** Virtual top area: stock, waste, 4 foundations in 2 rows (576×176). */
 export const VIRTUAL_IMAGE_TOP = {
   width: CANVAS_W,
@@ -67,99 +47,12 @@ export const VIRTUAL_IMAGE_WIN_OVERLAY = {
   y: 0,
 };
 
-/**
- * Hardware-faithful G2 board layout:
- * - top and tableau are ratio-faithful minimaps (200×50 each), stacked with no gap (200×100 total board)
- * - third image container is a transient overlay (e.g. menu), transparent during normal gameplay
- */
-export const IMAGE_TOP_MINI = {
-  id: 2,
-  name: "top-mini",
-  x: Math.floor((CANVAS_W - 200) / 2),
-  y: Math.floor((CANVAS_H - 100) / 2),
-  width: 200,
-  height: 50,
-};
-
-export const IMAGE_TABLEAU_MINI = {
-  id: 3,
-  name: "tab-mini",
-  x: Math.floor((CANVAS_W - 200) / 2),
-  y: IMAGE_TOP_MINI.y + IMAGE_TOP_MINI.height,
-  width: 200,
-  height: 50,
-};
-
-export const IMAGE_BOARD_OVERLAY = {
-  id: 4,
-  name: "ovr",
-  x: IMAGE_TOP_MINI.x,
-  y: IMAGE_TOP_MINI.y,
-  width: 200,
-  height: 100,
-};
-
-/** Backward-compatible alias (third image container is now used as board overlay, not a zoom pane). */
-export const IMAGE_FOCUS_ZOOM = IMAGE_BOARD_OVERLAY;
-
-/**
- * Experimental 2×2 tiled board layout (uses all 4 page containers as images, no event-capture text container).
- * This maximizes board size while preserving the original 2:1 board ratio.
- */
+/** Shared board geometry for centered 400×200 board layouts. */
 const TILE_BOARD_W = 400;
 const TILE_BOARD_H = 200;
-const TILE_BOARD_X = Math.floor((CANVAS_W - TILE_BOARD_W) / 2);
 const TILE_BOARD_Y = Math.floor((CANVAS_H - TILE_BOARD_H) / 2);
 const TILE_W = 200;
 const TILE_H = 100;
-
-export const IMAGE_TILE_TL = {
-  id: 1,
-  name: "tile-tl",
-  x: TILE_BOARD_X,
-  y: TILE_BOARD_Y,
-  width: TILE_W,
-  height: TILE_H,
-};
-
-export const IMAGE_TILE_TR = {
-  id: 2,
-  name: "tile-tr",
-  x: TILE_BOARD_X + TILE_W,
-  y: TILE_BOARD_Y,
-  width: TILE_W,
-  height: TILE_H,
-};
-
-export const IMAGE_TILE_BL = {
-  id: 3,
-  name: "tile-bl",
-  x: TILE_BOARD_X,
-  y: TILE_BOARD_Y + TILE_H,
-  width: TILE_W,
-  height: TILE_H,
-};
-
-export const IMAGE_TILE_BR = {
-  id: 4,
-  name: "tile-br",
-  x: TILE_BOARD_X + TILE_W,
-  y: TILE_BOARD_Y + TILE_H,
-  width: TILE_W,
-  height: TILE_H,
-};
-
-/**
- * Dynamic Container Swap Mode: alternates between display (4 tiles) and input (3 tiles + text) modes.
- * 
- * Display mode (max visual): TL, TR, BL, BR (400×200 total, no event capture)
- * Input mode (with events): TL, TR, BL + event capture text (300×200 visible, bottom-right empty)
- * 
- * IMPORTANT: Event capture text uses id: 4 (not id: 1) to avoid collision with IMAGE_TILE_TL.
- * Container IDs in input mode: 1=TL, 2=TR, 3=BL, 4=evt (text with isEventCapture=1)
- */
-export const SWAP_MODE_DISPLAY_TILES = [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL, IMAGE_TILE_BR] as const;
-export const SWAP_MODE_INPUT_TILES = [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL] as const;
 
 /**
  * Full-board 3-tile layout with info panel:
@@ -206,17 +99,6 @@ export const INFO_TEXT_CONTAINER = {
   height: CANVAS_H - TILE_BOARD_Y,
 };
 
-/** @deprecated Alias kept for backward compat; points to INFO_TEXT_CONTAINER. */
-export const SWAP_MODE_EVENT_CAPTURE = INFO_TEXT_CONTAINER;
-
-/** Total board area in display mode (4 tiles). */
-export const SWAP_MODE_BOARD_W = TILE_BOARD_W;
-export const SWAP_MODE_BOARD_H = TILE_BOARD_H;
-
-/** Visible board area in input mode (3 tiles, bottom-right corner empty). */
-export const SWAP_MODE_INPUT_VISIBLE_W = TILE_BOARD_W;
-export const SWAP_MODE_INPUT_VISIBLE_H = TILE_H; // Top row only, or L-shaped coverage
-
 export interface ImageContainerRect {
   id: number;
   name: string;
@@ -262,9 +144,6 @@ export const CARD_TABLEAU_H = 80;
 
 /** Vertical offset for static peek cards (compact to fit in reduced 112px tableau canvas). */
 export const STACK_OFFSET_Y_PEEK = 8;
-
-/** Vertical offset for floating cards (larger to clearly show ranks when selecting). */
-export const STACK_OFFSET_Y_FLOAT = 14;
 
 /** Max peek items (facedown + visible) shown above the bottom card in a tableau pile. */
 export const MAX_PEEK_ITEMS = 2;

@@ -1,9 +1,8 @@
 import type { AppState } from "./types";
 import { focusTargetToIndex } from "./ui-mode";
-import { MENU_OPTIONS, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU } from "./constants";
+import { FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU } from "./constants";
 import type { Card, Suit, Rank } from "../game/types";
 import { getLegalDests } from "../game/validation";
-import type { Source } from "../game/validation";
 
 /** Menu lines for overlay: Move Assist: On/Off, Draw Card, Reset, Exit; or Reset confirmation Yes/No. */
 export function getMenuLines(state: AppState): string[] {

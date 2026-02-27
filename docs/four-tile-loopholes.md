@@ -1,5 +1,16 @@
 # Ideas to Leverage 4×200×100 Within SDK Limits
 
+## Status (Historical Ideation)
+
+This note is kept for historical context. It predates the current canonical runtime path.
+
+- Dynamic swap-cycle experiments referenced here are removed from production/runtime code.
+- The "missing quadrant" layout described below is no longer current.
+- Current runtime uses full-board 3-tile coverage (`top`, `bottom-left`, `bottom-right`) plus a left-side info/event text container.
+
+Canonical implementation notes now live in:
+- `docs/performance-responsiveness-design.md`
+
 **Constraint:** Max 4 containers, and exactly one must have `isEventCapture: 1`. So we can have at most **3 image containers** if one is text/list for input.
 
 ---
@@ -14,7 +25,7 @@
 ## 2. Full board in 3 tiles (different crop layout)
 
 - **Idea:** Keep 3 image containers + 1 event capture, but change *what* we draw in the 3 tiles so they cover the **entire** board.
-- **Current:** 2×2 quadrants → we use TL, TR, BL; BR is event capture, so bottom-right quadrant is never drawn.
+- **Historical at spike time:** 2×2 quadrants → TL, TR, BL were used while BR was event capture, so bottom-right quadrant was not drawn.
 - **Alternative A – Horizontal strips:**  
   - Tile 1 = top third of board (y 0–96), Tile 2 = middle third (y 96–192), Tile 3 = bottom third (y 192–288).  
   - Each 576×96 scaled to 200×100.  
@@ -49,4 +60,4 @@
 
 ---
 
-**Recommended experiment:** Implement **Option 2B (top half + bottom-left + bottom-right)** so the full board is visible in 3 tiles with no missing quadrant, and keep the existing 4th container as full-screen event capture.
+**Outcome:** A variant of **Option 2B** became the canonical production path: full-board 3-tile coverage plus a dedicated left-side info/event text container.

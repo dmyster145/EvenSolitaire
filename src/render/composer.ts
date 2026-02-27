@@ -1,7 +1,6 @@
 /**
  * Compose page containers and drive display updates from state.
- * Default profile is supported image mode (hidden event-capture + 2 image containers).
- * Alternate text/tiled modes remain available behind flags for comparison/testing.
+ * Production path is fixed to input mode + full-board 3-tile rendering.
  */
 import {
   CreateStartUpPageContainer,
@@ -11,18 +10,9 @@ import {
   ImageRawDataUpdate,
 } from "@evenrealities/even_hub_sdk";
 import {
-  HUD_TEXT_CONTAINER,
-  SCREEN_TEXT_CONTAINER,
-  IMAGE_TOP_MINI,
-  IMAGE_TABLEAU_MINI,
-  IMAGE_TILE_TL,
-  IMAGE_TILE_TR,
-  IMAGE_TILE_BL,
-  IMAGE_TILE_BR,
   IMAGE_TILE_TOP,
   IMAGE_TILE_BOTTOM_LEFT,
   IMAGE_TILE_BOTTOM_RIGHT,
-  SWAP_MODE_EVENT_CAPTURE,
   INFO_TEXT_CONTAINER,
   VIRTUAL_IMAGE_TOP,
   VIRTUAL_IMAGE_TABLEAU,
@@ -45,8 +35,6 @@ import {
   renderBoardTableauToCanvas,
   type TableauRowViewModel,
 } from "./board-image-tableau";
-import { renderBoardTopMini, renderBoardTableauMini } from "./board-image-minis";
-import { renderFullscreenBoardText } from "./fullscreen-text-board";
 import { drawFaceUpCard } from "./card-canvas";
 import {
   canvasToPngBytes,
@@ -58,177 +46,38 @@ import type { AppState } from "../state/types";
 import type { EvenHubBridge } from "../evenhub/bridge";
 import { getPileView, getMenuLines, getFloatingCards, getInfoPanelText } from "../state/selectors";
 import { focusTargetToIndex } from "../state/ui-mode";
-import { perfLog, perfLogLazy, perfNowMs } from "../perf/log";
+import { perfLogLazy, perfNowMs } from "../perf/log";
 
-export const CONTAINER_ID_TEXT = HUD_TEXT_CONTAINER.id;
-export const CONTAINER_NAME_TEXT = HUD_TEXT_CONTAINER.name;
-export const CONTAINER_ID_TEXT_SCREEN = SCREEN_TEXT_CONTAINER.id;
-export const CONTAINER_NAME_TEXT_SCREEN = SCREEN_TEXT_CONTAINER.name;
-export const CONTAINER_ID_IMAGE_TILE_TL = IMAGE_TILE_TL.id;
-export const CONTAINER_NAME_IMAGE_TILE_TL = IMAGE_TILE_TL.name;
-export const CONTAINER_ID_IMAGE_TILE_TR = IMAGE_TILE_TR.id;
-export const CONTAINER_NAME_IMAGE_TILE_TR = IMAGE_TILE_TR.name;
-export const CONTAINER_ID_IMAGE_TILE_BL = IMAGE_TILE_BL.id;
-export const CONTAINER_NAME_IMAGE_TILE_BL = IMAGE_TILE_BL.name;
-export const CONTAINER_ID_IMAGE_TILE_BR = IMAGE_TILE_BR.id;
-export const CONTAINER_NAME_IMAGE_TILE_BR = IMAGE_TILE_BR.name;
-export const CONTAINER_ID_IMAGE_TOP = IMAGE_TOP_MINI.id;
-export const CONTAINER_NAME_IMAGE_TOP = IMAGE_TOP_MINI.name;
-export const CONTAINER_ID_IMAGE_TABLEAU = IMAGE_TABLEAU_MINI.id;
-export const CONTAINER_NAME_IMAGE_TABLEAU = IMAGE_TABLEAU_MINI.name;
-
-/** Event-capture container content (invisible; images draw on top). */
-const EVENT_CAPTURE_CONTENT = " ";
-const SCREEN_PLACEHOLDER_CONTENT = "Even Solitaire loading...";
 const EMPTY_PNG_U8 = new Uint8Array(0);
-
-const FULLSCREEN_TEXT_GAMEPLAY_MODE = false;
-const EXPERIMENTAL_2X2_TILE_MODE = false;
-
-/**
- * Dynamic Container Swapping: toggle between display mode (4 tiles, max visual)
- * and input mode (3 tiles + text event capture) for turn-based gameplay.
- * 
- * When enabled, replaces the default 2×(200×50) mini display with 4×(200×100) tiles.
- * The swap cycle shows all 4 tiles briefly, then swaps to 3 tiles + event capture.
- */
-export const DYNAMIC_SWAP_MODE = true;
-
-/**
- * Skip the display-mode swap for rapid state changes (blinks, menu navigation).
- * When true, only input mode is used (3 tiles), avoiding flicker during rapid updates.
- */
-const SKIP_DISPLAY_SWAP_FOR_RAPID_CHANGES = true;
-
-/** Keep true for production because full display/input swap is still less stable on-device than fixed 3-tile mode. */
-const DISABLE_SWAP_CYCLE_FOR_DEBUG = true;
-
-/**
- * When true, use "full board in 3 tiles" layout: top half, bottom-left quad, bottom-right quad.
- * Entire board is visible (no missing quadrant); 4th container remains event capture.
- */
-export const USE_FULL_BOARD_3_TILE_LAYOUT = true;
-export type ContainerMode = "display" | "input";
-let currentContainerMode: ContainerMode = "input";
-
-export function getContainerMode(): ContainerMode {
-  return currentContainerMode;
-}
-
-export function setContainerMode(mode: ContainerMode): void {
-  currentContainerMode = mode;
-}
-
-/** Display mode: 4 image tiles (400×200 board), no event capture. Maximum visual fidelity. */
-export function composeDisplayModePage(): RebuildPageContainer {
-  assertG2ContainerBudget(4, 0);
-  const imageTl = createImageContainer(IMAGE_TILE_TL);
-  const imageTr = createImageContainer(IMAGE_TILE_TR);
-  const imageBl = createImageContainer(IMAGE_TILE_BL);
-  const imageBr = createImageContainer(IMAGE_TILE_BR);
-  return new RebuildPageContainer({
-    containerTotalNum: 4,
-    imageObject: [imageTl, imageTr, imageBl, imageBr],
-  });
-}
 
 /** Input mode: 3 image tiles + 1 info panel text (with event capture). */
 export function composeInputModePage(): RebuildPageContainer {
   assertG2ContainerBudget(3, 1);
   const textContainer = createInfoPanelTextContainer();
-  const [tile1, tile2, tile3] = USE_FULL_BOARD_3_TILE_LAYOUT
-    ? [IMAGE_TILE_TOP, IMAGE_TILE_BOTTOM_LEFT, IMAGE_TILE_BOTTOM_RIGHT]
-    : [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL];
   return new RebuildPageContainer({
     containerTotalNum: 4,
-    imageObject: [createImageContainer(tile1), createImageContainer(tile2), createImageContainer(tile3)],
+    imageObject: [
+      createImageContainer(IMAGE_TILE_TOP),
+      createImageContainer(IMAGE_TILE_BOTTOM_LEFT),
+      createImageContainer(IMAGE_TILE_BOTTOM_RIGHT),
+    ],
     textObject: [textContainer],
   });
 }
 
 /** Startup page: 3 image tiles + info panel text (with event capture). */
-export function composeSwapModeStartupPage(): CreateStartUpPageContainer {
+export function composeStartupPage(): CreateStartUpPageContainer {
   assertG2ContainerBudget(3, 1);
   const textContainer = createInfoPanelTextContainer();
-  const [tile1, tile2, tile3] = USE_FULL_BOARD_3_TILE_LAYOUT
-    ? [IMAGE_TILE_TOP, IMAGE_TILE_BOTTOM_LEFT, IMAGE_TILE_BOTTOM_RIGHT]
-    : [IMAGE_TILE_TL, IMAGE_TILE_TR, IMAGE_TILE_BL];
   return new CreateStartUpPageContainer({
     containerTotalNum: 4,
-    imageObject: [createImageContainer(tile1), createImageContainer(tile2), createImageContainer(tile3)],
+    imageObject: [
+      createImageContainer(IMAGE_TILE_TOP),
+      createImageContainer(IMAGE_TILE_BOTTOM_LEFT),
+      createImageContainer(IMAGE_TILE_BOTTOM_RIGHT),
+    ],
     textObject: [textContainer],
   });
-}
-
-/**
- * Swap to display mode (4 image tiles, maximum visual fidelity, no event capture).
- * Call this before sending all 4 tile images for best display quality.
- * Returns true if swap succeeded.
- */
-export async function swapToDisplayMode(hub: EvenHubBridge): Promise<boolean> {
-  if (currentContainerMode === "display") return true;
-  const page = composeDisplayModePage();
-  const success = await hub.rebuildPage(page);
-  if (success) {
-    currentContainerMode = "display";
-  }
-  return success;
-}
-
-/**
- * Swap to input mode (3 image tiles + event capture text).
- * Call this after display update is complete to re-enable scroll/tap events.
- * Returns true if swap succeeded.
- */
-export async function swapToInputMode(hub: EvenHubBridge): Promise<boolean> {
-  if (currentContainerMode === "input") return true;
-  const page = composeInputModePage();
-  const success = await hub.rebuildPage(page);
-  if (success) {
-    currentContainerMode = "input";
-  }
-  return success;
-}
-
-/**
- * Perform a full display-then-input swap cycle:
- * 1. Swap to display mode (4 tiles)
- * 2. Send all 4 tile images
- * 3. Swap back to input mode (3 tiles + text)
- * 4. Re-send 3 visible tiles (uses cached images from step 2)
- * 
- * This maximizes display quality while maintaining input capability.
- * Returns true if the full cycle succeeded.
- */
-export async function performSwapCycle(
-  hub: EvenHubBridge,
-  images: { tileTlPng: number[]; tileTrPng: number[]; tileBlPng: number[]; tileBrPng: number[] }
-): Promise<boolean> {
-  perfLogLazy(() => `[Perf][Composer][SwapCycle] entry brBytes=${images.tileBrPng.length}`);
-  // Step 1: Swap to display mode
-  const displaySwapOk = await swapToDisplayMode(hub);
-  perfLogLazy(
-    () =>
-      `[Perf][Composer][SwapCycle] after-display-swap ok=${displaySwapOk ? "y" : "n"} mode=${currentContainerMode}`
-  );
-  if (!displaySwapOk) return false;
-
-  // Step 2: Send all 4 tile images
-  await sendDisplayModeTiles(hub, images);
-
-  // Step 3: Swap back to input mode
-  const inputSwapOk = await swapToInputMode(hub);
-  perfLogLazy(() => `[Perf][Composer][SwapCycle] after-input-swap ok=${inputSwapOk ? "y" : "n"} mode=input`);
-  if (!inputSwapOk) return false;
-
-  // Step 4: Re-send 3 visible tiles (BR is now replaced by event capture text)
-  await sendInputModeTiles(hub, {
-    tileTlPng: images.tileTlPng,
-    tileTrPng: images.tileTrPng,
-    tileBlPng: images.tileBlPng,
-  });
-
-  return true;
 }
 
 function createImageContainer(container: ImageContainerRect): ImageContainerProperty {
@@ -240,22 +89,6 @@ function createImageContainer(container: ImageContainerRect): ImageContainerProp
     height: container.height,
     containerID: container.id,
     containerName: container.name,
-  });
-}
-
-function createEventCaptureTextContainer(): TextContainerProperty {
-  return new TextContainerProperty({
-    xPosition: HUD_TEXT_CONTAINER.x,
-    yPosition: HUD_TEXT_CONTAINER.y,
-    width: HUD_TEXT_CONTAINER.width,
-    height: HUD_TEXT_CONTAINER.height,
-    borderWidth: 0,
-    borderColor: 0,
-    paddingLength: 0,
-    containerID: HUD_TEXT_CONTAINER.id,
-    containerName: HUD_TEXT_CONTAINER.name,
-    content: EVENT_CAPTURE_CONTENT,
-    isEventCapture: 1,
   });
 }
 
@@ -277,92 +110,6 @@ function createInfoPanelTextContainer(content = "Even Solitaire"): TextContainer
 }
 export const CONTAINER_ID_INFO = INFO_TEXT_CONTAINER.id;
 export const CONTAINER_NAME_INFO = INFO_TEXT_CONTAINER.name;
-
-function createScreenTextContainer(content = SCREEN_PLACEHOLDER_CONTENT): TextContainerProperty {
-  return new TextContainerProperty({
-    xPosition: SCREEN_TEXT_CONTAINER.x,
-    yPosition: SCREEN_TEXT_CONTAINER.y,
-    width: SCREEN_TEXT_CONTAINER.width,
-    height: SCREEN_TEXT_CONTAINER.height,
-    borderWidth: 0,
-    borderColor: 0,
-    paddingLength: 0,
-    containerID: SCREEN_TEXT_CONTAINER.id,
-    containerName: SCREEN_TEXT_CONTAINER.name,
-    content,
-    isEventCapture: 0,
-  });
-}
-
-export function composeStartupPage(): CreateStartUpPageContainer {
-  if (FULLSCREEN_TEXT_GAMEPLAY_MODE) {
-    assertG2ContainerBudget(0, 2);
-    const textEvent = createEventCaptureTextContainer();
-    const textScreen = createScreenTextContainer();
-    return new CreateStartUpPageContainer({
-      containerTotalNum: 2,
-      textObject: [textEvent, textScreen],
-    });
-  }
-  if (!EXPERIMENTAL_2X2_TILE_MODE) {
-    assertG2ContainerBudget(2, 1);
-    const textContainer = createEventCaptureTextContainer();
-    const imageTop = createImageContainer(IMAGE_TOP_MINI);
-    const imageTableau = createImageContainer(IMAGE_TABLEAU_MINI);
-    return new CreateStartUpPageContainer({
-      containerTotalNum: 3,
-      imageObject: [imageTop, imageTableau],
-      textObject: [textContainer],
-    });
-  }
-
-  // Experimental: no event-capture text container, so all 4 containers can be image tiles.
-  // Input may rely on sysEvent only and may not work on all hosts/devices.
-  assertG2ContainerBudget(4, 0);
-  const imageTl = createImageContainer(IMAGE_TILE_TL);
-  const imageTr = createImageContainer(IMAGE_TILE_TR);
-  const imageBl = createImageContainer(IMAGE_TILE_BL);
-  const imageBr = createImageContainer(IMAGE_TILE_BR);
-
-  return new CreateStartUpPageContainer({
-    containerTotalNum: 4,
-    imageObject: [imageTl, imageTr, imageBl, imageBr],
-  });
-}
-
-/** Gameplay page composition for the active display profile. */
-export function composeGameplayPage(): RebuildPageContainer {
-  if (FULLSCREEN_TEXT_GAMEPLAY_MODE) {
-    assertG2ContainerBudget(0, 2);
-    const textEvent = createEventCaptureTextContainer();
-    const textScreen = createScreenTextContainer();
-    return new RebuildPageContainer({
-      containerTotalNum: 2,
-      textObject: [textEvent, textScreen],
-    });
-  }
-  if (!EXPERIMENTAL_2X2_TILE_MODE) {
-    assertG2ContainerBudget(2, 1);
-    const textContainer = createEventCaptureTextContainer();
-    const imageTop = createImageContainer(IMAGE_TOP_MINI);
-    const imageTableau = createImageContainer(IMAGE_TABLEAU_MINI);
-    return new RebuildPageContainer({
-      containerTotalNum: 3,
-      imageObject: [imageTop, imageTableau],
-      textObject: [textContainer],
-    });
-  }
-
-  assertG2ContainerBudget(4, 0);
-  const imageTl = createImageContainer(IMAGE_TILE_TL);
-  const imageTr = createImageContainer(IMAGE_TILE_TR);
-  const imageBl = createImageContainer(IMAGE_TILE_BL);
-  const imageBr = createImageContainer(IMAGE_TILE_BR);
-  return new RebuildPageContainer({
-    containerTotalNum: 4,
-    imageObject: [imageTl, imageTr, imageBl, imageBr],
-  });
-}
 
 type BoardViewContext = {
   game: AppState["game"];
@@ -515,32 +262,6 @@ function getReusableCanvas2D(key: string, width: number, height: number): Reusab
   return entry;
 }
 
-async function cropScaleSourceToPngBytes(
-  source: CanvasImageSource,
-  sourceRect: { x: number; y: number; width: number; height: number },
-  targetRect: { width: number; height: number },
-  canvasKey: string
-): Promise<number[]> {
-  const { canvas, ctx } = getReusableCanvas2D(canvasKey, targetRect.width, targetRect.height);
-  ctx.imageSmoothingEnabled = true;
-  // Draw covers the full destination canvas. "copy" avoids an explicit clear and
-  // tends to reduce crop/encode variance on some runtimes.
-  ctx.globalCompositeOperation = "copy";
-  ctx.drawImage(
-    source,
-    sourceRect.x,
-    sourceRect.y,
-    sourceRect.width,
-    sourceRect.height,
-    0,
-    0,
-    targetRect.width,
-    targetRect.height
-  );
-  ctx.globalCompositeOperation = "source-over";
-  return canvasToPngBytes(canvas, `crop:${canvasKey}`);
-}
-
 async function cropScaleSourceToPngUint8Bytes(
   source: CanvasImageSource,
   sourceRect: { x: number; y: number; width: number; height: number },
@@ -588,30 +309,6 @@ function closeImageBitmapSafe(bitmap: ImageBitmap | null | undefined): void {
     bitmap.close();
   } catch {
     // Best effort cleanup only.
-  }
-}
-
-async function composeFullBoardCanvasFromBoardRowPngs(
-  topPng: number[],
-  tableauPng: number[]
-): Promise<HTMLCanvasElement> {
-  const { canvas, ctx } = getReusableCanvas2D("full-board-overlay", OVERLAY_W, OVERLAY_H);
-  ctx.clearRect(0, 0, OVERLAY_W, OVERLAY_H);
-  let topImg: ImageBitmap | null = null;
-  let tableauImg: ImageBitmap | null = null;
-  try {
-    if (topPng.length > 0) {
-      topImg = await pngBytesToImageBitmap(topPng);
-      if (topImg) ctx.drawImage(topImg, 0, 0);
-    }
-    if (tableauPng.length > 0) {
-      tableauImg = await pngBytesToImageBitmap(tableauPng);
-      if (tableauImg) ctx.drawImage(tableauImg, 0, FULL_SCREEN_CENTER_Y);
-    }
-    return canvas;
-  } finally {
-    closeImageBitmapSafe(topImg);
-    closeImageBitmapSafe(tableauImg);
   }
 }
 
@@ -686,93 +383,6 @@ export async function transparentOverlayPng(): Promise<number[]> {
   canvas.width = OVERLAY_W;
   canvas.height = OVERLAY_H;
   return canvasToPngBytes(canvas);
-}
-
-/** Composite top + tableau into one 576×288 overlay PNG so overlay shows the board (no alpha needed). */
-async function overlayPngFromBoardImages(topPng: number[], tableauPng: number[]): Promise<number[]> {
-  const canvas = document.createElement("canvas");
-  canvas.width = OVERLAY_W;
-  canvas.height = OVERLAY_H;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return [];
-  let topImg: ImageBitmap | null = null;
-  let tableauImg: ImageBitmap | null = null;
-  try {
-    if (topPng.length > 0) {
-      topImg = await pngBytesToImageBitmap(topPng);
-      if (topImg) ctx.drawImage(topImg, 0, 0);
-    }
-    if (tableauPng.length > 0) {
-      tableauImg = await pngBytesToImageBitmap(tableauPng);
-      if (tableauImg) ctx.drawImage(tableauImg, 0, FULL_SCREEN_CENTER_Y);
-    }
-    return canvasToPngBytes(canvas);
-  } finally {
-    closeImageBitmapSafe(topImg);
-    closeImageBitmapSafe(tableauImg);
-  }
-}
-
-async function renderTiledBoardImages(state: AppState): Promise<{
-  tileTlPng: number[];
-  tileTrPng: number[];
-  tileBlPng: number[];
-  tileBrPng: number[];
-}> {
-  const totalStartMs = perfNowMs();
-  const boardRowsStartMs = perfNowMs();
-  const boardCtx = buildBoardViewContext(state);
-  const topView = topRowViewFromState(state, boardCtx);
-  const tableauView = tableauViewFromState(state, boardCtx);
-  const { topSourceCanvas, tableauSourceCanvas } = getReusableBoardRowSourceCanvases();
-  const topCanvas = renderBoardTopToCanvas(topView, topSourceCanvas);
-  const tableauCanvas = renderBoardTableauToCanvas(tableauView, tableauSourceCanvas);
-  const boardRowsMs = perfNowMs() - boardRowsStartMs;
-  const compositeStartMs = perfNowMs();
-  const fullBoardCanvas = composeFullBoardCanvasFromBoardRowCanvases(topCanvas, tableauCanvas);
-  const compositeMs = perfNowMs() - compositeStartMs;
-
-  const srcHalfW = Math.floor(OVERLAY_W / 2); // 288
-  const srcHalfH = Math.floor(OVERLAY_H / 2); // 144
-  const cropStartMs = perfNowMs();
-  const [tileTlPng, tileTrPng, tileBlPng, tileBrPng] = await Promise.all([
-    cropScaleSourceToPngBytes(
-      fullBoardCanvas,
-      { x: 0, y: 0, width: srcHalfW, height: srcHalfH },
-      { width: IMAGE_TILE_TL.width, height: IMAGE_TILE_TL.height },
-      "tile-4-tl"
-    ),
-    cropScaleSourceToPngBytes(
-      fullBoardCanvas,
-      { x: srcHalfW, y: 0, width: srcHalfW, height: srcHalfH },
-      { width: IMAGE_TILE_TR.width, height: IMAGE_TILE_TR.height },
-      "tile-4-tr"
-    ),
-    cropScaleSourceToPngBytes(
-      fullBoardCanvas,
-      { x: 0, y: srcHalfH, width: srcHalfW, height: srcHalfH },
-      { width: IMAGE_TILE_BL.width, height: IMAGE_TILE_BL.height },
-      "tile-4-bl"
-    ),
-    cropScaleSourceToPngBytes(
-      fullBoardCanvas,
-      { x: srcHalfW, y: srcHalfH, width: srcHalfW, height: srcHalfH },
-      { width: IMAGE_TILE_BR.width, height: IMAGE_TILE_BR.height },
-      "tile-4-br"
-    ),
-  ]);
-  const cropMs = perfNowMs() - cropStartMs;
-  const totalMs = perfNowMs() - totalStartMs;
-
-  perfLogLazy(
-    () =>
-    `[Perf][Render][4Tile] rows=${boardRowsMs.toFixed(1)}ms composite=${compositeMs.toFixed(
-      1
-    )}ms crop=${cropMs.toFixed(1)}ms total=${totalMs.toFixed(1)}ms bytes=` +
-      `${tileTlPng.length + tileTrPng.length + tileBlPng.length + tileBrPng.length}`
-  );
-
-  return { tileTlPng, tileTrPng, tileBlPng, tileBrPng };
 }
 
 /**
@@ -933,6 +543,7 @@ type FullBoard3TilePreRenderHint = {
 const BACKLOG_RENDER_SKIP_QUEUE_DEPTH = 2;
 const BURST_STALE_SKIP_AVG_QWAIT_MS = 200;
 const ALL_FULL_BOARD_3_TILE_REGIONS: FullBoard3TileRegion[] = ["top", "bottomLeft", "bottomRight"];
+const SAFE_FULL_FRAME_3_TILE_RENDER = true;
 
 type StaleRenderSkipContext = {
   phase: "pre" | "post";
@@ -1467,241 +1078,17 @@ async function sendFullBoard3Tiles(
   return entries.length;
 }
 
-async function renderExperimentalTiledDisplayImages(state: AppState): Promise<{
-  tileTlPng: number[];
-  tileTrPng: number[];
-  tileBlPng: number[];
-  tileBrPng: number[];
-}> {
-  return await renderTiledBoardImages(state);
-}
-
-async function sendExperimentalTiledDisplayImages(
-  hub: EvenHubBridge,
-  images: { tileTlPng: number[]; tileTrPng: number[]; tileBlPng: number[]; tileBrPng: number[] },
-  behavior: ImageSendBehavior = "await"
-): Promise<void> {
-  if (images.tileTlPng.length > 0) {
-    await sendHubImage(
-      hub,
-      new ImageRawDataUpdate({
-        containerID: CONTAINER_ID_IMAGE_TILE_TL,
-        containerName: CONTAINER_NAME_IMAGE_TILE_TL,
-        imageData: images.tileTlPng,
-      }),
-      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_TL}` },
-      behavior
-    );
-  }
-  if (images.tileTrPng.length > 0) {
-    await sendHubImage(
-      hub,
-      new ImageRawDataUpdate({
-        containerID: CONTAINER_ID_IMAGE_TILE_TR,
-        containerName: CONTAINER_NAME_IMAGE_TILE_TR,
-        imageData: images.tileTrPng,
-      }),
-      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_TR}` },
-      behavior
-    );
-  }
-  if (images.tileBlPng.length > 0) {
-    await sendHubImage(
-      hub,
-      new ImageRawDataUpdate({
-        containerID: CONTAINER_ID_IMAGE_TILE_BL,
-        containerName: CONTAINER_NAME_IMAGE_TILE_BL,
-        imageData: images.tileBlPng,
-      }),
-      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_BL}` },
-      behavior
-    );
-  }
-  if (images.tileBrPng.length > 0) {
-    perfLogLazy(
-      () => `[Perf][Composer][4Tile] send cid=${CONTAINER_ID_IMAGE_TILE_BR} brBytes=${images.tileBrPng.length}`
-    );
-    await sendHubImage(
-      hub,
-      new ImageRawDataUpdate({
-        containerID: CONTAINER_ID_IMAGE_TILE_BR,
-        containerName: CONTAINER_NAME_IMAGE_TILE_BR,
-        imageData: images.tileBrPng,
-      }),
-      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_BR}` },
-      behavior
-    );
-  }
-}
-
-/** Render all 4 tiles for dynamic swap mode. Returns cached PNG data for both display and input modes. */
-export async function renderSwapModeTiles(state: AppState): Promise<{
-  tileTlPng: number[];
-  tileTrPng: number[];
-  tileBlPng: number[];
-  tileBrPng: number[];
-}> {
-  return await renderTiledBoardImages(state);
-}
-
-/** Send all 4 tiles (display mode). */
-export async function sendDisplayModeTiles(
-  hub: EvenHubBridge,
-  images: { tileTlPng: number[]; tileTrPng: number[]; tileBlPng: number[]; tileBrPng: number[] }
-): Promise<void> {
-  await sendExperimentalTiledDisplayImages(hub, images);
-}
-
-/** Send 3 tiles (input mode: TL, TR, BL only - no BR since that slot is used for event capture text). */
-export async function sendInputModeTiles(
-  hub: EvenHubBridge,
-  images: { tileTlPng: number[]; tileTrPng: number[]; tileBlPng: number[] },
-  behavior: ImageSendBehavior = "await"
-): Promise<void> {
-  if (images.tileTlPng.length > 0) {
-    await sendHubImage(
-      hub,
-      new ImageRawDataUpdate({
-        containerID: CONTAINER_ID_IMAGE_TILE_TL,
-        containerName: CONTAINER_NAME_IMAGE_TILE_TL,
-        imageData: images.tileTlPng,
-      }),
-      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_TL}` },
-      behavior
-    );
-  }
-  if (images.tileTrPng.length > 0) {
-    await sendHubImage(
-      hub,
-      new ImageRawDataUpdate({
-        containerID: CONTAINER_ID_IMAGE_TILE_TR,
-        containerName: CONTAINER_NAME_IMAGE_TILE_TR,
-        imageData: images.tileTrPng,
-      }),
-      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_TR}` },
-      behavior
-    );
-  }
-  if (images.tileBlPng.length > 0) {
-    await sendHubImage(
-      hub,
-      new ImageRawDataUpdate({
-        containerID: CONTAINER_ID_IMAGE_TILE_BL,
-        containerName: CONTAINER_NAME_IMAGE_TILE_BL,
-        imageData: images.tileBlPng,
-      }),
-      { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TILE_BL}` },
-      behavior
-    );
-  }
-}
-
-async function renderSupportedMiniDisplayImages(state: AppState): Promise<{
-  topMiniPng: number[];
-  tableauMiniPng: number[];
-}> {
-  const boardCtx = buildBoardViewContext(state);
-  const topView = topRowViewFromState(state, boardCtx);
-  const tableauView = tableauViewFromState(state, boardCtx);
-  const [topMiniPng, tableauMiniPng] = await Promise.all([
-    renderBoardTopMini(topView),
-    renderBoardTableauMini(tableauView),
-  ]);
-  return { topMiniPng, tableauMiniPng };
-}
-
-async function sendSupportedTopMiniImage(
-  hub: EvenHubBridge,
-  topMiniPng: number[],
-  behavior: ImageSendBehavior = "await"
-): Promise<void> {
-  if (topMiniPng.length === 0) return;
-  await sendHubImage(
-    hub,
-    new ImageRawDataUpdate({
-      containerID: CONTAINER_ID_IMAGE_TOP,
-      containerName: CONTAINER_NAME_IMAGE_TOP,
-      imageData: topMiniPng,
-    }),
-    { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TOP}` },
-    behavior
-  );
-}
-
-async function sendSupportedTableauMiniImage(
-  hub: EvenHubBridge,
-  tableauMiniPng: number[],
-  behavior: ImageSendBehavior = "await"
-): Promise<void> {
-  if (tableauMiniPng.length === 0) return;
-  await sendHubImage(
-    hub,
-    new ImageRawDataUpdate({
-      containerID: CONTAINER_ID_IMAGE_TABLEAU,
-      containerName: CONTAINER_NAME_IMAGE_TABLEAU,
-      imageData: tableauMiniPng,
-    }),
-    { priority: "high", coalesceKey: `img:${CONTAINER_ID_IMAGE_TABLEAU}` },
-    behavior
-  );
-}
-
-async function sendSupportedMiniDisplayImages(
-  hub: EvenHubBridge,
-  images: { topMiniPng: number[]; tableauMiniPng: number[] }
-): Promise<void> {
-  await sendSupportedTopMiniImage(hub, images.topMiniPng);
-  await sendSupportedTableauMiniImage(hub, images.tableauMiniPng);
-}
-
-async function sendFullscreenTextDisplay(hub: EvenHubBridge, state: AppState): Promise<void> {
-  await hub.updateText(
-    CONTAINER_ID_TEXT_SCREEN,
-    CONTAINER_NAME_TEXT_SCREEN,
-    renderFullscreenBoardText(state)
-  );
-}
-
-/** Send display contents for current active profile (text or images). */
+/** Send display contents for the fixed production profile (full-board 3-tile + info text). */
 export async function sendBoardImages(hub: EvenHubBridge, state: AppState): Promise<void> {
-  if (FULLSCREEN_TEXT_GAMEPLAY_MODE) {
-    await sendFullscreenTextDisplay(hub, state);
-    return;
-  }
-  if (EXPERIMENTAL_2X2_TILE_MODE) {
-    await sendExperimentalTiledDisplayImages(hub, await renderExperimentalTiledDisplayImages(state));
-    return;
-  }
-  await sendSupportedMiniDisplayImages(hub, await renderSupportedMiniDisplayImages(state));
+  const images = await renderFullBoard3Tiles(state);
+  await sendFullBoard3Tiles(hub, images, "enqueue");
+  await hub.updateText(CONTAINER_ID_INFO, CONTAINER_NAME_INFO, getInfoPanelText(state));
 }
 
 export async function sendInitialImages(hub: EvenHubBridge, state: AppState): Promise<void> {
-  if (FULLSCREEN_TEXT_GAMEPLAY_MODE) {
-    await sendFullscreenTextDisplay(hub, state);
-    return;
-  }
-  if (DYNAMIC_SWAP_MODE) {
-    if (USE_FULL_BOARD_3_TILE_LAYOUT) {
-      const images = await renderFullBoard3Tiles(state);
-      await sendFullBoard3Tiles(hub, images);
-      await hub.updateText(CONTAINER_ID_INFO, CONTAINER_NAME_INFO, getInfoPanelText(state));
-    } else {
-      const images = await renderSwapModeTiles(state);
-      await sendInputModeTiles(hub, {
-        tileTlPng: images.tileTlPng,
-        tileTrPng: images.tileTrPng,
-        tileBlPng: images.tileBlPng,
-      });
-    }
-    return;
-  }
-  if (EXPERIMENTAL_2X2_TILE_MODE) {
-    const images = await renderExperimentalTiledDisplayImages(state);
-    await sendExperimentalTiledDisplayImages(hub, images);
-    return;
-  }
-  const images = await renderSupportedMiniDisplayImages(state);
-  await sendSupportedMiniDisplayImages(hub, images);
+  const images = await renderFullBoard3Tiles(state);
+  await sendFullBoard3Tiles(hub, images);
+  await hub.updateText(CONTAINER_ID_INFO, CONTAINER_NAME_INFO, getInfoPanelText(state));
 }
 
 export async function flushDisplayUpdate(
@@ -1728,10 +1115,7 @@ export async function flushDisplayUpdate(
     lastTableauPng?: number[];
     /** Full-screen overlay: single rolling frame only (replaced each tick, cleared when animation ends). No history kept — memory bounded. */
     lastOverlayPng?: number[];
-    /** Per-row hashes for supported 2-image mode so unchanged rows are not re-rendered/re-sent. */
-    topMiniHash?: string;
-    tableauMiniHash?: string;
-    /** Combined hash for dynamic swap mode (4-tile rendering). */
+    /** Combined visual hash for the canonical full-board 3-tile pipeline. */
     tileHash?: string;
     /** Split hashes for cheap pre-render dirty prediction in 3-tile mode. */
     topPileHash?: string;
@@ -1783,15 +1167,6 @@ export async function flushDisplayUpdate(
       `cid${IMAGE_TILE_BOTTOM_LEFT.id}=${sentBottomLeftBytes}/${bottomLeftBytes},` +
       `cid${IMAGE_TILE_BOTTOM_RIGHT.id}=${sentBottomRightBytes}/${bottomRightBytes}`;
   };
-  if (FULLSCREEN_TEXT_GAMEPLAY_MODE) {
-    perfPath = "text";
-    const nextText = renderFullscreenBoardText(state);
-    if (nextText !== lastSent.screenText) {
-      await hub.updateText(CONTAINER_ID_TEXT_SCREEN, CONTAINER_NAME_TEXT_SCREEN, nextText);
-      lastSent.screenText = nextText;
-    }
-    return { lastSent };
-  }
   const focusIdx = focusTargetToIndex(state.ui.focus);
   const src = state.ui.selection.source;
   const sourceArea = src ? `${src.area}:${src.index}` : null;
@@ -1899,241 +1274,192 @@ export async function flushDisplayUpdate(
     uiMode !== lastSent.uiMode
   ) {
     lastSent.lastOverlayPng = undefined;
-    if (DYNAMIC_SWAP_MODE) {
-      const tileHash = dynamicTileVisualKeyFromPrimitives({
-        focusIdx,
-        sourceArea,
-        pileHash,
-        menuOpen,
-        menuSelectedIndex,
-        moveAssist,
-        pendingResetConfirm,
-        selectionInvalidBlinkRemaining,
-        selectionInvalidBlinkVisible,
-        selectedCardCount,
-        uiMode,
-      });
-      const changed = tileHash !== lastSent.tileHash;
-      if (changed) {
-        if (USE_FULL_BOARD_3_TILE_LAYOUT) {
-          perfPath = "dynamic-3tile";
-          if (
-            shouldSkipStaleBackloggedImageRender(hub, options, {
-              phase: "pre",
-              bursty: burstyVisualState,
-            })
-          ) {
-            return logSkippedVisualFlush(burstyVisualState ? "stale-burst-pre" : "stale-backlog-pre");
-          }
+    const tileHash = dynamicTileVisualKeyFromPrimitives({
+      focusIdx,
+      sourceArea,
+      pileHash,
+      menuOpen,
+      menuSelectedIndex,
+      moveAssist,
+      pendingResetConfirm,
+      selectionInvalidBlinkRemaining,
+      selectionInvalidBlinkVisible,
+      selectedCardCount,
+      uiMode,
+    });
+    const changed = tileHash !== lastSent.tileHash;
+    if (changed) {
+      perfPath = "dynamic-3tile";
+      if (
+        shouldSkipStaleBackloggedImageRender(hub, options, {
+          phase: "pre",
+          bursty: burstyVisualState,
+        })
+      ) {
+        return logSkippedVisualFlush(burstyVisualState ? "stale-burst-pre" : "stale-backlog-pre");
+      }
 
-          const predictedPreRenderHint =
-            predictMenuNavigation3TileHint({
-              focusIdx,
-              sourceArea,
-              topPileHash,
-              tableauPileHash,
-              menuOpen,
-              menuSelectedIndex,
-              moveAssist,
-              pendingResetConfirm,
-              selectionInvalidBlinkRemaining,
-              selectionInvalidBlinkVisible,
-              selectedCardCount,
-              uiMode,
-              lastSent,
-            }) ??
-            predictFullBoard3TilePreRenderHint({
-              focusIdx,
-              sourceArea,
-              topPileHash,
-              tableauPileHash,
-              menuOpen,
-              moveAssist,
-              pendingResetConfirm,
-              selectionInvalidBlinkRemaining,
-              selectionInvalidBlinkVisible,
-              selectedCardCount,
-              uiMode,
-              lastSent,
-            });
-          const preRenderHint = coherentFrameRequired
-            ? {
-                mode: "full" as const,
-                reason: transportUnderPressure ? "coherent-pressure" : "coherent-transition",
-              }
-            : predictedPreRenderHint;
-          perfHint = `${preRenderHint.reason}${interruptFocusHintSuffix}`;
-
-          if (preRenderHint.mode === "topOnly") {
-            perfPath = "dynamic-3tile-toponly";
-            const topTilePng = await renderFullBoard3TopTileOnly(state, {
-              focusIdxOverride: renderFocusIdxOverride,
-            });
-            if (
-              shouldSkipStaleBackloggedImageRender(hub, options, {
-                phase: "post",
-                bursty: burstyVisualState,
-              })
-            ) {
-              return logSkippedVisualFlush(burstyVisualState ? "stale-burst-post" : "stale-backlog-post");
-            }
-            const partialImages: FullBoard3TileImages = {
-              topPng: topTilePng,
-              bottomLeftPng: lastSent.last3TileBottomLeftPng ?? EMPTY_PNG_U8,
-              bottomRightPng: lastSent.last3TileBottomRightPng ?? EMPTY_PNG_U8,
-            };
-            const resolved = resolveFullBoard3TileImagesWithCacheFallback(partialImages, lastSent);
-            if (resolved.unrecoverableMissing) {
-              return logSkippedVisualFlush("render-empty-no-cache");
-            }
-            if (resolved.fallbackRegions.length > 0) {
-              perfHint = `${perfHint}+fallback:${resolved.fallbackRegions.join(",")}`;
-            }
-            const { dirty, changedCount } = diffFullBoard3TileImages(resolved.images, lastSent);
-            record3TilePerfBytes(resolved.images, dirty);
-            perfSkippedImages = 3 - changedCount;
-            if (changedCount > 0) {
-              perfSentImages = await sendFullBoard3Tiles(
-                hub,
-                resolved.images,
-                runtimeImageSendBehavior,
-                {
-                  dirty,
-                  preferredOrder: full3TilePreferredOrder,
-                  forceHighPriority: full3TileForceHighPriority,
-                  interruptProtectedRegions: full3TileInterruptProtectedRegions,
-                }
-              );
-            }
-            cacheFullBoard3TileImages(lastSent, resolved.images);
-          } else if (preRenderHint.mode === "bottomOnly") {
-            perfPath = "dynamic-3tile-bottomonly";
-            const { bottomLeftPng, bottomRightPng } = await renderFullBoard3BottomTilesOnly(state, {
-              focusIdxOverride: renderFocusIdxOverride,
-            });
-            if (
-              shouldSkipStaleBackloggedImageRender(hub, options, {
-                phase: "post",
-                bursty: burstyVisualState,
-              })
-            ) {
-              return logSkippedVisualFlush(burstyVisualState ? "stale-burst-post" : "stale-backlog-post");
-            }
-            const partialImages: FullBoard3TileImages = {
-              topPng: lastSent.last3TileTopPng ?? EMPTY_PNG_U8,
-              bottomLeftPng,
-              bottomRightPng,
-            };
-            const resolved = resolveFullBoard3TileImagesWithCacheFallback(partialImages, lastSent);
-            if (resolved.unrecoverableMissing) {
-              return logSkippedVisualFlush("render-empty-no-cache");
-            }
-            if (resolved.fallbackRegions.length > 0) {
-              perfHint = `${perfHint}+fallback:${resolved.fallbackRegions.join(",")}`;
-            }
-            const { dirty, changedCount } = diffFullBoard3TileImages(resolved.images, lastSent);
-            record3TilePerfBytes(resolved.images, dirty);
-            perfSkippedImages = 3 - changedCount;
-            if (changedCount > 0) {
-              perfSentImages = await sendFullBoard3Tiles(
-                hub,
-                resolved.images,
-                runtimeImageSendBehavior,
-                {
-                  dirty,
-                  preferredOrder: full3TilePreferredOrder,
-                  forceHighPriority: full3TileForceHighPriority,
-                  interruptProtectedRegions: full3TileInterruptProtectedRegions,
-                }
-              );
-            }
-            cacheFullBoard3TileImages(lastSent, resolved.images);
-          } else {
-            const images = await renderFullBoard3Tiles(state, {
-              focusIdxOverride: renderFocusIdxOverride,
-            });
-            if (
-              shouldSkipStaleBackloggedImageRender(hub, options, {
-                phase: "post",
-                bursty: burstyVisualState,
-              })
-            ) {
-              return logSkippedVisualFlush(burstyVisualState ? "stale-burst-post" : "stale-backlog-post");
-            }
-            const resolved = resolveFullBoard3TileImagesWithCacheFallback(images, lastSent);
-            if (resolved.unrecoverableMissing) {
-              return logSkippedVisualFlush("render-empty-no-cache");
-            }
-            if (resolved.fallbackRegions.length > 0) {
-              perfHint = `${perfHint}+fallback:${resolved.fallbackRegions.join(",")}`;
-            }
-            const { dirty, changedCount } = diffFullBoard3TileImages(resolved.images, lastSent);
-            record3TilePerfBytes(resolved.images, dirty);
-            perfSkippedImages = 3 - changedCount;
-            if (changedCount > 0) {
-              perfSentImages = await sendFullBoard3Tiles(hub, resolved.images, runtimeImageSendBehavior, {
-                dirty,
-                preferredOrder: full3TilePreferredOrder,
-                forceHighPriority: full3TileForceHighPriority,
-                interruptProtectedRegions: full3TileInterruptProtectedRegions,
-              });
-            }
-            cacheFullBoard3TileImages(lastSent, resolved.images);
+      const predictedPreRenderHint = SAFE_FULL_FRAME_3_TILE_RENDER
+        ? null
+        : predictMenuNavigation3TileHint({
+            focusIdx,
+            sourceArea,
+            topPileHash,
+            tableauPileHash,
+            menuOpen,
+            menuSelectedIndex,
+            moveAssist,
+            pendingResetConfirm,
+            selectionInvalidBlinkRemaining,
+            selectionInvalidBlinkVisible,
+            selectedCardCount,
+            uiMode,
+            lastSent,
+          }) ??
+          predictFullBoard3TilePreRenderHint({
+            focusIdx,
+            sourceArea,
+            topPileHash,
+            tableauPileHash,
+            menuOpen,
+            moveAssist,
+            pendingResetConfirm,
+            selectionInvalidBlinkRemaining,
+            selectionInvalidBlinkVisible,
+            selectedCardCount,
+            uiMode,
+            lastSent,
+          });
+      const preRenderHint = SAFE_FULL_FRAME_3_TILE_RENDER
+        ? {
+            mode: "full" as const,
+            reason: transportUnderPressure ? "coherent-pressure" : "safe-full",
           }
-        } else {
-          perfPath = "dynamic-swap";
-          const images = await renderSwapModeTiles(state);
-          const skipSwap =
-            DISABLE_SWAP_CYCLE_FOR_DEBUG ||
-            (SKIP_DISPLAY_SWAP_FOR_RAPID_CHANGES && (selectionInvalidBlinkRemaining > 0 || menuOpen));
-          perfLogLazy(
-            () =>
-            `[Perf][Composer][Flush][SwapPath] changed=${changed ? "y" : "n"} ` +
-              `skipSwap=${skipSwap ? "y" : "n"} brBytes=${images.tileBrPng.length} ` +
-              `cycle=${!skipSwap ? "y" : "n"}`
+        : coherentFrameRequired
+          ? {
+              mode: "full" as const,
+              reason: transportUnderPressure ? "coherent-pressure" : "coherent-transition",
+            }
+          : predictedPreRenderHint!;
+      perfHint = `${preRenderHint.reason}${interruptFocusHintSuffix}`;
+
+      if (preRenderHint.mode === "topOnly") {
+        perfPath = "dynamic-3tile-toponly";
+        const topTilePng = await renderFullBoard3TopTileOnly(state, {
+          focusIdxOverride: renderFocusIdxOverride,
+        });
+        if (
+          shouldSkipStaleBackloggedImageRender(hub, options, {
+            phase: "post",
+            bursty: burstyVisualState,
+          })
+        ) {
+          return logSkippedVisualFlush(burstyVisualState ? "stale-burst-post" : "stale-backlog-post");
+        }
+        const partialImages: FullBoard3TileImages = {
+          topPng: topTilePng,
+          bottomLeftPng: lastSent.last3TileBottomLeftPng ?? EMPTY_PNG_U8,
+          bottomRightPng: lastSent.last3TileBottomRightPng ?? EMPTY_PNG_U8,
+        };
+        const resolved = resolveFullBoard3TileImagesWithCacheFallback(partialImages, lastSent);
+        if (resolved.unrecoverableMissing) {
+          return logSkippedVisualFlush("render-empty-no-cache");
+        }
+        if (resolved.fallbackRegions.length > 0) {
+          perfHint = `${perfHint}+fallback:${resolved.fallbackRegions.join(",")}`;
+        }
+        const { dirty, changedCount } = diffFullBoard3TileImages(resolved.images, lastSent);
+        record3TilePerfBytes(resolved.images, dirty);
+        perfSkippedImages = 3 - changedCount;
+        if (changedCount > 0) {
+          perfSentImages = await sendFullBoard3Tiles(
+            hub,
+            resolved.images,
+            runtimeImageSendBehavior,
+            {
+              dirty,
+              preferredOrder: full3TilePreferredOrder,
+              forceHighPriority: full3TileForceHighPriority,
+              interruptProtectedRegions: full3TileInterruptProtectedRegions,
+            }
           );
-          if (skipSwap) {
-            await sendInputModeTiles(hub, {
-              tileTlPng: images.tileTlPng,
-              tileTrPng: images.tileTrPng,
-              tileBlPng: images.tileBlPng,
-            }, runtimeImageSendBehavior);
-          } else {
-            await performSwapCycle(hub, images);
-          }
         }
-        lastSent.tileHash = tileHash;
+        cacheFullBoard3TileImages(lastSent, resolved.images);
+      } else if (preRenderHint.mode === "bottomOnly") {
+        perfPath = "dynamic-3tile-bottomonly";
+        const { bottomLeftPng, bottomRightPng } = await renderFullBoard3BottomTilesOnly(state, {
+          focusIdxOverride: renderFocusIdxOverride,
+        });
+        if (
+          shouldSkipStaleBackloggedImageRender(hub, options, {
+            phase: "post",
+            bursty: burstyVisualState,
+          })
+        ) {
+          return logSkippedVisualFlush(burstyVisualState ? "stale-burst-post" : "stale-backlog-post");
+        }
+        const partialImages: FullBoard3TileImages = {
+          topPng: lastSent.last3TileTopPng ?? EMPTY_PNG_U8,
+          bottomLeftPng,
+          bottomRightPng,
+        };
+        const resolved = resolveFullBoard3TileImagesWithCacheFallback(partialImages, lastSent);
+        if (resolved.unrecoverableMissing) {
+          return logSkippedVisualFlush("render-empty-no-cache");
+        }
+        if (resolved.fallbackRegions.length > 0) {
+          perfHint = `${perfHint}+fallback:${resolved.fallbackRegions.join(",")}`;
+        }
+        const { dirty, changedCount } = diffFullBoard3TileImages(resolved.images, lastSent);
+        record3TilePerfBytes(resolved.images, dirty);
+        perfSkippedImages = 3 - changedCount;
+        if (changedCount > 0) {
+          perfSentImages = await sendFullBoard3Tiles(
+            hub,
+            resolved.images,
+            runtimeImageSendBehavior,
+            {
+              dirty,
+              preferredOrder: full3TilePreferredOrder,
+              forceHighPriority: full3TileForceHighPriority,
+              interruptProtectedRegions: full3TileInterruptProtectedRegions,
+            }
+          );
+        }
+        cacheFullBoard3TileImages(lastSent, resolved.images);
+      } else {
+        const images = await renderFullBoard3Tiles(state, {
+          focusIdxOverride: renderFocusIdxOverride,
+        });
+        if (
+          shouldSkipStaleBackloggedImageRender(hub, options, {
+            phase: "post",
+            bursty: burstyVisualState,
+          })
+        ) {
+          return logSkippedVisualFlush(burstyVisualState ? "stale-burst-post" : "stale-backlog-post");
+        }
+        const resolved = resolveFullBoard3TileImagesWithCacheFallback(images, lastSent);
+        if (resolved.unrecoverableMissing) {
+          return logSkippedVisualFlush("render-empty-no-cache");
+        }
+        if (resolved.fallbackRegions.length > 0) {
+          perfHint = `${perfHint}+fallback:${resolved.fallbackRegions.join(",")}`;
+        }
+        const { dirty, changedCount } = diffFullBoard3TileImages(resolved.images, lastSent);
+        record3TilePerfBytes(resolved.images, dirty);
+        perfSkippedImages = 3 - changedCount;
+        if (changedCount > 0) {
+          perfSentImages = await sendFullBoard3Tiles(hub, resolved.images, runtimeImageSendBehavior, {
+            dirty,
+            preferredOrder: full3TilePreferredOrder,
+            forceHighPriority: full3TileForceHighPriority,
+            interruptProtectedRegions: full3TileInterruptProtectedRegions,
+          });
+        }
+        cacheFullBoard3TileImages(lastSent, resolved.images);
       }
-    } else if (EXPERIMENTAL_2X2_TILE_MODE) {
-      perfPath = "4tile";
-      await sendExperimentalTiledDisplayImages(
-        hub,
-        await renderExperimentalTiledDisplayImages(state),
-        runtimeImageSendBehavior
-      );
-    } else {
-      perfPath = "mini";
-      const boardCtx = buildBoardViewContext(state);
-      const topView = topRowViewFromState(state, boardCtx);
-      const tableauView = tableauViewFromState(state, boardCtx);
-      const topMiniHash = JSON.stringify(topView);
-      const tableauMiniHash = JSON.stringify(tableauView);
-      const topChanged = topMiniHash !== lastSent.topMiniHash;
-      const tableauChanged = tableauMiniHash !== lastSent.tableauMiniHash;
-      if (topChanged || tableauChanged) {
-        const [topMiniPng, tableauMiniPng] = await Promise.all([
-          topChanged ? renderBoardTopMini(topView) : Promise.resolve<number[]>([]),
-          tableauChanged ? renderBoardTableauMini(tableauView) : Promise.resolve<number[]>([]),
-        ]);
-        if (topChanged) {
-          await sendSupportedTopMiniImage(hub, topMiniPng, runtimeImageSendBehavior);
-        }
-        if (tableauChanged) {
-          await sendSupportedTableauMiniImage(hub, tableauMiniPng, runtimeImageSendBehavior);
-        }
-      }
-      lastSent.topMiniHash = topMiniHash;
-      lastSent.tableauMiniHash = tableauMiniHash;
+      lastSent.tileHash = tileHash;
     }
     lastSent.lastTopPng = undefined;
     lastSent.lastTableauPng = undefined;

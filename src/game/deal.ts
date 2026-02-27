@@ -3,7 +3,7 @@
  */
 import type { GameState, TableauPile } from "./types";
 import { createDeck, shuffle } from "./cards";
-import { SUITS, RANKS } from "./types";
+import { SUITS } from "./types";
 
 export function deal(seed?: number): GameState {
   const random = seed !== undefined ? seededRandom(seed) : Math.random;

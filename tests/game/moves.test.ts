@@ -192,7 +192,6 @@ describe("moves", () => {
     const pileIndex = state.tableau.findIndex((p) => p.visible.length === 1 && p.hidden.length > 0);
     if (pileIndex < 0) return;
     const pile = state.tableau[pileIndex]!;
-    const topVisible = pile.visible[pile.visible.length - 1];
     const dests = getLegalDests(state, { area: "tableau", pileIndex, count: 1 });
     if (dests.length === 0) return;
     const dest = dests.find((d) => d.area === "tableau" && d.index !== pileIndex) ?? dests[0]!;

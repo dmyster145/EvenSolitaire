@@ -27,6 +27,14 @@ type QueuedImageUpdate = {
   enqueuedAtMs: number;
 };
 
+type QueuedTextUpdate = {
+  key: string;
+  containerID: number;
+  containerName: string;
+  content: string;
+  enqueuedAtMs: number;
+};
+
 export type ImageSendHealthSnapshot = {
   avgQueueWaitMs: number;
   avgSendMs: number;
@@ -38,6 +46,17 @@ export type ImageSendHealthSnapshot = {
   degraded: boolean;
   maxQueueWaitMs: number;
   sampleCount: number;
+};
+
+export type ImageTransportSnapshot = {
+  hasInFlight: boolean;
+  inFlightAgeMs: number;
+  queueDepth: number;
+  busy: boolean;
+  interrupted: boolean;
+  backlogged: boolean;
+  linkSlow: boolean;
+  wedged: boolean;
 };
 
 function imagePayloadBytes(imageData: ImageRawDataUpdate["imageData"]): number {
@@ -92,6 +111,8 @@ const IMAGE_SURVIVAL_MODE_WATCHDOG_WINDOW_MS = 15000;
 const IMAGE_SURVIVAL_MODE_RECOVER_QUIET_MS = 10000;
 const IMAGE_SURVIVAL_MODE_MIN_SEND_START_GAP_MS = 260;
 const IMAGE_SURVIVAL_MODE_INTER_SEND_GAP_MS = 240;
+const TEXT_UPDATE_SEND_TIMEOUT_MS = 1200;
+const TEXT_UPDATE_RETRY_COOLDOWN_MS = 600;
 
 function imagePriorityRank(priority: ImageUpdatePriority | undefined): number {
   switch (priority) {
@@ -158,6 +179,12 @@ export class EvenHubBridge {
   private inFlightImageHardTimeoutSeq = 0;
   private inFlightImageHardTimeoutTriggered = false;
   private imageInterruptionListeners = new Set<(active: boolean) => void>();
+  private textQueue = new Map<string, QueuedTextUpdate>();
+  private isSendingText = false;
+  private textSendBlocked = false;
+  private textResumeTimer: ReturnType<typeof setTimeout> | null = null;
+  private inFlightTextUpdate: QueuedTextUpdate | null = null;
+  private lastSentTextByKey = new Map<string, string>();
   private perfStorageWindowStartMs = perfNowMs();
   private perfStorageCount = 0;
   private perfStorageGetCount = 0;
@@ -242,17 +269,105 @@ export class EvenHubBridge {
 
   async updateText(containerID: number, containerName: string, content: string): Promise<boolean> {
     if (!this.bridge) return false;
+    const key = `${containerID}:${containerName}`;
+    if (this.lastSentTextByKey.get(key) === content && !this.textQueue.has(key) && this.inFlightTextUpdate?.key !== key) {
+      return true;
+    }
+    if (this.inFlightTextUpdate?.key === key && this.inFlightTextUpdate.content === content) {
+      return true;
+    }
+    const existingQueued = this.textQueue.get(key);
+    if (existingQueued && existingQueued.content === content) {
+      return true;
+    }
+    if (existingQueued) {
+      this.textQueue.delete(key);
+    }
+    this.textQueue.set(key, {
+      key,
+      containerID,
+      containerName,
+      content,
+      enqueuedAtMs: perfNowMs(),
+    });
+    void this.processTextQueue();
+    // Non-blocking by design: text sends are serialized/coalesced and should not stall flush loops.
+    return true;
+  }
+
+  private async processTextQueue(): Promise<void> {
+    if (this.isSendingText || !this.bridge || this.textSendBlocked) return;
+    this.isSendingText = true;
     try {
-      return await this.bridge.textContainerUpgrade(
-        new TextContainerUpgrade({
-          containerID,
-          containerName,
-          content,
-        })
-      );
-    } catch (err) {
-      error("[EvenHubBridge] textContainerUpgrade error:", err);
-      return false;
+      while (this.textQueue.size > 0) {
+        if (!this.bridge || this.textSendBlocked) break;
+        const next = this.textQueue.entries().next();
+        if (next.done) break;
+        const [key, queued] = next.value;
+        this.textQueue.delete(key);
+        this.inFlightTextUpdate = queued;
+        const startedAtMs = perfNowMs();
+        let timedOut = false;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        const sendPromise = this.bridge
+          .textContainerUpgrade(
+            new TextContainerUpgrade({
+              containerID: queued.containerID,
+              containerName: queued.containerName,
+              content: queued.content,
+            })
+          )
+          .catch((err) => {
+            error("[EvenHubBridge] textContainerUpgrade error:", err);
+            return false;
+          });
+        const timeoutPromise = new Promise<boolean>((resolve) => {
+          timeoutId = setTimeout(() => {
+            timedOut = true;
+            resolve(false);
+          }, TEXT_UPDATE_SEND_TIMEOUT_MS);
+        });
+        const updated = await Promise.race<boolean>([sendPromise, timeoutPromise]);
+        if (timeoutId) clearTimeout(timeoutId);
+        const durMs = perfNowMs() - startedAtMs;
+        if (timedOut) {
+          perfLogLazy(
+            () =>
+              `[Perf][Bridge][Text] timeout cid=${queued.containerID} dur=${durMs.toFixed(1)}ms ` +
+              `qwait=${(startedAtMs - queued.enqueuedAtMs).toFixed(1)}ms queued=${this.textQueue.size}`
+          );
+          this.textSendBlocked = true;
+          void sendPromise.finally(() => {
+            this.textSendBlocked = false;
+            this.inFlightTextUpdate = null;
+            if (this.textResumeTimer) {
+              clearTimeout(this.textResumeTimer);
+            }
+            this.textResumeTimer = setTimeout(() => {
+              this.textResumeTimer = null;
+              void this.processTextQueue();
+            }, TEXT_UPDATE_RETRY_COOLDOWN_MS);
+          });
+          break;
+        }
+        this.inFlightTextUpdate = null;
+        if (updated) {
+          this.lastSentTextByKey.set(key, queued.content);
+        }
+        if (durMs >= PERF_BRIDGE_LOG_SLOW_STORAGE_MS || !updated) {
+          perfLogLazy(
+            () =>
+              `[Perf][Bridge][Text] cid=${queued.containerID} ok=${updated ? "y" : "n"} dur=${durMs.toFixed(
+                1
+              )}ms qwait=${(startedAtMs - queued.enqueuedAtMs).toFixed(1)}ms queued=${this.textQueue.size}`
+          );
+        }
+      }
+    } finally {
+      this.isSendingText = false;
+      if (!this.textSendBlocked && this.textQueue.size > 0) {
+        void this.processTextQueue();
+      }
     }
   }
 
@@ -266,6 +381,47 @@ export class EvenHubBridge {
     });
     await this.processImageQueue();
     return await resultPromise;
+  }
+
+  forceResetImageTransport(reason: string): void {
+    const queuedCount = this.imageQueue.length;
+    const deferredCount = this.inFlightDeferredCoalesced.size;
+    const inFlight = this.inFlightQueuedImage;
+    if (
+      queuedCount <= 0 &&
+      deferredCount <= 0 &&
+      !inFlight &&
+      !this.isSendingImage &&
+      !this.imageSendWedged &&
+      !this.imageInterrupted
+    ) {
+      return;
+    }
+    perfLogLazy(
+      () =>
+      `[Perf][Bridge][Recovery] force-reset reason=${reason} queued=${queuedCount} deferred=${deferredCount} ` +
+        `inflight=${inFlight?.data.containerID ?? -1} busy=${this.isSendingImage ? "y" : "n"}`
+    );
+    if (inFlight) {
+      inFlight.abandoned = true;
+      if (inFlight.resolves.length > 0) {
+        const resolves = inFlight.resolves.splice(0, inFlight.resolves.length);
+        for (const resolve of resolves) resolve(null);
+      }
+      if (this.activeImageQueueRunnerId === inFlight.runnerId) {
+        this.activeImageQueueRunnerId += 1;
+      }
+    }
+    this.dropQueuedImagesForHardWedge();
+    this.disarmImageSendHardTimeout();
+    this.disarmImageSendWatchdog();
+    this.inFlightQueuedImage = null;
+    this.inFlightImageCoalesceKey = null;
+    this.isSendingImage = false;
+    this.lastAnyImageSendEndAtMs = perfNowMs();
+    this.setImageSendWedged(false, `force-reset:${reason}`);
+    this.setImageInterrupted(false, `force-reset:${reason}`);
+    this.setImageSurvivalMode(false, `force-reset:${reason}`);
   }
 
   enqueueImage(
@@ -283,6 +439,21 @@ export class EvenHubBridge {
 
   hasPendingImageWork(): boolean {
     return this.isSendingImage || this.imageQueue.length > 0 || this.inFlightDeferredCoalesced.size > 0;
+  }
+
+  getImageTransportSnapshot(): ImageTransportSnapshot {
+    const inFlight = this.inFlightQueuedImage;
+    const inFlightAgeMs = inFlight ? Math.max(0, perfNowMs() - inFlight.enqueuedAtMs) : 0;
+    return {
+      hasInFlight: inFlight != null,
+      inFlightAgeMs,
+      queueDepth: this.getImageQueueDepth(),
+      busy: this.hasPendingImageWork(),
+      interrupted: this.imageInterrupted,
+      backlogged: this.imageQueueBacklogged || this.getImageQueueDepth() >= IMAGE_BACKLOG_DEGRADED_QUEUE_DEPTH,
+      linkSlow: this.imageLinkSlow,
+      wedged: this.imageSendWedged,
+    };
   }
 
   getImageSendHealth(): ImageSendHealthSnapshot {
@@ -741,12 +912,15 @@ export class EvenHubBridge {
         try {
           const result = await this.bridge.updateImageRawData(queued.data);
           const sendMs = perfNowMs() - sendStartedAtMs;
-          this.disarmImageSendHardTimeout({
-            cid: queued.data.containerID,
-            sendMs,
-            abandoned: inFlightQueued.abandoned,
-          });
-          this.disarmImageSendWatchdog({ cid: queued.data.containerID, sendMs });
+          const ownsInFlightSlot = this.inFlightQueuedImage === inFlightQueued;
+          if (ownsInFlightSlot) {
+            this.disarmImageSendHardTimeout({
+              cid: queued.data.containerID,
+              sendMs,
+              abandoned: inFlightQueued.abandoned,
+            });
+            this.disarmImageSendWatchdog({ cid: queued.data.containerID, sendMs });
+          }
           if (!inFlightQueued.abandoned && runnerId === this.activeImageQueueRunnerId) {
             this.recordImagePerf(queued.data, queueWaitMs, sendMs);
             if (!ImageRawDataUpdateResult.isSuccess(result)) {
@@ -764,12 +938,15 @@ export class EvenHubBridge {
           }
         } catch (err) {
           const sendMs = perfNowMs() - sendStartedAtMs;
-          this.disarmImageSendHardTimeout({
-            cid: queued.data.containerID,
-            sendMs,
-            abandoned: inFlightQueued.abandoned,
-          });
-          this.disarmImageSendWatchdog({ cid: queued.data.containerID, sendMs });
+          const ownsInFlightSlot = this.inFlightQueuedImage === inFlightQueued;
+          if (ownsInFlightSlot) {
+            this.disarmImageSendHardTimeout({
+              cid: queued.data.containerID,
+              sendMs,
+              abandoned: inFlightQueued.abandoned,
+            });
+            this.disarmImageSendWatchdog({ cid: queued.data.containerID, sendMs });
+          }
           if (!inFlightQueued.abandoned && runnerId === this.activeImageQueueRunnerId) {
             this.recordImagePerf(queued.data, queueWaitMs, sendMs);
             error("[EvenHubBridge] Image update error:", err);
@@ -783,9 +960,9 @@ export class EvenHubBridge {
             void this.processImageQueue();
           }
         } finally {
-          this.disarmImageSendHardTimeout();
-          this.disarmImageSendWatchdog();
           if (this.inFlightQueuedImage === inFlightQueued) {
+            this.disarmImageSendHardTimeout();
+            this.disarmImageSendWatchdog();
             this.inFlightQueuedImage = null;
           }
           if (!inFlightQueued.abandoned && runnerId === this.activeImageQueueRunnerId) {
@@ -1297,6 +1474,15 @@ export class EvenHubBridge {
   async shutdown(): Promise<void> {
     this.disarmImageSendWatchdog();
     this.disarmImageSendHardTimeout();
+    if (this.textResumeTimer) {
+      clearTimeout(this.textResumeTimer);
+      this.textResumeTimer = null;
+    }
+    this.textQueue.clear();
+    this.isSendingText = false;
+    this.textSendBlocked = false;
+    this.inFlightTextUpdate = null;
+    this.lastSentTextByKey.clear();
     this.unsubscribeEvents?.();
     this.unsubscribeEvents = null;
     if (this.bridge) {

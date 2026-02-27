@@ -1,5 +1,19 @@
 # G2 Layout Feasibility Spike (Hardware-Faithful Simulator)
 
+## Status (Historical Spike)
+
+This document is retained for design history. Parts of it are superseded by the current production runtime.
+
+- Current runtime does **not** use the mini-board + focus-zoom path described below.
+- Legacy mini/zoom renderer paths referenced by this spike were removed from the codebase.
+- Current production path is:
+  - startup/input page with 3 board image tiles (`top`, `bottom-left`, `bottom-right`)
+  - left-side info/event text container
+  - full-board 3-tile rendering pipeline with queue/coalescing-based transport
+
+Canonical implementation notes now live in:
+- `docs/performance-responsiveness-design.md`
+
 ## Goal
 
 Make the simulator reflect what is actually renderable on the Even G2 device (no separate "art mode"), and determine whether the current full-board layout can be preserved by splitting into more image containers.
@@ -69,6 +83,8 @@ That is too small for the existing card-art treatment (corners, suit icons, bord
 ## What 3 Image Containers *Can* Do (and still reflect G2)
 
 ### Option A (Recommended Feasibility Target): Mini-board + Focus Zoom
+
+Historical note: this was a feasibility recommendation at spike time; it is not the active runtime architecture.
 
 Keep the board layout/ratio visible as a map, and add one readable detail panel.
 
@@ -142,6 +158,8 @@ A G2-faithful renderer is feasible without a full rewrite:
 - The bridge already serializes image updates and can be extended to return `ImageRawDataUpdateResult` for strict handling.
 
 ## Recommended Path (for this codebase)
+
+Historical note: this recommendation has been superseded by the current canonical startup/input + full-board 3-tile pipeline.
 
 1. Make **G2-safe layout the only layout** (no simulator-only art mode).
 2. Implement **Option A** first:

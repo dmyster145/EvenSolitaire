@@ -6,7 +6,6 @@ import {
   drawFromStock,
   drawThreeFromStock,
   recycleWasteToStock,
-  recycleWasteToStockPutFirstAtEnd,
   recycleWasteToStockMenuCardFirst,
   applyMove,
   checkWin,
@@ -15,7 +14,7 @@ import { getLegalDests, isLegalMove } from "../game/validation";
 import type { Source } from "../game/validation";
 import type { Dest } from "../game/validation";
 import { focusIndexToTarget, focusTargetToIndex, focusTargetToDest } from "./ui-mode";
-import { pushUndo, popUndo, clearUndo, canUndo } from "../features/undo";
+import { pushUndo, popUndo, clearUndo } from "../features/undo";
 
 function getFocusIndex(state: AppState): number {
   return focusTargetToIndex(state.ui.focus);
