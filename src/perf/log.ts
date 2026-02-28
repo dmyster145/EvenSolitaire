@@ -4,15 +4,16 @@
  */
 
 const STORAGE_KEY = "evensolitaire-perf-log-v1";
-const MAX_ENTRIES = 4000;
+const MAX_ENTRIES = 3000;
 const FLUSH_INTERVAL_MS = 1000;
 const FLUSH_IDLE_GAP_MS = 1500;
 const FLUSH_MAX_DEFER_MS = 5000;
-const DOM_MAX_LINES = 800;
+/** Max lines in the DOM console; oldest lines are dropped when exceeded (running flush). */
+const DOM_MAX_LINES = 500;
 const DOM_FLUSH_BATCH_MS = 16;
 const PERF_LOG_CONSOLE_ENABLED = false;
-const PERF_LOG_CAPTURE_ENABLED = false;
-const PERF_LOG_DOM_ENABLED = false;
+const PERF_LOG_CAPTURE_ENABLED = true;
+const PERF_LOG_DOM_ENABLED = true;
 
 if (typeof window !== "undefined") {
   (
@@ -47,6 +48,8 @@ let domInitialized = false;
 let domRenderedLines: string[] = [];
 let domPendingLines: string[] = [];
 let domFlushTimer: ReturnType<typeof setTimeout> | null = null;
+/** When true, perfLog does not append to DOM or capture (stop/start button). */
+let recordingPaused = false;
 
 export function perfNowMs(): number {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -160,6 +163,18 @@ function getDomOutput(): HTMLPreElement | null {
   return el instanceof HTMLPreElement ? el : null;
 }
 
+function getRecordButton(): HTMLButtonElement | null {
+  if (typeof document === "undefined") return null;
+  const el = document.getElementById("perf-console-record");
+  return el instanceof HTMLButtonElement ? el : null;
+}
+
+function updateRecordButtonLabel(): void {
+  const btn = getRecordButton();
+  if (!btn) return;
+  btn.textContent = recordingPaused ? "Start" : "Stop";
+}
+
 function setDomPanelVisibility(visible: boolean): void {
   const panel = getDomPanel();
   if (!panel) return;
@@ -189,6 +204,7 @@ function flushDomOutput(): void {
   }
   domRenderedLines.push(...domPendingLines);
   domPendingLines = [];
+  // Running flush: keep the most recent DOM_MAX_LINES, drop oldest when over cap
   if (domRenderedLines.length > DOM_MAX_LINES) {
     domRenderedLines.splice(0, domRenderedLines.length - DOM_MAX_LINES);
   }
@@ -214,7 +230,7 @@ function wireDomControls(): void {
   const toggleBtn = document.getElementById("perf-console-toggle");
   const clearBtn = document.getElementById("perf-console-clear");
   const copyBtn = document.getElementById("perf-console-copy");
-  const downloadBtn = document.getElementById("perf-console-download");
+  const recordBtn = document.getElementById("perf-console-record");
 
   if (toggleBtn instanceof HTMLButtonElement) {
     toggleBtn.addEventListener("click", () => {
@@ -243,11 +259,10 @@ function wireDomControls(): void {
     });
   }
 
-  if (downloadBtn instanceof HTMLButtonElement) {
-    downloadBtn.addEventListener("click", () => {
-      const api = (window as Window & { __evenSolitairePerf?: { download: () => void } })
-        .__evenSolitairePerf;
-      if (api) api.download();
+  if (recordBtn instanceof HTMLButtonElement) {
+    recordBtn.addEventListener("click", () => {
+      recordingPaused = !recordingPaused;
+      updateRecordButtonLabel();
     });
   }
 }
@@ -259,6 +274,7 @@ function ensureDomInitialized(): void {
   domInitialized = true;
   setDomPanelVisibility(true);
   wireDomControls();
+  updateRecordButtonLabel();
 }
 
 function ensureInitialized(): void {
@@ -292,19 +308,9 @@ function ensureInitialized(): void {
       console.log(ok ? "[PerfLog] Copied." : "[PerfLog] Copy failed.");
       return ok;
     },
-    download: (): void => {
-      const text = formatDumpLines(entries);
-      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `evensolitaire-perf-${new Date()
-        .toISOString()
-        .replace(/[:.]/g, "-")}.log`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toggleRecording: (): void => {
+      recordingPaused = !recordingPaused;
+      updateRecordButtonLabel();
     },
   };
 
@@ -319,6 +325,8 @@ function ensureInitialized(): void {
 
 export function perfLog(msg: string): void {
   if (!PERF_LOG_CONSOLE_ENABLED && !PERF_LOG_CAPTURE_ENABLED && !PERF_LOG_DOM_ENABLED) return;
+  if (recordingPaused) return;
+
   if (PERF_LOG_CAPTURE_ENABLED) {
     ensureInitialized();
   } else {
@@ -338,6 +346,7 @@ export function perfLog(msg: string): void {
 
   const nowTs = safeNow();
   entries.push({ ts: nowTs, msg });
+  // Running flush: keep most recent MAX_ENTRIES when over cap
   if (entries.length > MAX_ENTRIES) {
     entries.splice(0, entries.length - MAX_ENTRIES);
   }
