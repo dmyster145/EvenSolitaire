@@ -57,6 +57,8 @@ export type ImageTransportSnapshot = {
   backlogged: boolean;
   linkSlow: boolean;
   wedged: boolean;
+  consecutiveNonOkSends: number;
+  lastSuccessfulSendAtMs: number;
 };
 
 function imagePayloadBytes(imageData: ImageRawDataUpdate["imageData"]): number {
@@ -99,20 +101,24 @@ const IMAGE_INTERRUPTION_TRIGGER_TOTAL_CONFIRM_COUNT = 2;
 const IMAGE_INTERRUPTION_TRIGGER_TOTAL_CONFIRM_WINDOW_MS = 5000;
 const IMAGE_INTERRUPTION_TRIGGER_TOTAL_IMMEDIATE_SEND_MS = 1400;
 const IMAGE_INTERRUPTION_TRIGGER_TOTAL_IMMEDIATE_QWAIT_MS = 7000;
-const IMAGE_INTERRUPTION_RECOVER_MAX_SEND_MS = 1200;
+const IMAGE_INTERRUPTION_RECOVER_MAX_SEND_MS = 1100;
 const IMAGE_INTERRUPTION_RECOVER_MAX_QWAIT_MS = 1200;
 const IMAGE_INTERRUPTION_RECOVER_GOOD_SENDS = 3;
 const IMAGE_INTERRUPTION_MAX_QUEUED_IMAGES = 1;
 const IMAGE_INTERRUPTION_MAX_PROTECTED_IMAGES = 3;
-const IMAGE_SEND_WATCHDOG_TRIGGER_MS = 3000;
-const IMAGE_SEND_HARD_WEDGE_TRIGGER_MS = 12000;
+const IMAGE_SEND_WATCHDOG_TRIGGER_MS = 2500;
+const IMAGE_SEND_HARD_WEDGE_TRIGGER_MS = 8000;
 const IMAGE_SURVIVAL_MODE_TRIGGER_WATCHDOG_TRIPS = 3;
 const IMAGE_SURVIVAL_MODE_WATCHDOG_WINDOW_MS = 15000;
 const IMAGE_SURVIVAL_MODE_RECOVER_QUIET_MS = 10000;
 const IMAGE_SURVIVAL_MODE_MIN_SEND_START_GAP_MS = 260;
 const IMAGE_SURVIVAL_MODE_INTER_SEND_GAP_MS = 240;
+const IMAGE_CONSECUTIVE_STALL_THRESHOLD_MS = 3000;
+const IMAGE_CONSECUTIVE_STALL_COUNT = 2;
 const TEXT_UPDATE_SEND_TIMEOUT_MS = 1200;
 const TEXT_UPDATE_RETRY_COOLDOWN_MS = 600;
+const TEXT_SURVIVAL_GATE_RETRY_MS = 500;
+const IMAGE_DEFAULT_POST_SEND_GAP_MS = 40;
 
 function imagePriorityRank(priority: ImageUpdatePriority | undefined): number {
   switch (priority) {
@@ -185,6 +191,14 @@ export class EvenHubBridge {
   private textResumeTimer: ReturnType<typeof setTimeout> | null = null;
   private inFlightTextUpdate: QueuedTextUpdate | null = null;
   private lastSentTextByKey = new Map<string, string>();
+  private textGateActiveStartMs = 0;
+  private perfTextGateBlocks = 0;
+  private perfTextGateTotalMs = 0;
+  private consecutiveStallCount = 0;
+  private consecutiveNonOkSendCount = 0;
+  private lastSuccessfulImageSendAtMs = 0;
+  private perfBleGapCount = 0;
+  private perfBleGapTotalMs = 0;
   private perfStorageWindowStartMs = perfNowMs();
   private perfStorageCount = 0;
   private perfStorageGetCount = 0;
@@ -205,6 +219,15 @@ export class EvenHubBridge {
     try {
       this.bridge = await waitForEvenAppBridge();
       log("[EvenHubBridge] Bridge ready.");
+      perfLog(
+        `[Perf][Bridge][Config] watchdog=${IMAGE_SEND_WATCHDOG_TRIGGER_MS}ms ` +
+        `hardWedge=${IMAGE_SEND_HARD_WEDGE_TRIGGER_MS}ms ` +
+        `bleGap=${IMAGE_DEFAULT_POST_SEND_GAP_MS}/80ms ` +
+        `textGateRetry=${TEXT_SURVIVAL_GATE_RETRY_MS}ms ` +
+        `interruptTriggerSend=${IMAGE_INTERRUPTION_TRIGGER_SEND_MS}ms ` +
+        `survivalTriggerTrips=${IMAGE_SURVIVAL_MODE_TRIGGER_WATCHDOG_TRIPS} ` +
+        `indexedPng=enabled`
+      );
     } catch (err) {
       warn("[EvenHubBridge] Bridge init failed (running outside Even Hub?):", err);
       this.bridge = null;
@@ -301,6 +324,39 @@ export class EvenHubBridge {
     try {
       while (this.textQueue.size > 0) {
         if (!this.bridge || this.textSendBlocked) break;
+        if (this.imageInterrupted || (this.imageSurvivalMode && this.imageLinkSlow)) {
+          const isNewBlock = this.textGateActiveStartMs === 0;
+          this.textSendBlocked = true;
+          if (isNewBlock) {
+            this.perfTextGateBlocks += 1;
+            this.textGateActiveStartMs = perfNowMs();
+            perfLogLazy(
+              () =>
+              `[Perf][Bridge][TextGate] blocked queued=${this.textQueue.size} ` +
+                `interrupted=${this.imageInterrupted ? "y" : "n"} linkSlow=${this.imageLinkSlow ? "y" : "n"} ` +
+                `survival=${this.imageSurvivalMode ? "y" : "n"}`
+            );
+          }
+          if (!this.textResumeTimer) {
+            this.textResumeTimer = setTimeout(() => {
+              this.textResumeTimer = null;
+              this.textSendBlocked = false;
+              void this.processTextQueue();
+            }, TEXT_SURVIVAL_GATE_RETRY_MS);
+          }
+          break;
+        }
+        // If text gate was active and we got here, the gate has lifted — log the release.
+        if (this.textGateActiveStartMs > 0) {
+          const totalGateMs = perfNowMs() - this.textGateActiveStartMs;
+          this.perfTextGateTotalMs += totalGateMs;
+          perfLogLazy(
+            () =>
+            `[Perf][Bridge][TextGate] released gateMs=${totalGateMs.toFixed(1)} queued=${this.textQueue.size} ` +
+              `interrupted=${this.imageInterrupted ? "y" : "n"} survival=${this.imageSurvivalMode ? "y" : "n"}`
+          );
+          this.textGateActiveStartMs = 0;
+        }
         const next = this.textQueue.entries().next();
         if (next.done) break;
         const [key, queued] = next.value;
@@ -384,6 +440,10 @@ export class EvenHubBridge {
   }
 
   forceResetImageTransport(reason: string): void {
+    // Always reset the non-ok send counter — the caller is signalling a fresh
+    // start regardless of current queue state.
+    this.consecutiveNonOkSendCount = 0;
+
     const queuedCount = this.imageQueue.length;
     const deferredCount = this.inFlightDeferredCoalesced.size;
     const inFlight = this.inFlightQueuedImage;
@@ -419,6 +479,8 @@ export class EvenHubBridge {
     this.inFlightImageCoalesceKey = null;
     this.isSendingImage = false;
     this.lastAnyImageSendEndAtMs = perfNowMs();
+    this.consecutiveStallCount = 0;
+    this.consecutiveNonOkSendCount = 0;
     this.setImageSendWedged(false, `force-reset:${reason}`);
     this.setImageInterrupted(false, `force-reset:${reason}`);
     this.setImageSurvivalMode(false, `force-reset:${reason}`);
@@ -453,6 +515,8 @@ export class EvenHubBridge {
       backlogged: this.imageQueueBacklogged || this.getImageQueueDepth() >= IMAGE_BACKLOG_DEGRADED_QUEUE_DEPTH,
       linkSlow: this.imageLinkSlow,
       wedged: this.imageSendWedged,
+      consecutiveNonOkSends: this.consecutiveNonOkSendCount,
+      lastSuccessfulSendAtMs: this.lastSuccessfulImageSendAtMs,
     };
   }
 
@@ -890,7 +954,16 @@ export class EvenHubBridge {
     const runnerId = ++this.nextImageQueueRunnerId;
     this.activeImageQueueRunnerId = runnerId;
     try {
+      let firstIteration = true;
       while (this.imageQueue.length > 0) {
+        if (runnerId !== this.activeImageQueueRunnerId || this.imageSendWedged) break;
+        if (!firstIteration && !this.imageSendWedged && runnerId === this.activeImageQueueRunnerId) {
+          const gapMs = this.imageLinkSlow ? 80 : IMAGE_DEFAULT_POST_SEND_GAP_MS;
+          this.perfBleGapCount += 1;
+          this.perfBleGapTotalMs += gapMs;
+          await new Promise<void>((r) => setTimeout(r, gapMs));
+        }
+        firstIteration = false;
         if (runnerId !== this.activeImageQueueRunnerId || this.imageSendWedged) break;
         if (this.imageInterrupted) this.pruneQueuedImagesForInterruption();
         if (this.imageQueue.length <= 0) break;
@@ -922,17 +995,30 @@ export class EvenHubBridge {
             this.disarmImageSendWatchdog({ cid: queued.data.containerID, sendMs });
           }
           if (!inFlightQueued.abandoned && runnerId === this.activeImageQueueRunnerId) {
-            this.recordImagePerf(queued.data, queueWaitMs, sendMs);
-            if (!ImageRawDataUpdateResult.isSuccess(result)) {
+            const sendOk = ImageRawDataUpdateResult.isSuccess(result);
+            this.recordImagePerf(queued.data, queueWaitMs, sendMs, sendOk);
+            if (!sendOk) {
               warn("[EvenHubBridge] Image update not successful:", result);
             }
             for (const resolve of queued.resolves) resolve(result);
           } else if (inFlightQueued.abandoned) {
+            const lateOk = ImageRawDataUpdateResult.isSuccess(result);
             perfLogLazy(
               () =>
               `[Perf][Bridge][Wedge] late-return cid=${queued.data.containerID ?? -1} ` +
-                `send=${sendMs.toFixed(1)}ms result=${ImageRawDataUpdateResult.isSuccess(result) ? "ok" : "non-ok"}`
+                `send=${sendMs.toFixed(1)}ms result=${lateOk ? "ok" : "non-ok"}`
             );
+            // Track non-ok even on abandoned sends — a non-ok late-return is
+            // the strongest signal that BLE is dead and must trigger escalation.
+            if (!lateOk) {
+              this.consecutiveNonOkSendCount += 1;
+              perfLog(
+                `[Perf][Bridge][NonOk] count=${this.consecutiveNonOkSendCount} ` +
+                  `send=${sendMs.toFixed(1)}ms cid=${queued.data.containerID ?? -1} source=late-return`
+              );
+            } else {
+              this.consecutiveNonOkSendCount = 0;
+            }
             this.setImageSendWedged(false, "late-return");
             void this.processImageQueue();
           }
@@ -948,13 +1034,19 @@ export class EvenHubBridge {
             this.disarmImageSendWatchdog({ cid: queued.data.containerID, sendMs });
           }
           if (!inFlightQueued.abandoned && runnerId === this.activeImageQueueRunnerId) {
-            this.recordImagePerf(queued.data, queueWaitMs, sendMs);
+            this.recordImagePerf(queued.data, queueWaitMs, sendMs, false);
             error("[EvenHubBridge] Image update error:", err);
             for (const resolve of queued.resolves) resolve(null);
           } else if (inFlightQueued.abandoned) {
             perfLogLazy(
               () =>
               `[Perf][Bridge][Wedge] late-error cid=${queued.data.containerID ?? -1} send=${sendMs.toFixed(1)}ms`
+            );
+            // Errors on abandoned sends are always non-ok.
+            this.consecutiveNonOkSendCount += 1;
+            perfLog(
+              `[Perf][Bridge][NonOk] count=${this.consecutiveNonOkSendCount} ` +
+                `send=${sendMs.toFixed(1)}ms cid=${queued.data.containerID ?? -1} source=late-error`
             );
             this.setImageSendWedged(false, "late-error");
             void this.processImageQueue();
@@ -1260,11 +1352,44 @@ export class EvenHubBridge {
   private recordImagePerf(
     data: ImageRawDataUpdate,
     queueWaitMs: number,
-    sendMs: number
+    sendMs: number,
+    resultOk: boolean
   ): void {
     const pendingDepth = this.imageQueue.length + this.inFlightDeferredCoalesced.size;
     this.updateImageHealth(queueWaitMs, sendMs, pendingDepth);
     this.updateInterruptionState(queueWaitMs, sendMs, pendingDepth);
+
+    // Track consecutive non-ok BLE results — strongest dead-link signal.
+    if (!resultOk) {
+      this.consecutiveNonOkSendCount += 1;
+      perfLog(
+        `[Perf][Bridge][NonOk] count=${this.consecutiveNonOkSendCount} ` +
+        `send=${sendMs.toFixed(1)}ms cid=${data.containerID ?? -1}`
+      );
+    } else {
+      this.consecutiveNonOkSendCount = 0;
+      this.lastSuccessfulImageSendAtMs = perfNowMs();
+    }
+
+    // Detect cascading BLE stall: if N consecutive sends each exceed the stall
+    // threshold, the link is stuck and continuing to push data only prolongs the
+    // freeze.  Drop the queue immediately so the hang-probe / next user input
+    // can trigger a clean recovery with fresh state.
+    if (sendMs >= IMAGE_CONSECUTIVE_STALL_THRESHOLD_MS) {
+      this.consecutiveStallCount += 1;
+      if (this.consecutiveStallCount >= IMAGE_CONSECUTIVE_STALL_COUNT) {
+        perfLog(
+          `[Perf][Bridge][ConsecutiveStall] count=${this.consecutiveStallCount} ` +
+          `lastSend=${sendMs.toFixed(1)}ms pending=${pendingDepth} ` +
+          `cid=${data.containerID ?? -1}`
+        );
+        this.consecutiveStallCount = 0;
+        this.dropQueuedImagesForHardWedge();
+        this.pruneQueuedImagesForInterruption();
+      }
+    } else {
+      this.consecutiveStallCount = 0;
+    }
 
     const bytes = imagePayloadBytes(data.imageData);
     this.perfImageCount += 1;
@@ -1332,7 +1457,9 @@ export class EvenHubBridge {
         ` ` +
         `backlog=${this.imageQueueBacklogged ? "y" : "n"} linkSlow=${this.imageLinkSlow ? "y" : "n"} ` +
         `interrupted=${this.imageInterrupted ? "y" : "n"} wedged=${this.imageSendWedged ? "y" : "n"} ` +
-        `survival=${this.imageSurvivalMode ? "y" : "n"}`
+        `survival=${this.imageSurvivalMode ? "y" : "n"}` +
+        (this.perfBleGapCount > 0 ? ` bleGaps=${this.perfBleGapCount}/${this.perfBleGapTotalMs.toFixed(0)}ms` : "") +
+        (this.perfTextGateBlocks > 0 ? ` textGate=${this.perfTextGateBlocks}/${this.perfTextGateTotalMs.toFixed(0)}ms` : "")
     );
 
     this.perfWindowStartMs = perfNowMs();
@@ -1347,6 +1474,10 @@ export class EvenHubBridge {
     this.perfInterruptedDrops = 0;
     this.perfWatchdogTrips = 0;
     this.perfHardWedgeTrips = 0;
+    this.perfBleGapCount = 0;
+    this.perfBleGapTotalMs = 0;
+    this.perfTextGateBlocks = 0;
+    this.perfTextGateTotalMs = 0;
     this.perfImageByContainer.clear();
   }
 

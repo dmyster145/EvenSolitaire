@@ -72,6 +72,7 @@ vi.mock("../../src/render/card-canvas", () => ({
 vi.mock("../../src/render/png-utils", () => ({
   canvasToPngBytes: h.canvasToPngBytes,
   canvasToPngUint8Bytes: h.canvasToPngUint8Bytes,
+  canvasToGreyscaleIndexedPngUint8Bytes: h.canvasToPngUint8Bytes,
   getPngBytesHash: h.getPngBytesHash,
   pngBytesToImageBitmap: h.pngBytesToImageBitmap,
 }));
@@ -314,16 +315,14 @@ describe("composer integration/runtime behavior", () => {
     expect(next.lastSent.focusIndex).toBe(FOCUS_INDEX_WASTE);
   });
 
-  it("forces coherent full-frame high-priority sends under transport pressure", async () => {
+  it("does not force coherent all-protected sends under plain backlog pressure", async () => {
     const { flushDisplayUpdate } = await import("../../src/render/composer");
     const hub = createHubStub();
     const first = await flushDisplayUpdate(hub as never, initialState, defaultLastSent());
     hub.enqueueImage.mockClear();
-    h.renderBoardTopToCanvas.mockClear();
-    h.renderBoardTableauToCanvas.mockClear();
     hub.getImageSendHealth.mockReturnValue({
-      interrupted: true,
-      linkSlow: true,
+      interrupted: false,
+      linkSlow: false,
       backlogged: true,
       busy: true,
       survivalMode: false,
@@ -341,15 +340,13 @@ describe("composer integration/runtime behavior", () => {
     };
     await flushDisplayUpdate(hub as never, nextState, first.lastSent);
 
-    expect(h.renderBoardTopToCanvas).toHaveBeenCalledTimes(1);
-    expect(h.renderBoardTableauToCanvas).toHaveBeenCalledTimes(1);
-    expect(hub.enqueueImage).toHaveBeenCalledTimes(3);
-    for (const call of hub.enqueueImage.mock.calls as unknown as Array<
+    // Tiles should still be sent (focus changed) but NOT all interrupt-protected
+    // since coherent frame is no longer forced by generic backlog pressure.
+    expect(hub.enqueueImage).toHaveBeenCalled();
+    const calls = hub.enqueueImage.mock.calls as unknown as Array<
       [unknown, { priority?: string; interruptProtected?: boolean }]
-    >) {
-      const sendOpts = call[1];
-      expect(sendOpts.priority).toBe("high");
-      expect(sendOpts.interruptProtected).toBe(true);
-    }
+    >;
+    const protectedCount = calls.filter((c) => c[1].interruptProtected).length;
+    expect(protectedCount).toBeLessThan(calls.length);
   });
 });
