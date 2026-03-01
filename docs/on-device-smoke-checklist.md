@@ -19,7 +19,10 @@ Use this after major gameplay, HUD, or input changes. It is intentionally short 
 ## Move Assist behavior
 
 1. Turn **Move Assist ON**:
-   - Verify destination auto-jump can occur when a source has a single legal target.
+   - Verify selecting waste or tableau auto-focuses foundation first when a legal foundation move exists.
+   - Verify placement still requires a second tap (including Aces).
+   - Verify when multiple legal moves exist (foundation + tableau), swiping can reach legal tableau alternatives.
+   - Verify destination auto-jump can still occur when a source has a single legal target and no legal foundation.
    - Verify legal move count updates while cycling selected cards, using the last selected card as the basis.
 2. Turn **Move Assist OFF**:
    - Verify no auto-jump destination movement occurs.

@@ -101,7 +101,7 @@ describe("source select auto-destination focus", () => {
     resetIdCounter();
   });
 
-  it("ignores multi-destination ambiguity for tableau Ace and auto-places it to foundation", () => {
+  it("focuses foundation for tableau Ace but still requires confirm tap", () => {
     const game = emptyGame();
     game.tableau[0].visible = [card("t7h", 7, "H"), card("t6c", 6, "C"), card("tas", 1, "S")];
     game.tableau[1].visible = [card("t7d", 7, "D")];
@@ -119,10 +119,10 @@ describe("source select auto-destination focus", () => {
 
     const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) });
 
-    expect(next.ui.mode).toBe("browse");
-    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU));
-    expect(next.game.tableau[0].visible.map((c) => c.id)).toEqual(["t7h", "t6c"]);
-    expect(next.game.foundations[0].cards.map((c) => c.id)).toEqual(["tas"]);
+    expect(next.ui.mode).toBe("select_destination");
+    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION));
+    expect(next.game.tableau[0].visible.map((c) => c.id)).toEqual(["t7h", "t6c", "tas"]);
+    expect(next.game.foundations[0].cards).toHaveLength(0);
   });
 
   it("auto-focuses foundation for waste when no legal tableau destination exists", () => {
@@ -196,7 +196,7 @@ describe("source select auto-destination focus", () => {
     expect(next.game.foundations[0].cards).toHaveLength(1);
   });
 
-  it("does not auto-focus for tableau source when multiple legal destinations exist", () => {
+  it("auto-focuses foundation for tableau source when both foundation and tableau destinations are legal", () => {
     const game = emptyGame();
     game.foundations[0].cards = [card("f5c", 5, "C")];
     game.tableau[0].visible = [card("t6c", 6, "C")];
@@ -215,7 +215,7 @@ describe("source select auto-destination focus", () => {
     const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) });
 
     expect(next.ui.mode).toBe("select_destination");
-    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU));
+    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION));
   });
 
   it("does not auto-focus tableau source when only deeper run sizes have legal moves", () => {

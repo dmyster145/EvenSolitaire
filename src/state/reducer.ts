@@ -107,12 +107,15 @@ type LegalDestCacheEntry = {
 };
 
 function getAutoDestinationFocusTarget(source: Source, dests: Dest[]): AppState["ui"]["focus"] | null {
-  // Waste assist: prefer foundation first, then choose the first legal tableau pile from the left.
+  // Move Assist: prefer foundation first for both waste and tableau selections.
+  // If foundation is not legal, waste falls back to the leftmost legal tableau destination.
+  // Tableau keeps source focus unless there is exactly one legal non-foundation destination.
+  const foundationDest = dests.find((d) => d.area === "foundation");
+  if (foundationDest && foundationDest.area === "foundation") {
+    return focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION + foundationDest.index);
+  }
+
   if (source.area === "waste") {
-    const foundationDest = dests.find((d) => d.area === "foundation");
-    if (foundationDest && foundationDest.area === "foundation") {
-      return focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION + foundationDest.index);
-    }
     const leftmostTableauDest = dests.find((d) => d.area === "tableau");
     if (leftmostTableauDest && leftmostTableauDest.area === "tableau") {
       return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + leftmostTableauDest.index);
@@ -120,28 +123,16 @@ function getAutoDestinationFocusTarget(source: Source, dests: Dest[]): AppState[
     return null;
   }
 
-  // Tableau top-card assist: only auto-focus when there is exactly one legal destination.
-  // If there are multiple legal moves, keep focus on source so the player chooses.
-  if (source.area === "tableau") return null;
-
-  // Fallback: prefer foundation when legal.
-  const foundationDest = dests.find((d) => d.area === "foundation");
-  if (foundationDest && foundationDest.area === "foundation") {
-    return focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION + foundationDest.index);
+  if (source.area === "tableau") {
+    if (dests.length !== 1) return null;
+    const onlyDest = dests[0];
+    if (onlyDest.area === "tableau") {
+      return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + onlyDest.index);
+    }
+    return null;
   }
 
   return null;
-}
-
-function getSingleLegalDestFocusForSource(
-  game: AppState["game"],
-  source: Source
-): AppState["ui"]["focus"] | null {
-  const focusIndexes = getCachedLegalDestEntry(game, source).focusIndexes;
-  if (focusIndexes.size !== 1) return null;
-  const first = focusIndexes.values().next();
-  if (first.done) return null;
-  return focusIndexToTarget(first.value);
 }
 
 // Cache legal destinations across focus navigation while the immutable game snapshot and
@@ -327,23 +318,9 @@ export function rootReducer(
       if (!source) return state;
       const dests = getCachedLegalDestEntry(state.game, source).dests;
 
-      // Move Assist quick-play: tapping a tableau Ace auto-places it to foundation.
-      if (state.ui.moveAssist && source.area === "tableau") {
-        const pile = state.game.tableau[source.pileIndex];
-        const top = pile.visible[pile.visible.length - 1];
-        const foundationDest = dests.find((d) => d.area === "foundation");
-        if (top?.rank === 1 && foundationDest && foundationDest.area === "foundation") {
-          return applyLegalMoveAndReturnBrowseState(state, action.target, source, foundationDest);
-        }
-      }
-
       let autoDestinationFocus: AppState["ui"]["focus"] | null = null;
       if (state.ui.moveAssist) {
-        if (source.area === "tableau") {
-          autoDestinationFocus = getSingleLegalDestFocusForSource(state.game, source);
-        } else {
-          autoDestinationFocus = getAutoDestinationFocusTarget(source, dests);
-        }
+        autoDestinationFocus = getAutoDestinationFocusTarget(source, dests);
       }
       return {
         ...state,
