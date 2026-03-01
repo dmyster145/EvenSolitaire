@@ -12,8 +12,8 @@ const FLUSH_MAX_DEFER_MS = 5000;
 const DOM_MAX_LINES = 500;
 const DOM_FLUSH_BATCH_MS = 16;
 const PERF_LOG_CONSOLE_ENABLED = false;
-const PERF_LOG_CAPTURE_ENABLED = true;
-const PERF_LOG_DOM_ENABLED = true;
+const PERF_LOG_CAPTURE_ENABLED = false;
+const PERF_LOG_DOM_ENABLED = false;
 
 if (typeof window !== "undefined") {
   (
