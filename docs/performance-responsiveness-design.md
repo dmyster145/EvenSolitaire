@@ -1,188 +1,442 @@
-# Performance & Responsiveness Design Notes
+# BLE Display Transport: Performance & Resilience Design
 
-This document captures the concrete design choices from our performance/responsiveness passes so external reviewers can study and reuse them.
+Reference architecture for Even Realities G2 smart glasses apps that render UI as image tiles and text, sent over BLE via the Even Hub SDK.
 
-## Context
+---
 
-- Performance-heavy work landed primarily in:
-  - `1fc0896` (2026-02-25) — major queueing/render/PNG instrumentation pass.
-  - `22b3c2e` (2026-02-26) — adaptive pressure handling, input tuning, autosave deferral, and recovery hardening.
-- Follow-up fixes and tests were added in `ff211b9` (2026-02-26) and current `main`.
-- Additional hardening in current `main` adds coherent 3-tile frame delivery under pressure and flush-hang watchdog recovery with state restore.
-- Runtime A/B profile switches and legacy swap-cycle APIs have been removed from `composer/bootstrap`; production now runs a single canonical path: startup/input page (3 image tiles + info/event text) + full-board 3-tile rendering + queued image transport.
+## Architecture Overview
 
-## Core Design Choices
+```
+User Input
+    |
+scheduleFlush() ← burst absorption + link-pressure deferral
+    |
+Render Pipeline ← full-frame render, tile diff, skip unchanged
+    |
+Bridge Transport ← prioritized queue, coalescing, throttling
+    |  |
+    |  +-- Image channel (queued, prioritized, watchdog-guarded)
+    |  +-- Text channel  (serialized, coalesced, non-blocking)
+    |
+BLE Link → Glasses Display
+    |
+Health Model ← hysteresis thresholds, sliding sample windows
+    |
+Recovery Stack ← flush hang → transport reset → bridge reinit → page reload
+```
 
-### 1) Transport-aware image queue with coalescing
+---
 
-`src/evenhub/bridge.ts` treats image updates as a prioritized queue (`high`/`normal`/`low`) and supports `coalesceKey` replacement.
+## 1. Transport Layer (Bridge)
 
-- Newer frames replace stale queued frames for the same container.
-- Coalescing also works while a matching frame is in-flight (`inFlightDeferredCoalesced`) so bursts do not explode queue depth.
-- Result: lower queue pressure and lower visual latency under bursty UI changes.
+The bridge wraps the Even Hub SDK and provides a managed image/text send pipeline with health monitoring, automatic degradation handling, and multi-tier recovery.
 
-### 2) Health model with hysteresis (not single-threshold toggles)
+### 1.1 Image Queue with Coalescing
 
-The bridge tracks `avgSendMs`, `avgQueueWaitMs`, max values, queue depth, and sample windows.
+Images are enqueued with priority (`high`/`normal`/`low`) and an optional `coalesceKey`.
 
-- Link degradation and backlog states have separate enter/recover thresholds.
-- This avoids rapid on/off flapping and keeps behavior stable during borderline conditions.
+- **Queue coalescing:** Newer frames replace stale queued frames for the same key. Prevents queue depth explosion during bursty UI updates.
+- **In-flight deferred coalescing:** If a matching key is already mid-send, the update is held in a deferred map and promoted on completion. This prevents duplicate sends for the same region.
+- **Priority insertion:** Items are sorted by priority rank. High-priority items are processed first.
+- **Interrupt pruning:** During interruption, low-priority queued work is dropped. A configurable budget of protected and normal-priority images is retained.
 
-### 3) Explicit interruption and survival modes
+### 1.2 Health Model with Hysteresis
 
-When transport degrades hard, the bridge enters `interrupted` and optionally `survivalMode`.
+Transport health is tracked via sliding windows of recent send times and queue wait times. Three degradation flags use separate enter/recover thresholds to prevent rapid on/off flapping:
 
-- Non-critical queued work is pruned quickly.
-- High-priority and explicitly `interruptProtected` frames are preserved with budgets.
-- Survival mode engages after repeated watchdog trips and relaxes only after a quiet recovery window.
+| Flag | Enter Condition | Recover Condition |
+|------|----------------|-------------------|
+| `linkSlow` | avgSendMs >= 1050 | avgSendMs < 900 |
+| `backlogged` | avgQueueWait >= 450 or maxQueueWait >= 900 or depth >= 2 | avgQueueWait < 220 and maxQueueWait < 500 and depth <= 1 |
+| `interrupted` | Single send > 2500ms, or confirmed slow-total pattern | 3 consecutive good sends with max_send < 1100ms and max_qwait < 1200ms |
 
-### 4) Watchdog + hard-wedge recovery
+The composite `isTransportDegraded()` is true when any flag is set. Callers use this to defer non-critical work.
 
-Bridge sends are guarded by both a watchdog timer and a hard timeout.
+### 1.3 Watchdog and Hard-Wedge Recovery
 
-- Watchdog path marks interruption and trims stale queue work while send is still in-flight.
-- Hard timeout path force-unwedges the app by resolving waiters, dropping stale queued work, and invalidating the runner.
-- Foreground-enter refresh logic is used to repaint cleanly after recovery.
+Every image send is guarded by two timers:
 
-### 5) Action-aware flush scheduling
+| Timer | Threshold | Action |
+|-------|-----------|--------|
+| **Watchdog** | 2500ms | Marks `interrupted`, trims stale queue work. Send continues in background. |
+| **Hard wedge** | 8000ms | Force-resolves waiters, drops all queued work, marks `wedged`. Unblocks pipeline. |
 
-`src/app/bootstrap.ts` does not flush immediately for every dispatch.
+Timer cleanup is scoped to the owning in-flight item so a late return from an abandoned send cannot disarm timers for a newer active send.
 
-- Menu actions are burst-absorbed by small delays.
-- Under link pressure, selected action classes get extra defer windows.
-- Flush loop is versioned (`requestedFlushVersion` vs `completedFlushVersion`) so only the newest state matters.
+### 1.4 Survival Mode
 
-### 6) Skip stale renders before they become transport debt
+Survival mode engages after repeated watchdog trips (3 trips within 15s) and adds aggressive inter-send gaps to reduce BLE contention:
 
-`src/render/composer.ts` intentionally skips stale pre/post renders when a newer state is pending and transport pressure is already present.
+- Per-container minimum gap: 260ms
+- Cross-container gap: 240ms
+- Text sends are gated (blocked) during survival + degradation
 
-- Separate behavior for bursty states (menu open, invalid-drop blink).
-- Prevents rendering work that would be visually superseded before display.
+Exit condition: 10s quiet window with no pending work and link healthy.
 
-### 7) Full-frame render + partial-send pipeline (3-tile mode)
+### 1.5 Transport Throttling
 
-In full-board 3-tile mode:
+Multiple gap/throttle layers prevent overwhelming a slow BLE link:
 
-- Runtime defaults to full-frame render for gameplay tiles.
-- Tile bytes are diffed against last sent bytes; unchanged tiles are not resent.
-- Tile send order is focus-aware and can prioritize the source region during selection clears.
+| Condition | Gap |
+|-----------|-----|
+| Default post-send | 40ms |
+| Backlogged, non-high priority | 120ms |
+| Link slow, non-high priority | 180ms |
+| Survival mode | 240-260ms |
+| Per-container minimum (link slow) | 180ms between same container |
 
-### 8) Coherent-frame escalation in volatile/degraded states (3-tile mode)
+High-priority sends are exempt from most throttling unless survival mode requires protection.
 
-`src/render/composer.ts` now promotes safety over micro-optimizations when desync risk is high.
+### 1.6 Text Channel
 
-- When transport is degraded (`interrupted`/`linkSlow`/`backlogged`) or visual transitions are volatile (selection/menu/cross-bottom focus transitions), hint-driven partial renders are overridden to `full`.
-- Runtime now defaults to full-frame rendering for 3-tile gameplay (`SAFE_FULL_FRAME_3_TILE_RENDER`) to reduce branch complexity and eliminate partial-frame edge cases during recovery-heavy sessions.
-- Full-frame sends are elevated to high priority and can mark all 3 tile regions as `interruptProtected`.
-- If any newly rendered tile bytes are unexpectedly empty, cached bytes for that region are used as fallback; if no fallback exists, that flush is skipped instead of committing a partial frame.
-- Goal: prevent mixed-frame commits that can produce duplicate selection outlines or partially rendered cards under pressure.
+Text updates run on a separate serialized channel, independent of the image pipeline:
 
-### 9) Async send mode with per-tile priorities
+- **Non-blocking:** Callers (flush loops) never await text sends. This prevents a slow text channel from stalling image delivery.
+- **Coalesced:** Only one text send is in-flight; newer updates for the same container replace older queued ones.
+- **Timeout-guarded:** 1200ms send timeout with 600ms retry cooldown prevents repeated text hangs from cascading into image/flush recovery.
+- **Gated during degradation:** Text sends are blocked when `interrupted` or in survival mode with `linkSlow`, retrying on a 500ms interval.
 
-Runtime send behavior uses queue enqueue mode (not synchronous await-per-tile sends).
+### 1.7 Non-OK Send Tracking
 
-- Top/active-focus regions can be forced to higher priority during visual transitions.
-- `interruptProtectedRegions` keeps the currently meaningful frame parts alive during degradation.
+BLE sends that return a non-success result are tracked via `consecutiveNonOkSendCount`. This counter resets on any successful send or transport force-reset. The bootstrap layer uses this as a fast dead-link signal (threshold: 2 consecutive non-OK sends).
 
-### 10) Serialized PNG encoding to reduce encode jitter
+### 1.8 Performance Metrics
 
-`src/render/png-utils.ts` serializes canvas PNG encodes through a single async queue.
+The bridge emits structured `[Perf][Bridge][...]` log lines for:
+- Individual slow image/text sends
+- Diagnostic windows (every 2s during degradation): avg/max queue wait, avg/max send time, watchdog count, queue depth, all flags
+- Periodic summaries (every 20 images): throughput, coalesce/throttle/drop counts, per-container breakdown
+- State transitions: interrupt on/off, linkSlow on/off, backlog on/off, wedge on/off, survival on/off
 
-- Reduces `toBlob` contention in constrained runtimes/WebViews.
-- Tracks queue wait, encode cost, and slow samples via perf logs.
+---
 
-### 11) Input-side noise reduction
+## 2. Flush Pipeline (Compositor → Bootstrap)
 
-`src/input/debounce.ts` and `src/input/gestures.ts` suppress duplicate/accidental input bursts.
+### 2.1 Action-Aware Flush Scheduling
 
-- Direction-sensitive scroll debounce.
-- Tap/double-tap duplicate windows.
-- Short scroll suppression after tap to prevent unintended scroll-after-tap sequences.
+State changes do not immediately trigger a flush. Instead, `scheduleFlush()` applies:
 
-### 12) Autosave is intentionally backpressure-aware
+- **Burst absorption:** Small delays for rapid-fire actions (e.g., menu navigation, repeated inputs) to batch visual updates.
+- **Link-pressure deferral:** Under `linkSlow` or `backlogged` conditions, certain action types get extra defer windows (64-140ms) to reduce transport debt.
+- **Version tracking:** `requestedFlushVersion` vs `completedFlushVersion` ensures only the newest state is rendered. Stale in-progress flushes are superseded, not queued.
 
-Autosave is debounced, then deferred further if image transport is under pressure.
+### 2.2 Render Pipeline
 
-- Save writes are postponed within a max defer window so rendering remains responsive.
-- This avoids storage activity competing with interactive frame delivery during stress.
+The compositor renders the full display state into tile images, diffs against last-sent bytes, and skips unchanged tiles:
 
-### 13) Flush-hang watchdog and container rebuild recovery
+- **Full-frame default:** Under degradation or volatile visual transitions, full-frame rendering is forced to prevent mixed-frame artifacts.
+- **Tile diff:** Each tile's PNG bytes are compared to last sent; unchanged tiles are not re-sent.
+- **Priority ordering:** Send order is focus-aware; the tile containing the user's focus region is sent first.
+- **Interrupt protection:** The focus region is marked `interruptProtected` so it survives queue pruning during degradation.
+- **Cached fallback:** If a rendered tile produces unexpectedly empty bytes, cached last-known-good bytes are used. If no cache exists, the flush is skipped rather than committing a partial frame.
 
-`src/app/bootstrap.ts` now includes app-level flush hang recovery (separate from bridge send watchdogs).
+### 2.3 Serialized PNG Encoding
 
-- Each flush runner arms two timers:
-  - Stall watchdog (`FLUSH_STALL_WATCHDOG_MS`) for early recovery and user feedback.
-  - Hang watchdog (`FLUSH_HANG_WATCHDOG_MS`) for deeper escalation.
-- Stall and hang paths are intentionally split:
-  - Stall only raises user-visible feedback (`Syncing display...`) and does not invalidate the active flush.
-  - Hang performs invalidation and enters guarded recovery.
-- Recovery is tiered to preserve responsiveness and avoid unnecessary gameplay rollback:
-  - First hang: soft recovery (invalidate runner, invalidate visual caches, force fresh flush).
-  - Repeated hang: hard recovery (container rebuild + fresh flush).
-  - Persistent repeated hang: restore from most recently persisted snapshot (`RESTORE_SAVED_STATE`) + rebuild + fresh flush.
-- Hard/restore recovery now force-resets the bridge image transport first (abandon in-flight send, clear queued/deferred image work, disarm image timers) so recovery does not wait for long wedge timeouts to expire.
-- During recovery, the info panel can show a short “Syncing display...” banner so users do not perceive a silent freeze.
-- Transport-only hang recovery suppresses this banner to avoid text-channel churn during degraded-but-progressing image sends.
-- Stall-indicator text updates are bounded by a short timeout so a slow text channel cannot block recovery flow.
-- Hard/restore recovery enqueues cached last-known-good tile PNGs immediately after transport reset for fastest possible visual comeback, and again after successful rebuild.
-- Transport-only hard recovery skips immediate cached repaint and prioritizes a single invalidated fresh flush to reduce repeated queue churn loops.
-- Rebuild is attempted in a guarded async recovery loop with short bounded retries; each rebuild attempt has its own timeout so a hung SDK rebuild call cannot block flush recovery.
-- Timed-out rebuild calls are treated as failed for forward progress, and late rebuild completion triggers a fresh invalidated flush so containers resync cleanly.
-- Rebuild recovery has a circuit breaker (`FLUSH_REBUILD_FAILURE_CIRCUIT_BREAKER_THRESHOLD`) so repeated rebuild failures disable further rebuild attempts for the active session, falling back to transport reset + cached repaint + fresh flush instead of looping rebuild timeouts.
-- Cooldowns (`FLUSH_STALL_RECOVERY_COOLDOWN_MS` and `FLUSH_HANG_RECOVERY_COOLDOWN_MS`) prevent rapid reset loops.
-- Watchdog callbacks are scoped to the active flush target version, which prevents stale timeout callbacks from invalidating a newer in-flight flush iteration.
-- A transport-only hang probe handles the case where image transport is interrupted and still busy without an active flush runner (in-flight send with empty queue).
-- The transport-only probe remains armed while interruption and pending work persist, so recovery still triggers when the queue drains from `q>0` to in-flight-only `q=0`.
-- Probe-triggered transport-only hard recovery now requires confirmed stuck in-flight evidence (in-flight age threshold or wedge signal) to avoid resetting during slow but progressing sends.
-- Probe-triggered transport-only recovery also tolerates small deferred backlogs (`q<=2`) so a stale in-flight send can be reset before hard-wedge timeout even when a couple coalesced images are waiting behind it.
-- For transport-only hangs, hard recovery prioritizes transport reset + fresh flush and skips immediate page rebuild on the first pass to avoid black placeholder states when rebuild return status is unreliable under link pressure.
-- Bootstrap also runs an input-idle visual reconcile pass: after user input settles, if transport recently showed risk and HUD text is already aligned, a single cache-invalidated flush is forced to emit a fresh keyframe and repair silent image desync.
-- Idle reconcile waits for transport/idle conditions (including `interrupted=n`) with short retries and applies a cooldown to avoid repeated repaint churn.
-- Bridge in-flight timer cleanup is scoped to the owning in-flight item so late-return cleanup from an abandoned send cannot disarm watchdog/hard-timeout timers for a newer active send.
+Canvas `toBlob` calls are serialized through a single async queue to reduce encode contention in constrained WebViews. Queue wait and encode cost are tracked via perf logs.
 
-### 14) Non-blocking text update channel
+### 2.4 Stale Render Skipping
 
-`src/evenhub/bridge.ts` now treats text updates as a separate serialized/coalesced channel.
+When a newer state is pending and transport is already under pressure, pre/post renders for the superseded state are intentionally skipped. This prevents rendering work that would be visually replaced before it reaches the display.
 
-- `updateText` is non-blocking for callers (flush loops are not allowed to wait on slow text transport).
-- Only one text send is in-flight at a time; newer updates for the same container replace older queued ones.
-- Text sends are timeout-guarded with cooldown before retrying queue drain, preventing repeated text-channel hangs from cascading into image/flush recovery loops.
+---
 
-### 15) Reducer-side legal-destination cache
+## 3. Flush-Hang Recovery
 
-`src/state/reducer.ts` caches legal destinations by immutable game snapshot + source selection in a `WeakMap`.
+App-level recovery for when the flush pipeline or transport gets stuck. This is separate from the bridge's per-send watchdog timers.
 
-- Removes repeated validation work while swiping destination focus.
-- Keeps behavior identical while reducing per-action compute churn.
+### 3.1 Stall and Hang Detection
 
-## Instrumentation and Observability
+Each flush arms two timers:
 
-- `src/perf/log.ts`: runtime perf logging (console/capture/DOM panel toggles).
-- `src/perf/dispatch-trace.ts`: tags dispatch source (`input`, `timer`, etc.) for flush correlation.
-- Bridge/composer/bootstrap logs use consistent `[Perf][...]` channels for timeline reconstruction.
+| Timer | Threshold | Purpose |
+|-------|-----------|---------|
+| **Stall watchdog** | 1200ms | Early warning. Shows "Syncing display..." indicator. Does not invalidate the flush. |
+| **Hang watchdog** | 5000ms | Full hang. Invalidates the flush runner and enters recovery. |
 
-## Guardrails (Do Not Regress)
+Both are scoped to the active flush version so stale callbacks cannot invalidate a newer flush.
 
-When refactoring, preserve these properties unless you have profiling proof and test updates:
+### 3.2 Tiered Recovery Escalation
 
-1. Keep image update coalescing by container key.
-2. Keep watchdog + hard-timeout recovery paths.
-3. Keep stale-render skip gates under backlog/burst pressure.
-4. Keep coherent-frame escalation and cached-tile fallback behavior in 3-tile mode.
-5. Keep partial tile diff/send behavior for stable states in 3-tile mode.
-6. Keep split stall/hang watchdog recovery behavior, including early user-visible stall indication.
-7. Keep post-rebuild cached-tile fast repaint behavior before fresh render completes.
-8. Keep serialized PNG encode queue (or replace with equivalent anti-contention strategy).
-9. Keep non-blocking/coalesced text update behavior so text channel latency cannot stall flush loops.
-10. Keep input debouncing and tap/scroll suppression semantics.
-11. Keep autosave defer-on-pressure behavior and max defer cap.
+Recovery escalates based on consecutive hang count:
 
-## Test Coverage Areas
+| Level | Consecutive Hangs | Actions |
+|-------|------------------|---------|
+| **Soft** | 1 | Invalidate visual caches, force fresh flush |
+| **Hard** | 2 | Force-reset transport, attempt container rebuild, enqueue cached tile PNGs for fast repaint |
+| **Restore** | 3+ | Force-reset + rebuild + restore from last persisted snapshot (rollback unsaved state changes) |
 
-These tests cover key behavior and should stay green on perf-related changes:
+Key behaviors:
+- Hard/restore recovery force-resets transport first so recovery doesn't wait for wedge timeouts.
+- Rebuild is bounded by per-attempt timeouts (1200ms) with a circuit breaker (1 failure disables further rebuilds for the session).
+- Transport-only hangs skip immediate rebuild to avoid blank placeholder states under unreliable link conditions.
+- Cached last-known-good tile PNGs are re-enqueued immediately after transport reset for fastest visual recovery.
 
-- `tests/render/composer.integration.test.ts`
-- `tests/app/bootstrap.integration.test.ts`
-- `tests/input/action-map.test.ts`
-- `tests/state/reducer-runtime.test.ts`
-- `tests/state/foundation-focus.test.ts`
+### 3.3 Transport-Only Hang Probe
+
+Handles the case where the image transport is stuck (interrupted, in-flight send with no active flush runner):
+
+- Probes every 1400ms while interruption and pending work persist
+- Requires confirmed evidence: in-flight age > 5000ms or wedge signal
+- Tolerates small deferred backlogs (queue depth <= 2) so a stale send can be reset before hard-wedge timeout
+- Escalates to force-reset + fresh flush
+
+### 3.4 Idle Visual Reconcile
+
+After user input settles and transport was recently at risk, a single cache-invalidated flush is forced to emit a fresh keyframe and repair any silent image desync:
+
+- Triggers 240ms after last input
+- Retries up to 6 times at 180ms intervals if transport is still busy
+- Applies 1800ms cooldown to avoid repeated repaint churn
+- Skips if transport is still interrupted
+
+---
+
+## 4. Bridge Reinit and Connection Recovery
+
+When transport is confirmed dead (not just slow), the app escalates beyond flush-level recovery to full bridge reinitialization.
+
+### 4.1 Triggers
+
+Bridge reinit is triggered by any of:
+
+| Trigger | Condition |
+|---------|-----------|
+| **Dead link (force-reset count)** | 3+ consecutive transport force-resets with no successful sends between them |
+| **Dead link (non-OK sends)** | 2+ consecutive BLE sends returning non-OK result |
+| **Recovery burst** | 3+ flush-hang recoveries within a 30s sliding window |
+| **Long JS suspension** | Heartbeat gap > 30s (push notification or OS suspension) |
+| **Short suspension + recent recovery** | Heartbeat gap > 5s with recent hang recoveries in the last 10s |
+| **Visibility change** | App returns to foreground with transport wedged/interrupted or non-OK sends |
+
+### 4.2 Early Shutdown
+
+Every reinit trigger (dead link, recovery burst, suspension, visibility change, interrupt-after-recovery) calls `fireEarlyShutdown()` immediately alongside `attemptBridgeReinit()`. This is a non-blocking async call that:
+
+1. Calls `hub.shutdown()` (`shutDownPageContainer` — releases BLE session)
+2. Starts a 1500ms settle timer
+3. Sets `earlyShutdownSettled = true` when the timer completes
+
+Because reinit always goes through a cooldown gate (2s after failure, 8s in slow-retry, 30s after success), the shutdown + settle runs in the background during that cooldown. By the time reinit actually starts, the settle has already elapsed and reinit skips straight to step 3 below.
+
+### 4.3 Reinit Flow
+
+```
+1. Stop timers       (flush, blink, watchdogs, probes)
+2. Shutdown/settle   (skip if early shutdown settled, wait remainder if in-flight,
+                      or do full shutdown + 1500ms settle as fallback)
+3. Init bridge       (re-acquire SDK handle via waitForEvenAppBridge)
+4. Setup page        (re-establish display containers, 3s timeout cap)
+5. Re-subscribe      (SDK event listeners)
+6. Reset state       (all recovery counters, reload count, slow-retry flag,
+                      early-shutdown flag)
+7. Send initial      (repopulate display from current app state)
+```
+
+The shutdown-before-reinit step is critical: calling `setupPage` without first releasing the previous BLE page container can cause the SDK to refuse reconnection indefinitely.
+
+### 4.4 Retry and Reload Escalation
+
+When `setupPage` returns false (BLE link dead):
+
+```
+Attempt 1 → setupPage fails → retry after 2s cooldown
+Attempt 2 → setupPage fails → exhausted:
+  ├─ Transport still alive? → slow-retry mode (8s interval)
+  ├─ Reload count < 2?      → window.location.reload()
+  └─ Reload count >= 2?     → slow-retry mode (8s interval)
+```
+
+Page reloads are capped at 2 to avoid destroying app state in an infinite reload loop. After the cap, the app switches to slow indefinite retry.
+
+### 4.5 Cooldown System
+
+Three cooldown tiers prevent reinit attempts from firing too frequently:
+
+| Mode | Cooldown | When Active |
+|------|----------|-------------|
+| **After success** | 30s | Last reinit succeeded (no failures) |
+| **After failure** | 2s | Retrying after a failed setupPage |
+| **Slow retry** | 8s | After max reloads reached; indefinite retry mode |
+
+### 4.6 setupPage Timeout
+
+The SDK's `setupPage` can take 5-10s to return false on a dead BLE link. A `Promise.race` wrapper caps this at 3s so the retry cycle isn't bottlenecked by slow SDK responses. Applied to both startup and reinit paths.
+
+### 4.7 Reload Counter Persistence
+
+The page reload counter must survive `window.location.reload()`. Dual persistence:
+
+1. **`sessionStorage`** (primary): `__es_reload_count`
+2. **`window.name`** (fallback): pattern `__es_rc=N`
+
+The fallback handles WebView environments where `sessionStorage` doesn't reliably persist across reloads. Both are cleared on successful reinit.
+
+---
+
+## 5. Suspension Detection
+
+### 5.1 Heartbeat
+
+A 1-second `setInterval` heartbeat detects JS thread suspension (caused by push notifications, OS backgrounding, or WebView throttling):
+
+- **Gap > 5s:** Short suspension detected. Force-reset transport. If recent hang recoveries exist, escalate to bridge reinit.
+- **Gap > 30s:** Long suspension detected. Immediate bridge reinit — the BLE link is almost certainly dead.
+
+### 5.2 Keep-Alive (Throttle Prevention)
+
+Two mechanisms prevent Chromium/WebView from aggressively throttling the JS thread:
+
+1. **AudioContext oscillator:** 1 Hz sine wave at gain 0.001 (inaudible). Flags the page as "audio-playing," exempting it from timer throttling.
+2. **Web Locks API:** Acquires a lock that never resolves, signaling ongoing work to the runtime.
+
+Both require user-gesture activation (autoplay policy). Failures are silently caught — the app continues without keep-alive.
+
+### 5.3 Visibility Change Recovery
+
+When the page regains visibility (`visibilitychange` → visible):
+
+1. Check transport state: if `wedged` or `interrupted`, force-reset transport
+2. Check non-OK sends: if any, escalate to bridge reinit
+3. Check recent hang recoveries: if any within 10s, escalate to bridge reinit
+4. Otherwise: invalidate visual caches, schedule fresh flush
+
+---
+
+## 6. Autosave Backpressure
+
+Persistence writes are deferred when image transport is under pressure:
+
+- Base debounce: 500ms
+- Backlogged deferral: +1200ms
+- Link slow deferral: +1800ms
+- Maximum total defer: 12s
+
+This prevents storage I/O from competing with interactive frame delivery during BLE stress.
+
+---
+
+## 7. Input Noise Reduction
+
+Input handling suppresses duplicate and accidental bursts before they enter the state/flush pipeline:
+
+- Direction-sensitive scroll debounce
+- Tap/double-tap duplicate windows
+- Short scroll suppression after tap (prevents unintended scroll-after-tap sequences)
+
+---
+
+## 8. Instrumentation
+
+### Log Format
+
+All performance logs use the `[Perf][Module][Event]` format for structured timeline reconstruction:
+
+```
+[Perf][Bridge][Image]      — individual image send timing
+[Perf][Bridge][Watchdog]   — watchdog trip/recovery
+[Perf][Bridge][Wedge]      — hard wedge events
+[Perf][Bridge][Interrupt]  — interrupt on/off transitions
+[Perf][Bridge][Diag]       — state transition diagnostics
+[Perf][Bridge][DiagWindow] — periodic degraded-state summaries
+[Perf][Bridge][Summary]    — periodic aggregate stats
+[Perf][Bridge][Recovery]   — force-reset events
+[Perf][Bridge][NonOk]      — non-OK BLE send results
+[Perf][Bridge][Lifecycle]  — system lifecycle events
+[Perf][Heartbeat][Reinit]  — bridge reinit attempts, cooldowns, outcomes
+[Perf][Startup]            — initial setupPage timing
+[Perf][Flush]              — flush hang detection and recovery
+```
+
+### Log Persistence
+
+- Stored in `localStorage` as JSON array (max 3000 entries)
+- Flushed on 1s interval with idle-gap and max-defer caps
+- Optional DOM panel with toggle/clear/copy/record controls
+- Available programmatically via `window.__evenSolitairePerf.dumpText()`
+
+### Dispatch Tracing
+
+Each state dispatch is tagged with its source (`input`, `timer`, etc.) for flush correlation. This allows log analysis to distinguish user-triggered flushes from timer-triggered ones.
+
+---
+
+## 9. Constants Reference
+
+### Bridge Transport
+
+```
+IMAGE_SEND_WATCHDOG_TRIGGER_MS        = 2500    // watchdog trip threshold
+IMAGE_SEND_HARD_WEDGE_TRIGGER_MS      = 8000    // hard timeout, force-unwedge
+IMAGE_DEFAULT_POST_SEND_GAP_MS        = 40      // minimum inter-send gap
+IMAGE_LINK_SLOW_MIN_SEND_START_GAP_MS = 180     // per-container gap when slow
+IMAGE_BACKLOG_NON_HIGH_INTER_SEND_GAP_MS = 120  // non-high gap when backlogged
+IMAGE_LINK_SLOW_NON_HIGH_INTER_SEND_GAP_MS = 180
+IMAGE_SURVIVAL_MODE_MIN_SEND_START_GAP_MS = 260 // survival per-container gap
+IMAGE_SURVIVAL_MODE_INTER_SEND_GAP_MS = 240     // survival cross-container gap
+IMAGE_HEALTH_WINDOW_SAMPLES           = 8       // sliding health window size
+IMAGE_HEALTH_MIN_SAMPLES              = 3       // min samples for averages
+TEXT_UPDATE_SEND_TIMEOUT_MS           = 1200     // text send timeout
+TEXT_UPDATE_RETRY_COOLDOWN_MS         = 600      // text retry cooldown
+TEXT_SURVIVAL_GATE_RETRY_MS           = 500      // text gate retry interval
+```
+
+### Flush Recovery
+
+```
+FLUSH_STALL_WATCHDOG_MS               = 1200    // show stall indicator
+FLUSH_HANG_WATCHDOG_MS                = 5000    // full hang timeout
+FLUSH_STALL_RECOVERY_COOLDOWN_MS      = 800     // stall recovery rate limit
+FLUSH_HANG_RECOVERY_COOLDOWN_MS       = 3000    // hang recovery rate limit
+FLUSH_REBUILD_ATTEMPT_TIMEOUT_MS      = 1200    // per-rebuild timeout
+FLUSH_REBUILD_MAX_ATTEMPTS            = 3       // rebuild retries
+FLUSH_REBUILD_FAILURE_CIRCUIT_BREAKER = 1       // failures before disabling
+FLUSH_TRANSPORT_ONLY_HANG_PROBE_MS    = 1400    // probe interval
+FLUSH_TRANSPORT_ONLY_HANG_MIN_INFLIGHT_AGE_MS = 5000
+```
+
+### Bridge Reinit
+
+```
+BRIDGE_REINIT_COOLDOWN_MS             = 30000   // cooldown after success
+BRIDGE_REINIT_FAILED_COOLDOWN_MS      = 2000    // cooldown after failure
+BRIDGE_REINIT_SLOW_RETRY_INTERVAL_MS  = 8000    // slow-retry cadence
+BRIDGE_REINIT_SETUP_PAGE_TIMEOUT_MS   = 3000    // setupPage timeout cap
+BRIDGE_REINIT_SHUTDOWN_SETTLE_MS      = 1500    // post-shutdown settle delay
+BRIDGE_REINIT_MAX_CONSECUTIVE_FAILURES = 2      // failures before reload
+BRIDGE_REINIT_MAX_PAGE_RELOADS        = 2       // max reloads before slow-retry
+NON_OK_DEAD_LINK_THRESHOLD            = 2       // non-OK sends before reinit
+DEAD_LINK_CONSECUTIVE_RESETS_FOR_REINIT = 3     // force-resets before reinit
+RECOVERY_BURST_WINDOW_MS              = 30000   // burst detection window
+RECOVERY_BURST_THRESHOLD              = 3       // recoveries to trigger burst
+```
+
+### Suspension Detection
+
+```
+HEARTBEAT_INTERVAL_MS                 = 1000    // heartbeat tick rate
+HEARTBEAT_SUSPENSION_THRESHOLD_MS     = 5000    // short suspension threshold
+HEARTBEAT_BRIDGE_REINIT_THRESHOLD_MS  = 30000   // long suspension threshold
+VISIBILITY_RECENT_RECOVERY_WINDOW_MS  = 10000   // visibility check window
+```
+
+---
+
+## 10. Guardrails
+
+When modifying this system, preserve these properties unless you have profiling proof:
+
+1. Image coalescing by container key (queue and in-flight deferred)
+2. Watchdog + hard-wedge dual-timer recovery on every send
+3. Hysteresis on all health state transitions (separate enter/recover thresholds)
+4. Stale-render skip gates under backlog/burst pressure
+5. Full-frame escalation and cached-tile fallback during degradation
+6. Split stall/hang watchdog recovery with early user-visible stall indication
+7. Cached-tile fast repaint after transport reset (before fresh render completes)
+8. Serialized PNG encode queue (or equivalent anti-contention strategy)
+9. Non-blocking text channel (text latency must never stall image flush loops)
+10. Shutdown before reinit (release BLE page container before re-establishing)
+11. setupPage timeout cap (prevent slow SDK responses from bottlenecking retry cycles)
+12. Page reload cap with slow-retry fallback (prevent infinite reload loops)
+13. Cooldown tier separation (success vs failure vs slow-retry)
+14. Input debouncing and burst absorption before flush scheduling
+15. Autosave defer-on-pressure with max defer cap
