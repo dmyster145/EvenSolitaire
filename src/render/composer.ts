@@ -39,6 +39,7 @@ import { drawFaceUpCard } from "./card-canvas";
 import {
   canvasToPngBytes,
   canvasToPngUint8Bytes,
+  canvasToGreyscaleIndexedPngUint8Bytes,
   getPngBytesHash,
   pngBytesToImageBitmap,
 } from "./png-utils";
@@ -283,7 +284,7 @@ async function cropScaleSourceToPngUint8Bytes(
     targetRect.height
   );
   ctx.globalCompositeOperation = "source-over";
-  return canvasToPngUint8Bytes(canvas, `crop:${canvasKey}`);
+  return canvasToGreyscaleIndexedPngUint8Bytes(canvas, `crop:${canvasKey}`);
 }
 
 function getReusableBoardRowSourceCanvases(): {
@@ -543,7 +544,10 @@ type FullBoard3TilePreRenderHint = {
 const BACKLOG_RENDER_SKIP_QUEUE_DEPTH = 2;
 const BURST_STALE_SKIP_AVG_QWAIT_MS = 200;
 const ALL_FULL_BOARD_3_TILE_REGIONS: FullBoard3TileRegion[] = ["top", "bottomLeft", "bottomRight"];
-const SAFE_FULL_FRAME_3_TILE_RENDER = true;
+// Dynamic: activates partial-tile prediction under survival/pressure to reduce BLE payload.
+// When false, existing predictMenuNavigation3TileHint / predictFullBoard3TilePreRenderHint
+// functions determine which tiles actually need re-rendering.
+// Computed per-flush from transport health; see flushDisplayUpdate.
 
 type StaleRenderSkipContext = {
   phase: "pre" | "post";
@@ -1200,6 +1204,8 @@ export async function flushDisplayUpdate(
   const imageHealth = hub.getImageSendHealth();
   const transportUnderPressure =
     imageHealth.interrupted || imageHealth.linkSlow || imageHealth.backlogged;
+  const useFullFrameRender =
+    !imageHealth.survivalMode && !(imageHealth.interrupted && imageHealth.linkSlow);
   const menuTransitionUnderPressure = menuOpenTransition && (imageHealth.linkSlow || imageHealth.interrupted);
   const menuTransitionProtectedRegions: FullBoard3TileRegion[] | undefined = menuOpenTransition
     ? imageHealth.interrupted
@@ -1238,7 +1244,6 @@ export async function flushDisplayUpdate(
   const extraHighPriorityVisualTransition = interruptCrossContainerFocusSuppression;
   const interruptFocusHintSuffix = interruptCrossContainerFocusSuppression ? "+intr-focus-suppress" : "";
   const coherentFrameRequired =
-    transportUnderPressure ||
     selectionVisualTransition ||
     menuOpenTransition ||
     crossBottomFocusTransition;
@@ -1257,7 +1262,9 @@ export async function flushDisplayUpdate(
   const full3TileInterruptProtectedRegions =
     coherentFrameRequired && transportUnderPressure
       ? ALL_FULL_BOARD_3_TILE_REGIONS
-      : menuTransitionProtectedRegions;
+      : (imageHealth.interrupted || imageHealth.survivalMode) && transportUnderPressure
+        ? ([nextFocusRegion ?? "top"] as FullBoard3TileRegion[])
+        : menuTransitionProtectedRegions;
   const full3TileForceHighPriority =
     coherentFrameRequired || focusChanged || extraHighPriorityVisualTransition;
   if (
@@ -1299,7 +1306,7 @@ export async function flushDisplayUpdate(
         return logSkippedVisualFlush(burstyVisualState ? "stale-burst-pre" : "stale-backlog-pre");
       }
 
-      const predictedPreRenderHint = SAFE_FULL_FRAME_3_TILE_RENDER
+      const predictedPreRenderHint = useFullFrameRender
         ? null
         : predictMenuNavigation3TileHint({
             focusIdx,
@@ -1330,7 +1337,7 @@ export async function flushDisplayUpdate(
             uiMode,
             lastSent,
           });
-      const preRenderHint = SAFE_FULL_FRAME_3_TILE_RENDER
+      const preRenderHint = useFullFrameRender
         ? {
             mode: "full" as const,
             reason: transportUnderPressure ? "coherent-pressure" : "safe-full",
@@ -1492,7 +1499,11 @@ export async function flushDisplayUpdate(
         (perfImageBytesTotal > 0
           ? ` imgBytes=${perfImageBytesSent}/${perfImageBytesTotal} ${perfImageBytesByCid}`
           : "") +
-        (perfHint ? ` hint=${perfHint}` : "")
+        (perfHint ? ` hint=${perfHint}` : "") +
+        ` fullFrame=${useFullFrameRender ? "y" : "n"} coherent=${coherentFrameRequired ? "y" : "n"}` +
+        (transportUnderPressure
+          ? ` pressure=y survival=${imageHealth.survivalMode ? "y" : "n"}`
+          : "")
     );
   }
   return { lastSent, didClearOverlay: didClearOverlay ? true : undefined };

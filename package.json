@@ -13,7 +13,8 @@
     "test:coverage": "node scripts/run-coverage.mjs"
   },
   "dependencies": {
-    "@evenrealities/even_hub_sdk": "^0.0.7"
+    "@evenrealities/even_hub_sdk": "^0.0.7",
+    "upng-js": "^2.1.0"
   },
   "devDependencies": {
     "@evenrealities/evenhub-cli": "^0.1.5",

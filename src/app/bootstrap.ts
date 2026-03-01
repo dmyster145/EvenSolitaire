@@ -26,7 +26,9 @@ import {
   type PerfDispatchSource,
 } from "../perf/dispatch-trace";
 import type { Action } from "../state/actions";
+import { focusTargetToIndex } from "../state/ui-mode";
 import { ImageRawDataUpdate, OsEventTypeList, type EvenHubEvent } from "@evenrealities/even_hub_sdk";
+import { activateKeepAlive, isKeepAliveActive, deactivateKeepAlive } from "../utils/keep-alive";
 
 // Link-pressure tuning: absorb bursty menu input and defer non-critical flushes while transport is degraded.
 const LINK_SLOW_DEFER_MENU_MOVE_MS = 72;
@@ -56,14 +58,32 @@ const FLUSH_REBUILD_MAX_ATTEMPTS = 3;
 const FLUSH_REBUILD_RETRY_DELAY_MS = 180;
 const FLUSH_REBUILD_ATTEMPT_TIMEOUT_MS = 1200;
 const FLUSH_TRANSPORT_ONLY_HANG_PROBE_MS = 1400;
-const FLUSH_TRANSPORT_ONLY_HANG_MIN_INFLIGHT_AGE_MS = 9000;
-const FLUSH_TRANSPORT_ONLY_HANG_CONFIRM_COUNT = 2;
+const FLUSH_TRANSPORT_ONLY_HANG_MIN_INFLIGHT_AGE_MS = 5000;
+const FLUSH_TRANSPORT_ONLY_HANG_CONFIRM_COUNT = 1;
 const FLUSH_TRANSPORT_ONLY_HANG_MAX_QUEUE_DEPTH = 2;
 const FLUSH_REBUILD_FAILURE_CIRCUIT_BREAKER_THRESHOLD = 1;
 const INPUT_IDLE_VISUAL_RECONCILE_DELAY_MS = 240;
 const INPUT_IDLE_VISUAL_RECONCILE_RETRY_MS = 180;
 const INPUT_IDLE_VISUAL_RECONCILE_MAX_RETRIES = 6;
 const INPUT_IDLE_VISUAL_RECONCILE_COOLDOWN_MS = 1800;
+
+// --- Suspension guard (flip to false to disable after SDK fix) ---------------
+const SUSPENSION_GUARD_ENABLED = true;
+const HEARTBEAT_INTERVAL_MS = 1000;
+const HEARTBEAT_SUSPENSION_THRESHOLD_MS = 2000;
+const HEARTBEAT_BRIDGE_REINIT_THRESHOLD_MS = 30000;
+const DEAD_LINK_CONSECUTIVE_RESETS_FOR_REINIT = 3;
+const BRIDGE_REINIT_COOLDOWN_MS = 30000;
+const BRIDGE_REINIT_FAILED_COOLDOWN_MS = 1000;
+const BRIDGE_REINIT_MAX_CONSECUTIVE_FAILURES = 2;
+const BRIDGE_REINIT_MAX_PAGE_RELOADS = 2;
+const BRIDGE_REINIT_SLOW_RETRY_INTERVAL_MS = 8000;
+const BRIDGE_REINIT_SETUP_PAGE_TIMEOUT_MS = 3000;
+const BRIDGE_REINIT_SHUTDOWN_SETTLE_MS = 1500;
+const NON_OK_DEAD_LINK_THRESHOLD = 2;
+const RECOVERY_BURST_WINDOW_MS = 30000;
+const RECOVERY_BURST_THRESHOLD = 3;
+const VISIBILITY_RECENT_RECOVERY_WINDOW_MS = 10000;
 
 type FlushHangRecoveryLevel = "soft" | "hard" | "restore";
 type FlushRecoveryTrigger = "stall" | "hang";
@@ -165,8 +185,47 @@ export async function initApp(): Promise<void> {
   let perfUndefinedSysEventBurstCount = 0;
   let perfLastSyntheticForegroundEnterAtMs = 0;
 
-  function triggerForegroundEnterRecoveryRefresh(source: "foreground-enter" | "heuristic-undefined-sysevent"): void {
+  function triggerForegroundEnterRecoveryRefresh(source: "foreground-enter" | "heuristic-undefined-sysevent" | "visibility-visible"): void {
     hub.notifySystemLifecycleEvent("foreground-enter");
+
+    // Probe BLE health immediately on visibility change or foreground-enter.
+    // If the transport is broken (push notification, app switch, etc.),
+    // escalate to force-reset or full reinit rather than blindly sending.
+    if (SUSPENSION_GUARD_ENABLED) {
+      const transport = hub.getImageTransportSnapshot();
+      if (transport.wedged || transport.interrupted) {
+        perfLog(
+          `[Perf][Bridge][Lifecycle] ${source} health-probe wedged=${transport.wedged ? "y" : "n"} ` +
+            `intr=${transport.interrupted ? "y" : "n"} nonOk=${transport.consecutiveNonOkSends}`
+        );
+        hub.forceResetImageTransport(`visibility-recovery-${source}`);
+      }
+      if (transport.consecutiveNonOkSends >= 1) {
+        perfLog(
+          `[Perf][Bridge][Lifecycle] ${source} non-ok-escalation nonOk=${transport.consecutiveNonOkSends}`
+        );
+        fireEarlyShutdown(`visibility-dead-link-${source}`);
+        void attemptBridgeReinit(`visibility-dead-link-${source}`);
+        return;
+      }
+      // Check for recent hang recoveries — even if force-reset has cleared
+      // all flags, recent hang activity means the link was dying and a full
+      // reinit is needed rather than blindly re-sending into a dead link.
+      const nowMs = perfNowMs();
+      const recentRecoveryCount = recentHangRecoveryTimestamps.filter(
+        (ts) => nowMs - ts < VISIBILITY_RECENT_RECOVERY_WINDOW_MS
+      ).length;
+      if (recentRecoveryCount > 0) {
+        perfLog(
+          `[Perf][Bridge][Lifecycle] ${source} recent-recovery-escalation ` +
+            `recoveries=${recentRecoveryCount} window=${VISIBILITY_RECENT_RECOVERY_WINDOW_MS}ms`
+        );
+        fireEarlyShutdown(`visibility-recent-recovery-${source}`);
+        void attemptBridgeReinit(`visibility-recent-recovery-${source}`);
+        return;
+      }
+    }
+
     setTimeout(() => {
       if (!startupPageReadyForAssetRefresh) return;
       pendingRecoveryRefresh = false;
@@ -233,6 +292,10 @@ export async function initApp(): Promise<void> {
       handleSystemLifecycleSysEvent(event);
       const eventReceivedAtMs = perfNowMs();
       const action = mapEvenHubEvent(event, store.getState());
+      // Activate keep-alive on first user action (satisfies AudioContext autoplay policy)
+      if (SUSPENSION_GUARD_ENABLED && action && !isKeepAliveActive()) {
+        activateKeepAlive();
+      }
       if (action) {
         switch (action.type) {
           case "FOCUS_MOVE":
@@ -323,6 +386,31 @@ export async function initApp(): Promise<void> {
   let rebuildRecoveryDisabled = false;
   let rebuildRecoveryFailureCount = 0;
 
+  // Suspension guard state
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let lastHeartbeatAtMs = 0;
+  let consecutiveForceResetsWithNoSends = 0;
+  let lastBridgeReinitAtMs = 0;
+  let bridgeReinitInProgress = false;
+  let consecutiveBridgeReinitFailures = 0;
+  let inSlowRetryMode = false;
+  let pageReloadCount = (() => {
+    try {
+      const ss = sessionStorage.getItem("__es_reload_count");
+      if (ss) return parseInt(ss, 10) || 0;
+    } catch { /* sessionStorage unavailable */ }
+    // Fallback: window.name persists across reloads in the same browsing context
+    try {
+      const m = window.name.match(/__es_rc=(\d+)/);
+      if (m) return parseInt(m[1], 10) || 0;
+    } catch { /* window.name unavailable */ }
+    return 0;
+  })();
+  let recentHangRecoveryTimestamps: number[] = [];
+  let earlyShutdownFiredAtMs = 0;
+  let earlyShutdownSettled = false;
+  let earlyShutdownInFlight = false;
+
   function armFlushLoopAfterStartup(): void {
     if (flushLoopArmed) return;
     flushLoopArmed = true;
@@ -398,6 +486,23 @@ export async function initApp(): Promise<void> {
           `transport-only ${reason} inflightAge=${transport.inFlightAgeMs.toFixed(1)}ms wedged=${stuckByWedge ? "y" : "n"}`,
           "hang"
         );
+      }
+      // Fast-path: consecutive non-ok BLE results mean the link is dead.
+      // Bypass normal recovery escalation and reinit immediately.
+      if (
+        SUSPENSION_GUARD_ENABLED &&
+        !shouldRecover &&
+        !blockedByAppFlow &&
+        transport.consecutiveNonOkSends >= NON_OK_DEAD_LINK_THRESHOLD
+      ) {
+        perfLog(
+          `[Perf][Flush][NonOkEscalation] nonOkSends=${transport.consecutiveNonOkSends} ` +
+            `inflightAge=${transport.inFlightAgeMs.toFixed(1)}ms`
+        );
+        transportHangProbeConfirmCount = 0;
+        fireEarlyShutdown("non-ok-dead-link");
+        void attemptBridgeReinit("non-ok-dead-link");
+        return;
       }
       const shouldContinueProbing =
         !exitInProgress && !flushRecoveryInProgress && health.interrupted && hasPending;
@@ -521,23 +626,36 @@ export async function initApp(): Promise<void> {
     }
   }
 
-  function enqueueCachedRecoveryTiles(): number {
-    const entries: Array<{ bytes?: Uint8Array; cid: number; name: string }> = [
-      { bytes: lastSent.last3TileTopPng, cid: IMAGE_TILE_TOP.id, name: IMAGE_TILE_TOP.name },
+  type TileRegion = "top" | "bottomLeft" | "bottomRight";
+
+  function focusIndexToTileRegion(idx: number): TileRegion {
+    if (idx <= 5) return "top";
+    const col = idx - 6;
+    return col >= 4 ? "bottomRight" : "bottomLeft";
+  }
+
+  function enqueueCachedRecoveryTiles(focusRegion?: TileRegion): number {
+    const entries: Array<{ region: TileRegion; bytes?: Uint8Array; cid: number; name: string }> = [
+      { region: "top", bytes: lastSent.last3TileTopPng, cid: IMAGE_TILE_TOP.id, name: IMAGE_TILE_TOP.name },
       {
+        region: "bottomLeft",
         bytes: lastSent.last3TileBottomLeftPng,
         cid: IMAGE_TILE_BOTTOM_LEFT.id,
         name: IMAGE_TILE_BOTTOM_LEFT.name,
       },
       {
+        region: "bottomRight",
         bytes: lastSent.last3TileBottomRightPng,
         cid: IMAGE_TILE_BOTTOM_RIGHT.id,
         name: IMAGE_TILE_BOTTOM_RIGHT.name,
       },
     ];
     let queued = 0;
+    let highCount = 0;
+    let totalBytes = 0;
     for (const entry of entries) {
       if (!entry.bytes || entry.bytes.length === 0) continue;
+      const isFocusTile = !focusRegion || entry.region === focusRegion;
       hub.enqueueImage(
         new ImageRawDataUpdate({
           containerID: entry.cid,
@@ -545,12 +663,20 @@ export async function initApp(): Promise<void> {
           imageData: entry.bytes,
         }),
         {
-          priority: "high",
+          priority: isFocusTile ? "high" : "normal",
           coalesceKey: `img:${entry.cid}`,
-          interruptProtected: true,
+          interruptProtected: isFocusTile,
         }
       );
       queued += 1;
+      totalBytes += entry.bytes.length;
+      if (isFocusTile) highCount += 1;
+    }
+    if (queued > 0 && focusRegion) {
+      perfLog(
+        `[Perf][Recovery][Tiles] focus=${focusRegion} high=${highCount} normal=${queued - highCount} ` +
+          `totalBytes=${totalBytes}`
+      );
     }
     return queued;
   }
@@ -640,9 +766,10 @@ export async function initApp(): Promise<void> {
       const rebuilt = await runRebuildAttemptWithTimeout(page, level, attempt, attempts);
       if (rebuilt) {
         rebuildRecoveryFailureCount = 0;
-        const cachedQueued = enqueueCachedRecoveryTiles();
+        const currentFocusRegion = focusIndexToTileRegion(focusTargetToIndex(store.getState().ui.focus));
+        const cachedQueued = enqueueCachedRecoveryTiles(currentFocusRegion);
         if (cachedQueued > 0) {
-          perfLog(`[Perf][Flush][Hang] cache-repaint queued=${cachedQueued} source=rebuild`);
+          perfLog(`[Perf][Flush][Hang] cache-repaint queued=${cachedQueued} source=rebuild focus=${currentFocusRegion}`);
         }
         return true;
       }
@@ -729,6 +856,34 @@ export async function initApp(): Promise<void> {
     try {
       markIdleVisualReconcileRisk();
       flushRecoveryConsecutiveCount += 1;
+
+      // Recovery burst detection: catches the "intermittent BLE" pattern where
+      // flushes alternate between hanging and succeeding.  Successful flushes
+      // reset flushRecoveryConsecutiveCount (so the normal soft→hard→restore
+      // escalation never progresses) and reset consecutiveForceResetsWithNoSends
+      // (so dead-link escalation never fires).  We only push a timestamp when
+      // the consecutive count is 1 (a fresh hang after a successful flush) to
+      // avoid interfering with the normal continuous-hang escalation path.
+      if (SUSPENSION_GUARD_ENABLED && flushRecoveryConsecutiveCount === 1) {
+        recentHangRecoveryTimestamps.push(nowMs);
+        while (
+          recentHangRecoveryTimestamps.length > 0 &&
+          nowMs - recentHangRecoveryTimestamps[0]! > RECOVERY_BURST_WINDOW_MS
+        ) {
+          recentHangRecoveryTimestamps.shift();
+        }
+        if (recentHangRecoveryTimestamps.length >= RECOVERY_BURST_THRESHOLD) {
+          perfLog(
+            `[Perf][Flush][Hang] recovery-burst-escalation ` +
+              `count=${recentHangRecoveryTimestamps.length} window=${RECOVERY_BURST_WINDOW_MS}ms`
+          );
+          recentHangRecoveryTimestamps = [];
+          flushRecoveryInProgress = false;
+          fireEarlyShutdown("recovery-burst");
+          void attemptBridgeReinit("recovery-burst");
+          return;
+        }
+      }
       const transportOnlyHang = trigger === "hang" && reason.startsWith("transport-only");
       const baseRecoveryLevel: FlushHangRecoveryLevel =
         flushRecoveryConsecutiveCount <= FLUSH_HANG_SOFT_RECOVERY_THRESHOLD
@@ -770,10 +925,12 @@ export async function initApp(): Promise<void> {
         pendingSavePayload = null;
         pendingSaveFirstQueuedAtMs = 0;
         hub.forceResetImageTransport(`flush-${recoveryLevel}`);
+        consecutiveForceResetsWithNoSends += 1;
         if (!transportOnlyHang) {
-          const cachedQueued = enqueueCachedRecoveryTiles();
+          const currentFocusRegion = focusIndexToTileRegion(focusTargetToIndex(store.getState().ui.focus));
+          const cachedQueued = enqueueCachedRecoveryTiles(currentFocusRegion);
           if (cachedQueued > 0) {
-            perfLog(`[Perf][Flush][Hang] cache-repaint queued=${cachedQueued} source=force-reset`);
+            perfLog(`[Perf][Flush][Hang] cache-repaint queued=${cachedQueued} source=force-reset focus=${currentFocusRegion}`);
           }
         }
       }
@@ -791,7 +948,22 @@ export async function initApp(): Promise<void> {
         queueRecoveryRebuild(recoveryLevel, reason);
       }
       clearTransportHangProbe();
-      scheduleFlush();
+
+      // Dead-link escalation: if N consecutive force-resets with no successful
+      // sends between them, the BLE link is dead — escalate to full reinit.
+      if (
+        SUSPENSION_GUARD_ENABLED &&
+        consecutiveForceResetsWithNoSends >= DEAD_LINK_CONSECUTIVE_RESETS_FOR_REINIT
+      ) {
+        perfLog(
+          `[Perf][Flush][Hang] dead-link-escalation ` +
+            `resets=${consecutiveForceResetsWithNoSends}`
+        );
+        fireEarlyShutdown("dead-link-escalation");
+        void attemptBridgeReinit("dead-link-escalation");
+      } else {
+        scheduleFlush();
+      }
     } catch (err) {
       console.error("[EvenSolitaire] Flush hang recovery failed:", err);
     } finally {
@@ -820,6 +992,326 @@ export async function initApp(): Promise<void> {
     }, FLUSH_HANG_WATCHDOG_MS);
   }
 
+  // ---------------------------------------------------------------------------
+  // Suspension guard: heartbeat, visibility listener, bridge reinit
+  // ---------------------------------------------------------------------------
+
+  function startHeartbeat(): void {
+    if (heartbeatTimer) return;
+    lastHeartbeatAtMs = perfNowMs();
+    heartbeatTimer = setInterval(() => {
+      const nowMs = perfNowMs();
+      const elapsedMs = nowMs - lastHeartbeatAtMs;
+      lastHeartbeatAtMs = nowMs;
+
+      if (exitInProgress || bridgeReinitInProgress) return;
+
+      if (elapsedMs >= HEARTBEAT_SUSPENSION_THRESHOLD_MS) {
+        perfLog(
+          `[Perf][Heartbeat] suspension-detected gap=${elapsedMs.toFixed(1)}ms ` +
+            `threshold=${HEARTBEAT_SUSPENSION_THRESHOLD_MS}ms`
+        );
+
+        // The BLE link is almost certainly dead after a suspension.
+        // Force-reset transport and schedule a fresh flush with cache invalidation.
+        hub.notifySystemLifecycleEvent("foreground-enter");
+        hub.forceResetImageTransport("suspension-detected");
+        pendingRecoveryRefresh = false;
+        pendingRecoveryCacheInvalidate = true;
+        invalidateLastSentVisualCachesForRecovery();
+
+        // Check if the link was already in trouble before the suspension.
+        // Recent hang recoveries + suspension = dead link — reinit immediately
+        // instead of waiting for the 30s long-suspension threshold.
+        const recentRecoveryCount = recentHangRecoveryTimestamps.filter(
+          (ts) => nowMs - ts < RECOVERY_BURST_WINDOW_MS
+        ).length;
+
+        if (elapsedMs >= HEARTBEAT_BRIDGE_REINIT_THRESHOLD_MS) {
+          // Long suspension (>30s) — BLE link is definitely dead.
+          perfLog(
+            `[Perf][Heartbeat] long-suspension reinit gap=${elapsedMs.toFixed(1)}ms`
+          );
+          fireEarlyShutdown("long-suspension");
+          void attemptBridgeReinit("long-suspension");
+        } else if (recentRecoveryCount > 0) {
+          // Short suspension but link was already dying — reinit immediately.
+          perfLog(
+            `[Perf][Heartbeat] suspension+recent-recovery reinit ` +
+              `gap=${elapsedMs.toFixed(1)}ms recoveries=${recentRecoveryCount}`
+          );
+          fireEarlyShutdown("suspension-with-recent-recovery");
+          void attemptBridgeReinit("suspension-with-recent-recovery");
+        } else {
+          scheduleFlush();
+        }
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  function stopHeartbeat(): void {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+
+  function setupVisibilityListener(): void {
+    if (typeof document === "undefined") return;
+    document.addEventListener("visibilitychange", () => {
+      const state = document.visibilityState;
+      perfLog(`[Perf][Visibility] state=${state}`);
+      if (state === "hidden") {
+        hub.notifySystemLifecycleEvent("foreground-exit");
+      } else if (state === "visible") {
+        triggerForegroundEnterRecoveryRefresh("visibility-visible");
+      }
+    });
+  }
+
+  /**
+   * Fire shutdown early at the first dead-link signal so the SDK releases the
+   * BLE page container while detection/cooldown delays play out. By the time
+   * attemptBridgeReinit runs, the settle delay has already elapsed and reinit
+   * can skip straight to init + setupPage.
+   */
+  function fireEarlyShutdown(reason: string): void {
+    if (earlyShutdownInFlight || earlyShutdownSettled || exitInProgress) return;
+    earlyShutdownInFlight = true;
+    earlyShutdownFiredAtMs = perfNowMs();
+    perfLog(`[Perf][Heartbeat][EarlyShutdown] fired reason=${reason}`);
+    (async () => {
+      try {
+        await hub.shutdown();
+        perfLog(`[Perf][Heartbeat][EarlyShutdown] shutdown-complete — settling ${BRIDGE_REINIT_SHUTDOWN_SETTLE_MS}ms`);
+      } catch {
+        perfLog(`[Perf][Heartbeat][EarlyShutdown] shutdown-failed — settling anyway`);
+      }
+      setTimeout(() => {
+        earlyShutdownSettled = true;
+        earlyShutdownInFlight = false;
+        perfLog(`[Perf][Heartbeat][EarlyShutdown] settled`);
+      }, BRIDGE_REINIT_SHUTDOWN_SETTLE_MS);
+    })();
+  }
+
+  async function attemptBridgeReinit(reason: string): Promise<void> {
+    if (bridgeReinitInProgress || exitInProgress) return;
+    const nowMs = perfNowMs();
+
+    // Use shorter cooldown after a failed reinit to allow rapid retries,
+    // slow-retry interval when in slow-retry mode, full cooldown only after success.
+    const effectiveCooldown = inSlowRetryMode
+      ? BRIDGE_REINIT_SLOW_RETRY_INTERVAL_MS
+      : consecutiveBridgeReinitFailures > 0
+        ? BRIDGE_REINIT_FAILED_COOLDOWN_MS
+        : BRIDGE_REINIT_COOLDOWN_MS;
+
+    if (lastBridgeReinitAtMs > 0 && nowMs - lastBridgeReinitAtMs < effectiveCooldown) {
+      perfLog(
+        `[Perf][Heartbeat][Reinit] cooldown reason=${reason} ` +
+          `elapsed=${(nowMs - lastBridgeReinitAtMs).toFixed(1)}ms ` +
+          `effective=${effectiveCooldown}ms failures=${consecutiveBridgeReinitFailures}`
+      );
+      return;
+    }
+
+    bridgeReinitInProgress = true;
+    lastBridgeReinitAtMs = nowMs;
+    perfLog(
+      `[Perf][Heartbeat][Reinit] start reason=${reason} ` +
+        `attempt=${consecutiveBridgeReinitFailures + 1}/${BRIDGE_REINIT_MAX_CONSECUTIVE_FAILURES}`
+    );
+
+    try {
+      // 1. Stop all pending timers / probes
+      if (pendingFlush) {
+        clearTimeout(pendingFlush);
+        pendingFlush = null;
+      }
+      clearIdleVisualReconcileTimer();
+      if (pendingBlink) {
+        clearTimeout(pendingBlink);
+        pendingBlink = null;
+      }
+      disarmFlushWatchdogs();
+      clearTransportHangProbe();
+      invalidateActiveFlushRunner("bridge-reinit");
+
+      // 2. Cleanly tear down existing display session so the SDK releases
+      //    the BLE page container before we attempt to re-establish it.
+      //    If fireEarlyShutdown() already ran, skip or wait only for remaining settle time.
+      if (earlyShutdownSettled) {
+        perfLog(`[Perf][Heartbeat][Reinit] early-shutdown-already-settled — skipping shutdown`);
+      } else if (earlyShutdownInFlight) {
+        // Early shutdown fired but settle not yet complete — wait for remainder.
+        const elapsedSinceShutdown = perfNowMs() - earlyShutdownFiredAtMs;
+        const remainingMs = Math.max(0, BRIDGE_REINIT_SHUTDOWN_SETTLE_MS - elapsedSinceShutdown);
+        perfLog(`[Perf][Heartbeat][Reinit] early-shutdown-in-flight — waiting ${remainingMs.toFixed(0)}ms`);
+        await new Promise((r) => setTimeout(r, remainingMs));
+      } else {
+        try {
+          await hub.shutdown();
+          perfLog(`[Perf][Heartbeat][Reinit] shutdown-complete — settling ${BRIDGE_REINIT_SHUTDOWN_SETTLE_MS}ms`);
+        } catch (shutdownErr) {
+          perfLog(`[Perf][Heartbeat][Reinit] shutdown-failed — continuing anyway`);
+        }
+        await new Promise((r) => setTimeout(r, BRIDGE_REINIT_SHUTDOWN_SETTLE_MS));
+      }
+      // Reset early-shutdown state regardless of which path was taken.
+      earlyShutdownFiredAtMs = 0;
+      earlyShutdownSettled = false;
+      earlyShutdownInFlight = false;
+
+      // 3. Re-initialize bridge (re-acquires waitForEvenAppBridge handle)
+      await hub.init();
+
+      // 4. Re-setup page containers (with timeout to cap slow SDK responses)
+      const startupPage = composeStartupPage();
+      const setupStartMs = perfNowMs();
+      const setupOk = await Promise.race([
+        hub.setupPage(startupPage),
+        new Promise<boolean>((resolve) =>
+          setTimeout(() => resolve(false), BRIDGE_REINIT_SETUP_PAGE_TIMEOUT_MS)
+        ),
+      ]);
+      const setupDurMs = perfNowMs() - setupStartMs;
+      startupPageReadyForAssetRefresh = setupOk;
+      perfLog(
+        `[Perf][Heartbeat][Reinit] setupPage ok=${setupOk ? "y" : "n"} ms=${setupDurMs.toFixed(1)}`
+      );
+
+      if (!setupOk) {
+        // setupPage returned false — BLE link is dead. Track the failure
+        // and schedule a retry with shorter cooldown, or reload as last resort.
+        consecutiveBridgeReinitFailures += 1;
+        perfLog(
+          `[Perf][Heartbeat][Reinit] setupPage-failed failures=${consecutiveBridgeReinitFailures} ` +
+            `max=${BRIDGE_REINIT_MAX_CONSECUTIVE_FAILURES} reason=${reason}`
+        );
+
+        if (consecutiveBridgeReinitFailures >= BRIDGE_REINIT_MAX_CONSECUTIVE_FAILURES) {
+          // Check if image transport is still working — if so, a reload
+          // would destroy a functioning pipe. Skip reload and keep retrying.
+          const snap = hub.getImageTransportSnapshot();
+          const transportAlive = snap.lastSuccessfulSendAtMs > 0 &&
+            (perfNowMs() - snap.lastSuccessfulSendAtMs) < 10000;
+
+          if (transportAlive) {
+            perfLog(
+              `[Perf][Heartbeat][Reinit] skip-reload transport-alive ` +
+                `lastSend=${(perfNowMs() - snap.lastSuccessfulSendAtMs).toFixed(0)}ms ago reason=${reason}`
+            );
+            // Reset failures and keep retrying with slow cadence
+            consecutiveBridgeReinitFailures = 0;
+            inSlowRetryMode = true;
+            bridgeReinitInProgress = false;
+            setTimeout(() => {
+              void attemptBridgeReinit(`slow-retry-${reason}`);
+            }, BRIDGE_REINIT_SLOW_RETRY_INTERVAL_MS);
+            return;
+          }
+
+          if (pageReloadCount >= BRIDGE_REINIT_MAX_PAGE_RELOADS) {
+            // Already reloaded max times — further reloads won't help.
+            // Switch to slow indefinite retry instead of destroying app state.
+            perfLog(
+              `[Perf][Heartbeat][Reinit] max-reloads-reached count=${pageReloadCount} — switching to slow-retry reason=${reason}`
+            );
+            consecutiveBridgeReinitFailures = 0;
+            inSlowRetryMode = true;
+            bridgeReinitInProgress = false;
+            setTimeout(() => {
+              void attemptBridgeReinit(`slow-retry-${reason}`);
+            }, BRIDGE_REINIT_SLOW_RETRY_INTERVAL_MS);
+            return;
+          }
+
+          perfLog(
+            `[Perf][Heartbeat][Reinit] all-retries-exhausted — reloading page reason=${reason}`
+          );
+          // Full page reload to force the WebView + SDK to
+          // re-establish the BLE connection from scratch.
+          bridgeReinitInProgress = false;
+          pageReloadCount += 1;
+          try { sessionStorage.setItem("__es_reload_count", String(pageReloadCount)); } catch { /* noop */ }
+          try { window.name = `__es_rc=${pageReloadCount}`; } catch { /* noop */ }
+          window.location.reload();
+          return;
+        }
+
+        // Schedule a retry after the shorter cooldown. We use setTimeout
+        // so the current call stack unwinds and the cooldown gate works.
+        bridgeReinitInProgress = false;
+        setTimeout(() => {
+          void attemptBridgeReinit(`retry-${reason}`);
+        }, BRIDGE_REINIT_FAILED_COOLDOWN_MS);
+        return;
+      }
+
+      // 5. Re-subscribe events (SDK replaces prior subscription)
+      subscribeHubEvents();
+
+      // 6. Reset all recovery state
+      invalidateLastSentVisualCachesForRecovery();
+      pendingRecoveryRefresh = false;
+      pendingRecoveryCacheInvalidate = true;
+      consecutiveForceResetsWithNoSends = 0;
+      flushRecoveryConsecutiveCount = 0;
+      recentHangRecoveryTimestamps = [];
+      rebuildRecoveryDisabled = false;
+      rebuildRecoveryFailureCount = 0;
+      queuedRecoveryRebuildLevel = null;
+      consecutiveBridgeReinitFailures = 0;
+      inSlowRetryMode = false;
+      pageReloadCount = 0;
+      try { sessionStorage.removeItem("__es_reload_count"); } catch { /* noop */ }
+      try { window.name = ""; } catch { /* noop */ }
+
+      // 7. Send initial images to repopulate the display
+      await sendInitialImages(hub, store.getState());
+
+      perfLog(`[Perf][Heartbeat][Reinit] complete reason=${reason}`);
+      scheduleFlush();
+    } catch (err) {
+      console.error("[EvenSolitaire] Bridge reinit failed:", err);
+      perfLog(`[Perf][Heartbeat][Reinit] failed reason=${reason}`);
+      consecutiveBridgeReinitFailures += 1;
+
+      if (consecutiveBridgeReinitFailures >= BRIDGE_REINIT_MAX_CONSECUTIVE_FAILURES) {
+        if (pageReloadCount >= BRIDGE_REINIT_MAX_PAGE_RELOADS) {
+          perfLog(
+            `[Perf][Heartbeat][Reinit] max-reloads-reached count=${pageReloadCount} — switching to slow-retry reason=${reason}`
+          );
+          consecutiveBridgeReinitFailures = 0;
+          inSlowRetryMode = true;
+          bridgeReinitInProgress = false;
+          setTimeout(() => {
+            void attemptBridgeReinit(`slow-retry-${reason}`);
+          }, BRIDGE_REINIT_SLOW_RETRY_INTERVAL_MS);
+          return;
+        }
+
+        perfLog(
+          `[Perf][Heartbeat][Reinit] all-retries-exhausted — reloading page reason=${reason}`
+        );
+        bridgeReinitInProgress = false;
+        pageReloadCount += 1;
+        try { sessionStorage.setItem("__es_reload_count", String(pageReloadCount)); } catch { /* noop */ }
+        window.location.reload();
+        return;
+      }
+
+      bridgeReinitInProgress = false;
+      setTimeout(() => {
+        void attemptBridgeReinit(`retry-${reason}`);
+      }, BRIDGE_REINIT_FAILED_COOLDOWN_MS);
+      return;
+    } finally {
+      bridgeReinitInProgress = false;
+    }
+  }
+
   subscribeStoreEffects();
   subscribeHubEvents();
 
@@ -827,6 +1319,8 @@ export async function initApp(): Promise<void> {
     if (exitInProgress) return;
     exitInProgress = true;
     try {
+      stopHeartbeat();
+      deactivateKeepAlive();
       if (pendingFlush) {
         clearTimeout(pendingFlush);
         pendingFlush = null;
@@ -910,7 +1404,12 @@ export async function initApp(): Promise<void> {
   try {
     const setupStartMs = perfNowMs();
     const startupPage = composeStartupPage();
-    const setupOk = await hub.setupPage(startupPage);
+    const setupOk = await Promise.race([
+      hub.setupPage(startupPage),
+      new Promise<boolean>((resolve) =>
+        setTimeout(() => resolve(false), BRIDGE_REINIT_SETUP_PAGE_TIMEOUT_MS)
+      ),
+    ]);
     startupPageReadyForAssetRefresh = setupOk;
     perfLog(
       `[Perf][Startup] setupPage ok=${setupOk ? "y" : "n"} ms=${(perfNowMs() - setupStartMs).toFixed(
@@ -927,11 +1426,26 @@ export async function initApp(): Promise<void> {
       perfLog(
         `[Perf][Startup] initialImages ms=${(perfNowMs() - initialImagesStartMs).toFixed(1)}`
       );
+    } else if (SUSPENSION_GUARD_ENABLED) {
+      // Initial setupPage failed (e.g. after a page reload when BLE is dead).
+      // Schedule a delayed reinit to give the BLE stack time to recover.
+      perfLog("[Perf][Startup] setupPage-failed — scheduling delayed reinit");
+      fireEarlyShutdown("startup-setupPage-failed");
+      setTimeout(() => {
+        void attemptBridgeReinit("startup-setupPage-failed");
+      }, BRIDGE_REINIT_FAILED_COOLDOWN_MS);
     }
   } catch (err) {
     console.error("[EvenSolitaire] Initialization failed:", err);
   } finally {
     armFlushLoopAfterStartup();
+    if (SUSPENSION_GUARD_ENABLED) {
+      setupVisibilityListener();
+      startHeartbeat();
+      perfLog(`[Perf][Bootstrap][Config] suspensionGuard=y`);
+    } else {
+      perfLog(`[Perf][Bootstrap][Config] suspensionGuard=n`);
+    }
   }
 
   function scheduleSaveAttempt(delayMs: number): void {
@@ -1013,6 +1527,23 @@ export async function initApp(): Promise<void> {
     if (active) {
       markIdleVisualReconcileRisk();
       pendingRecoveryRefresh = true;
+      // Fast-path: if a hang recovery already fired recently and the transport
+      // is interrupting again, the link is dead.  Reinit immediately rather
+      // than waiting for the 1400ms probe — JS may be suspended before then.
+      if (SUSPENSION_GUARD_ENABLED && !bridgeReinitInProgress && !exitInProgress) {
+        const nowMs = perfNowMs();
+        const recentCount = recentHangRecoveryTimestamps.filter(
+          (ts) => nowMs - ts < VISIBILITY_RECENT_RECOVERY_WINDOW_MS
+        ).length;
+        if (recentCount > 0) {
+          perfLog(
+            `[Perf][Bridge][Interrupt] fast-reinit recentRecoveries=${recentCount}`
+          );
+          fireEarlyShutdown("interrupt-after-recent-recovery");
+          void attemptBridgeReinit("interrupt-after-recent-recovery");
+          return;
+        }
+      }
       armTransportOnlyHangProbe("image-interruption");
       return;
     }
@@ -1059,6 +1590,12 @@ export async function initApp(): Promise<void> {
         lastSent = result.lastSent;
         completedFlushVersion = targetVersion;
         flushRecoveryConsecutiveCount = 0;
+        consecutiveForceResetsWithNoSends = 0;
+        // NOTE: recentHangRecoveryTimestamps is intentionally NOT reset here.
+        // When BLE is intermittently working, individual flushes may succeed
+        // (resetting the dead-link counter) while the overall pattern is still
+        // a burst of hang recoveries.  The burst window resets only on bridge
+        // reinit or when the burst escalation itself fires.
         if (stallIndicatorVisible) {
           void setStallIndicatorVisible(false);
         }
