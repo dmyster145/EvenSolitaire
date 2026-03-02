@@ -6,7 +6,7 @@
 import type { Card } from "../game/types";
 import type { Suit } from "../game/types";
 import { FG_BLACK, FG_CARD_LIGHT, FG_EMPTY_SLOT, NORMAL_BORDER_WIDTH, FOCUS_BORDER_WIDTH, CORNER_RADIUS, STRIPE_DASH } from "./palette";
-import { perfLog, perfNowMs } from "../perf/log";
+import { perfLogLazy, perfNowMs } from "../perf/log";
 
 import clubUrl from "./assets/suits/club.png";
 import spadeUrl from "./assets/suits/spade.png";
@@ -58,7 +58,7 @@ function maybeNotifySuitAssetsReady(): void {
   if (loadedSuitCount + loadedCornerSuitCount < 8) return;
   if (!suitAssetsReadyLogged) {
     suitAssetsReadyLogged = true;
-    perfLog(
+    perfLogLazy(() => 
       `[Perf][CardAssets] suits-ready ms=${cardAssetsElapsedMs()} main=${loadedSuitCount}/4 corner=${loadedCornerSuitCount}/4 loaded=${loadedCount}/${TOTAL_ASSETS}`
     );
   }
@@ -73,7 +73,7 @@ function maybeNotifyAssetsReady(): void {
   if (loadedCount >= TOTAL_ASSETS) {
     if (!cardAssetsReadyLogged) {
       cardAssetsReadyLogged = true;
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][CardAssets] all-ready ms=${cardAssetsElapsedMs()} main=${loadedSuitCount}/4 corner=${loadedCornerSuitCount}/4 stock=${stockBackLoaded ? "y" : "n"} loaded=${loadedCount}/${TOTAL_ASSETS}`
       );
     }
@@ -104,13 +104,13 @@ export function whenCardSuitAssetsReady(cb: () => void): void {
 }
 
 function logAssetLoaded(kind: string, name: string): void {
-  perfLog(
+  perfLogLazy(() => 
     `[Perf][CardAssets] load kind=${kind} name=${name} ms=${cardAssetsElapsedMs()} loaded=${loadedCount}/${TOTAL_ASSETS}`
   );
 }
 
 function logAssetError(kind: string, name: string): void {
-  perfLog(
+  perfLogLazy(() => 
     `[Perf][CardAssets] error kind=${kind} name=${name} ms=${cardAssetsElapsedMs()} loaded=${loadedCount}/${TOTAL_ASSETS}`
   );
 }
@@ -125,11 +125,11 @@ function loadSuitImages(): void {
       loadedCount += 1;
       if (!firstSuitAssetLogged) {
         firstSuitAssetLogged = true;
-        perfLog(`[Perf][CardAssets] first-suit ms=${cardAssetsElapsedMs()}`);
+        perfLogLazy(() => `[Perf][CardAssets] first-suit ms=${cardAssetsElapsedMs()}`);
       }
       logAssetLoaded("suit-main", suit);
       if (loadedSuitCount === 4) {
-        perfLog(`[Perf][CardAssets] main-suits-ready ms=${cardAssetsElapsedMs()}`);
+        perfLogLazy(() => `[Perf][CardAssets] main-suits-ready ms=${cardAssetsElapsedMs()}`);
       }
       maybeNotifySuitAssetsReady();
       maybeNotifyAssetsReady();
@@ -150,11 +150,11 @@ function loadCornerSuitImages(): void {
       loadedCount += 1;
       if (!firstSuitAssetLogged) {
         firstSuitAssetLogged = true;
-        perfLog(`[Perf][CardAssets] first-suit ms=${cardAssetsElapsedMs()}`);
+        perfLogLazy(() => `[Perf][CardAssets] first-suit ms=${cardAssetsElapsedMs()}`);
       }
       logAssetLoaded("suit-corner", suit);
       if (loadedCornerSuitCount === 4) {
-        perfLog(`[Perf][CardAssets] corner-suits-ready ms=${cardAssetsElapsedMs()}`);
+        perfLogLazy(() => `[Perf][CardAssets] corner-suits-ready ms=${cardAssetsElapsedMs()}`);
       }
       maybeNotifySuitAssetsReady();
       maybeNotifyAssetsReady();

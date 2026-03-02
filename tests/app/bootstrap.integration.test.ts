@@ -5,6 +5,7 @@ import type { Action } from "../../src/state/actions";
 import { getInfoPanelText } from "../../src/state/selectors";
 
 const h = vi.hoisted(() => {
+  const perfLog = vi.fn();
   const storageBridge = {
     getLocalStorage: vi.fn(async () => ""),
     setLocalStorage: vi.fn(async () => true),
@@ -24,8 +25,8 @@ const h = vi.hoisted(() => {
     setStorageBridge: vi.fn(),
     whenCardAssetsReady: vi.fn((_cb: () => void) => {}),
     whenCardSuitAssetsReady: vi.fn((_cb: () => void) => {}),
-    perfLog: vi.fn(),
-    perfLogLazy: vi.fn(),
+    perfLog,
+    perfLogLazy: vi.fn((lazy: () => string) => perfLog(lazy())),
     perfNowMs: vi.fn(() => Date.now()),
     getLastPerfDispatchTrace: vi.fn(() => ({ source: "input", actionType: "-" })),
     recordPerfDispatch: vi.fn(),

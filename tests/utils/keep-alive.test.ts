@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockPerfLog = vi.fn();
 vi.mock("../../src/perf/log", () => ({
   perfLog: mockPerfLog,
+  perfLogLazy: (lazy: () => string) => mockPerfLog(lazy()),
 }));
 
 // ---------------------------------------------------------------------------

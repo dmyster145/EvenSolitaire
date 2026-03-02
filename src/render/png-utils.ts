@@ -1,6 +1,6 @@
 /** PNG/canvas helpers for image-container rendering. */
 import UPNG from "upng-js";
-import { isPerfLoggingEnabled, perfLog, perfNowMs } from "../perf/log";
+import { isPerfLoggingEnabled, perfLogLazy, perfNowMs } from "../perf/log";
 
 export type PngBytes = number[] | Uint8Array;
 
@@ -73,7 +73,7 @@ function recordPngEncodePerf(sample: PngEncodePerfSample): void {
 
   if (sample.totalMs >= PNG_ENCODE_PERF_SLOW_TOTAL_MS || sample.toBlobMs >= PNG_ENCODE_PERF_SLOW_TOBLOB_MS) {
     pngEncodePerfSlowCount += 1;
-    perfLog(
+    perfLogLazy(() => 
       `[Perf][PngEncode] label=${sample.label} size=${sample.width}x${sample.height} ` +
         `qwait=${sample.qwaitMs.toFixed(1)}ms toBlob=${sample.toBlobMs.toFixed(1)}ms ` +
         `read=${sample.readMs.toFixed(1)}ms encode=${sample.encodeMs.toFixed(1)}ms ` +
@@ -89,7 +89,7 @@ function recordPngEncodePerf(sample: PngEncodePerfSample): void {
     .slice(0, 4)
     .map(([label, count]) => `${label}:${count}`)
     .join(",");
-  perfLog(
+  perfLogLazy(() => 
     `[Perf][PngEncodeSummary] n=${pngEncodePerfCount} avgBytes=${Math.round(avg(pngEncodePerfBytesTotal))} ` +
       `avgQwait=${avg(pngEncodePerfQwaitTotalMs).toFixed(1)}ms avgBlob=${avg(pngEncodePerfToBlobTotalMs).toFixed(
         1

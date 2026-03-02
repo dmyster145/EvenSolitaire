@@ -17,7 +17,7 @@ import { resetTapCooldown } from "../input/gestures";
 import { loadGame, saveGame } from "../storage/save-game";
 import { setStorageBridge } from "../storage/local";
 import { whenCardAssetsReady, whenCardSuitAssetsReady } from "../render/card-canvas";
-import { perfLog, perfNowMs } from "../perf/log";
+import { perfLogLazy, perfNowMs } from "../perf/log";
 import { getInfoPanelText } from "../state/selectors";
 import { IMAGE_TILE_TOP, IMAGE_TILE_BOTTOM_LEFT, IMAGE_TILE_BOTTOM_RIGHT } from "../render/layout";
 import {
@@ -194,14 +194,14 @@ export async function initApp(): Promise<void> {
     if (SUSPENSION_GUARD_ENABLED) {
       const transport = hub.getImageTransportSnapshot();
       if (transport.wedged || transport.interrupted) {
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Bridge][Lifecycle] ${source} health-probe wedged=${transport.wedged ? "y" : "n"} ` +
             `intr=${transport.interrupted ? "y" : "n"} nonOk=${transport.consecutiveNonOkSends}`
         );
         hub.forceResetImageTransport(`visibility-recovery-${source}`);
       }
       if (transport.consecutiveNonOkSends >= 1) {
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Bridge][Lifecycle] ${source} non-ok-escalation nonOk=${transport.consecutiveNonOkSends}`
         );
         fireEarlyShutdown(`visibility-dead-link-${source}`);
@@ -216,7 +216,7 @@ export async function initApp(): Promise<void> {
         (ts) => nowMs - ts < VISIBILITY_RECENT_RECOVERY_WINDOW_MS
       ).length;
       if (recentRecoveryCount > 0) {
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Bridge][Lifecycle] ${source} recent-recovery-escalation ` +
             `recoveries=${recentRecoveryCount} window=${VISIBILITY_RECENT_RECOVERY_WINDOW_MS}ms`
         );
@@ -230,7 +230,7 @@ export async function initApp(): Promise<void> {
       if (!startupPageReadyForAssetRefresh) return;
       pendingRecoveryRefresh = false;
       pendingRecoveryCacheInvalidate = true;
-      perfLog(`[Perf][Bridge][Lifecycle] ${source} force-refresh=y`);
+      perfLogLazy(() => `[Perf][Bridge][Lifecycle] ${source} force-refresh=y`);
       scheduleFlush();
     }, 0);
   }
@@ -244,7 +244,7 @@ export async function initApp(): Promise<void> {
           : et == null
             ? "undefined"
             : String(et);
-      perfLog(`[Perf][SysEvent] eventType=${enumName} raw=${et == null ? "undefined" : String(et)}`);
+      perfLogLazy(() => `[Perf][SysEvent] eventType=${enumName} raw=${et == null ? "undefined" : String(et)}`);
       if (et == null) {
         const nowMs = perfNowMs();
         if (nowMs - perfLastUndefinedSysEventAtMs <= SYS_EVENT_UNDEFINED_BURST_WINDOW_MS) {
@@ -262,7 +262,7 @@ export async function initApp(): Promise<void> {
           nowMs - perfLastSyntheticForegroundEnterAtMs >= SYS_EVENT_UNDEFINED_SYNTHETIC_ENTER_COOLDOWN_MS;
         if (shouldSyntheticForegroundEnter) {
           perfLastSyntheticForegroundEnterAtMs = nowMs;
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][SysEvent] heuristic=synthetic-foreground-enter burst=${perfUndefinedSysEventBurstCount} ` +
               `intr=${health.interrupted ? "y" : "n"} link=${health.linkSlow ? "y" : "n"} q=${hub.getImageQueueDepth()}`
           );
@@ -495,7 +495,7 @@ export async function initApp(): Promise<void> {
         !blockedByAppFlow &&
         transport.consecutiveNonOkSends >= NON_OK_DEAD_LINK_THRESHOLD
       ) {
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Flush][NonOkEscalation] nonOkSends=${transport.consecutiveNonOkSends} ` +
             `inflightAge=${transport.inFlightAgeMs.toFixed(1)}ms`
         );
@@ -562,7 +562,7 @@ export async function initApp(): Promise<void> {
         : transportBusy
           ? "transport-busy"
           : "transport-interrupted";
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Flush][IdleReconcile] skip reason=${reason} ` +
           `retry=${retryCount} q=${hub.getImageQueueDepth()}`
       );
@@ -572,7 +572,7 @@ export async function initApp(): Promise<void> {
     lastIdleVisualReconcileAtMs = nowMs;
     pendingRecoveryRefresh = false;
     pendingRecoveryCacheInvalidate = true;
-    perfLog(
+    perfLogLazy(() => 
       `[Perf][Flush][IdleReconcile] force-refresh=y seq=${inputSeq} retry=${retryCount} q=${hub.getImageQueueDepth()}`
     );
     scheduleFlush();
@@ -589,7 +589,7 @@ export async function initApp(): Promise<void> {
         hub.updateText(CONTAINER_ID_INFO, CONTAINER_NAME_INFO, content),
       ]);
       if (!updated) {
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Flush][Hang] stall-indicator timeout=${STALL_INDICATOR_UPDATE_TIMEOUT_MS}ms`
         );
       }
@@ -673,7 +673,7 @@ export async function initApp(): Promise<void> {
       if (isFocusTile) highCount += 1;
     }
     if (queued > 0 && focusRegion) {
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Recovery][Tiles] focus=${focusRegion} high=${highCount} normal=${queued - highCount} ` +
           `totalBytes=${totalBytes}`
       );
@@ -689,7 +689,7 @@ export async function initApp(): Promise<void> {
     }
     flushInProgress = false;
     disarmFlushWatchdogs();
-    perfLog(`[Perf][Flush][Hang] invalidate reason=${reason}`);
+    perfLogLazy(() => `[Perf][Flush][Hang] invalidate reason=${reason}`);
   }
 
   function getRecoverySnapshot(): { game: typeof initialState.game; moveAssist: boolean } {
@@ -711,7 +711,7 @@ export async function initApp(): Promise<void> {
       .rebuildPage(page)
       .then((rebuilt) => {
         if (timedOut) {
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][Flush][Hang] rebuild-late ok=${rebuilt ? "y" : "n"} mode=input ` +
               `level=${level} attempt=${attempt}/${attempts}`
           );
@@ -727,7 +727,7 @@ export async function initApp(): Promise<void> {
         if (!timedOut) {
           console.error("[EvenSolitaire] rebuildPage error:", err);
         } else {
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][Flush][Hang] rebuild-late-error mode=input ` +
               `level=${level} attempt=${attempt}/${attempts}`
           );
@@ -744,12 +744,12 @@ export async function initApp(): Promise<void> {
     if (timeoutId) clearTimeout(timeoutId);
     const durMs = perfNowMs() - startedAtMs;
     if (timedOut) {
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Flush][Hang] rebuild timeout=${FLUSH_REBUILD_ATTEMPT_TIMEOUT_MS}ms mode=input ` +
           `level=${level} attempt=${attempt}/${attempts}`
       );
     }
-    perfLog(
+    perfLogLazy(() => 
       `[Perf][Flush][Hang] rebuild ok=${rebuilt ? "y" : "n"} mode=input ` +
         `level=${level} attempt=${attempt}/${attempts} dur=${durMs.toFixed(1)}ms`
     );
@@ -769,7 +769,7 @@ export async function initApp(): Promise<void> {
         const currentFocusRegion = focusIndexToTileRegion(focusTargetToIndex(store.getState().ui.focus));
         const cachedQueued = enqueueCachedRecoveryTiles(currentFocusRegion);
         if (cachedQueued > 0) {
-          perfLog(`[Perf][Flush][Hang] cache-repaint queued=${cachedQueued} source=rebuild focus=${currentFocusRegion}`);
+          perfLogLazy(() => `[Perf][Flush][Hang] cache-repaint queued=${cachedQueued} source=rebuild focus=${currentFocusRegion}`);
         }
         return true;
       }
@@ -782,7 +782,7 @@ export async function initApp(): Promise<void> {
     rebuildRecoveryFailureCount += 1;
     if (rebuildRecoveryFailureCount >= FLUSH_REBUILD_FAILURE_CIRCUIT_BREAKER_THRESHOLD) {
       rebuildRecoveryDisabled = true;
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Flush][Hang] rebuild disabled=y failures=${rebuildRecoveryFailureCount} ` +
           `threshold=${FLUSH_REBUILD_FAILURE_CIRCUIT_BREAKER_THRESHOLD}`
       );
@@ -800,7 +800,7 @@ export async function initApp(): Promise<void> {
       queuedRecoveryRebuildLevel = level;
     }
     if (recoveryRebuildInProgress) {
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Flush][Hang] rebuild-queued level=${queuedRecoveryRebuildLevel} reason=${reason}`
       );
       return;
@@ -843,7 +843,7 @@ export async function initApp(): Promise<void> {
       markIdleVisualReconcileRisk();
       lastFlushStallRecoveryAtMs = nowMs;
       const health = hub.getImageSendHealth();
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Flush][Hang] trigger=${trigger} reason=${reason} q=${hub.getImageQueueDepth()} ` +
           `busy=${health.busy ? "y" : "n"} intr=${health.interrupted ? "y" : "n"} ` +
           `link=${health.linkSlow ? "y" : "n"} backlog=${health.backlogged ? "y" : "n"}`
@@ -873,7 +873,7 @@ export async function initApp(): Promise<void> {
           recentHangRecoveryTimestamps.shift();
         }
         if (recentHangRecoveryTimestamps.length >= RECOVERY_BURST_THRESHOLD) {
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][Flush][Hang] recovery-burst-escalation ` +
               `count=${recentHangRecoveryTimestamps.length} window=${RECOVERY_BURST_WINDOW_MS}ms`
           );
@@ -899,7 +899,7 @@ export async function initApp(): Promise<void> {
         (recoveryLevel === "restore" ||
           (recoveryLevel === "hard" && !transportOnlyHang));
       const health = hub.getImageSendHealth();
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Flush][Hang] trigger=${trigger} reason=${reason} level=${recoveryLevel} n=${flushRecoveryConsecutiveCount} q=${hub.getImageQueueDepth()} ` +
           `busy=${health.busy ? "y" : "n"} intr=${health.interrupted ? "y" : "n"} ` +
           `link=${health.linkSlow ? "y" : "n"} backlog=${health.backlogged ? "y" : "n"} ` +
@@ -930,7 +930,7 @@ export async function initApp(): Promise<void> {
           const currentFocusRegion = focusIndexToTileRegion(focusTargetToIndex(store.getState().ui.focus));
           const cachedQueued = enqueueCachedRecoveryTiles(currentFocusRegion);
           if (cachedQueued > 0) {
-            perfLog(`[Perf][Flush][Hang] cache-repaint queued=${cachedQueued} source=force-reset focus=${currentFocusRegion}`);
+            perfLogLazy(() => `[Perf][Flush][Hang] cache-repaint queued=${cachedQueued} source=force-reset focus=${currentFocusRegion}`);
           }
         }
       }
@@ -955,7 +955,7 @@ export async function initApp(): Promise<void> {
         SUSPENSION_GUARD_ENABLED &&
         consecutiveForceResetsWithNoSends >= DEAD_LINK_CONSECUTIVE_RESETS_FOR_REINIT
       ) {
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Flush][Hang] dead-link-escalation ` +
             `resets=${consecutiveForceResetsWithNoSends}`
         );
@@ -1007,7 +1007,7 @@ export async function initApp(): Promise<void> {
       if (exitInProgress || bridgeReinitInProgress) return;
 
       if (elapsedMs >= HEARTBEAT_SUSPENSION_THRESHOLD_MS) {
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Heartbeat] suspension-detected gap=${elapsedMs.toFixed(1)}ms ` +
             `threshold=${HEARTBEAT_SUSPENSION_THRESHOLD_MS}ms`
         );
@@ -1029,14 +1029,14 @@ export async function initApp(): Promise<void> {
 
         if (elapsedMs >= HEARTBEAT_BRIDGE_REINIT_THRESHOLD_MS) {
           // Long suspension (>30s) — BLE link is definitely dead.
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][Heartbeat] long-suspension reinit gap=${elapsedMs.toFixed(1)}ms`
           );
           fireEarlyShutdown("long-suspension");
           void attemptBridgeReinit("long-suspension");
         } else if (recentRecoveryCount > 0) {
           // Short suspension but link was already dying — reinit immediately.
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][Heartbeat] suspension+recent-recovery reinit ` +
               `gap=${elapsedMs.toFixed(1)}ms recoveries=${recentRecoveryCount}`
           );
@@ -1060,7 +1060,7 @@ export async function initApp(): Promise<void> {
     if (typeof document === "undefined") return;
     document.addEventListener("visibilitychange", () => {
       const state = document.visibilityState;
-      perfLog(`[Perf][Visibility] state=${state}`);
+      perfLogLazy(() => `[Perf][Visibility] state=${state}`);
       if (state === "hidden") {
         hub.notifySystemLifecycleEvent("foreground-exit");
       } else if (state === "visible") {
@@ -1079,18 +1079,18 @@ export async function initApp(): Promise<void> {
     if (earlyShutdownInFlight || earlyShutdownSettled || exitInProgress) return;
     earlyShutdownInFlight = true;
     earlyShutdownFiredAtMs = perfNowMs();
-    perfLog(`[Perf][Heartbeat][EarlyShutdown] fired reason=${reason}`);
+    perfLogLazy(() => `[Perf][Heartbeat][EarlyShutdown] fired reason=${reason}`);
     (async () => {
       try {
         await hub.shutdown();
-        perfLog(`[Perf][Heartbeat][EarlyShutdown] shutdown-complete — settling ${BRIDGE_REINIT_SHUTDOWN_SETTLE_MS}ms`);
+        perfLogLazy(() => `[Perf][Heartbeat][EarlyShutdown] shutdown-complete — settling ${BRIDGE_REINIT_SHUTDOWN_SETTLE_MS}ms`);
       } catch {
-        perfLog(`[Perf][Heartbeat][EarlyShutdown] shutdown-failed — settling anyway`);
+        perfLogLazy(() => `[Perf][Heartbeat][EarlyShutdown] shutdown-failed — settling anyway`);
       }
       setTimeout(() => {
         earlyShutdownSettled = true;
         earlyShutdownInFlight = false;
-        perfLog(`[Perf][Heartbeat][EarlyShutdown] settled`);
+        perfLogLazy(() => `[Perf][Heartbeat][EarlyShutdown] settled`);
       }, BRIDGE_REINIT_SHUTDOWN_SETTLE_MS);
     })();
   }
@@ -1108,7 +1108,7 @@ export async function initApp(): Promise<void> {
         : BRIDGE_REINIT_COOLDOWN_MS;
 
     if (lastBridgeReinitAtMs > 0 && nowMs - lastBridgeReinitAtMs < effectiveCooldown) {
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Heartbeat][Reinit] cooldown reason=${reason} ` +
           `elapsed=${(nowMs - lastBridgeReinitAtMs).toFixed(1)}ms ` +
           `effective=${effectiveCooldown}ms failures=${consecutiveBridgeReinitFailures}`
@@ -1118,7 +1118,7 @@ export async function initApp(): Promise<void> {
 
     bridgeReinitInProgress = true;
     lastBridgeReinitAtMs = nowMs;
-    perfLog(
+    perfLogLazy(() => 
       `[Perf][Heartbeat][Reinit] start reason=${reason} ` +
         `attempt=${consecutiveBridgeReinitFailures + 1}/${BRIDGE_REINIT_MAX_CONSECUTIVE_FAILURES}`
     );
@@ -1142,19 +1142,19 @@ export async function initApp(): Promise<void> {
       //    the BLE page container before we attempt to re-establish it.
       //    If fireEarlyShutdown() already ran, skip or wait only for remaining settle time.
       if (earlyShutdownSettled) {
-        perfLog(`[Perf][Heartbeat][Reinit] early-shutdown-already-settled — skipping shutdown`);
+        perfLogLazy(() => `[Perf][Heartbeat][Reinit] early-shutdown-already-settled — skipping shutdown`);
       } else if (earlyShutdownInFlight) {
         // Early shutdown fired but settle not yet complete — wait for remainder.
         const elapsedSinceShutdown = perfNowMs() - earlyShutdownFiredAtMs;
         const remainingMs = Math.max(0, BRIDGE_REINIT_SHUTDOWN_SETTLE_MS - elapsedSinceShutdown);
-        perfLog(`[Perf][Heartbeat][Reinit] early-shutdown-in-flight — waiting ${remainingMs.toFixed(0)}ms`);
+        perfLogLazy(() => `[Perf][Heartbeat][Reinit] early-shutdown-in-flight — waiting ${remainingMs.toFixed(0)}ms`);
         await new Promise((r) => setTimeout(r, remainingMs));
       } else {
         try {
           await hub.shutdown();
-          perfLog(`[Perf][Heartbeat][Reinit] shutdown-complete — settling ${BRIDGE_REINIT_SHUTDOWN_SETTLE_MS}ms`);
+          perfLogLazy(() => `[Perf][Heartbeat][Reinit] shutdown-complete — settling ${BRIDGE_REINIT_SHUTDOWN_SETTLE_MS}ms`);
         } catch (shutdownErr) {
-          perfLog(`[Perf][Heartbeat][Reinit] shutdown-failed — continuing anyway`);
+          perfLogLazy(() => `[Perf][Heartbeat][Reinit] shutdown-failed — continuing anyway`);
         }
         await new Promise((r) => setTimeout(r, BRIDGE_REINIT_SHUTDOWN_SETTLE_MS));
       }
@@ -1177,7 +1177,7 @@ export async function initApp(): Promise<void> {
       ]);
       const setupDurMs = perfNowMs() - setupStartMs;
       startupPageReadyForAssetRefresh = setupOk;
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Heartbeat][Reinit] setupPage ok=${setupOk ? "y" : "n"} ms=${setupDurMs.toFixed(1)}`
       );
 
@@ -1185,7 +1185,7 @@ export async function initApp(): Promise<void> {
         // setupPage returned false — BLE link is dead. Track the failure
         // and schedule a retry with shorter cooldown, or reload as last resort.
         consecutiveBridgeReinitFailures += 1;
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Heartbeat][Reinit] setupPage-failed failures=${consecutiveBridgeReinitFailures} ` +
             `max=${BRIDGE_REINIT_MAX_CONSECUTIVE_FAILURES} reason=${reason}`
         );
@@ -1198,7 +1198,7 @@ export async function initApp(): Promise<void> {
             (perfNowMs() - snap.lastSuccessfulSendAtMs) < 10000;
 
           if (transportAlive) {
-            perfLog(
+            perfLogLazy(() => 
               `[Perf][Heartbeat][Reinit] skip-reload transport-alive ` +
                 `lastSend=${(perfNowMs() - snap.lastSuccessfulSendAtMs).toFixed(0)}ms ago reason=${reason}`
             );
@@ -1215,7 +1215,7 @@ export async function initApp(): Promise<void> {
           if (pageReloadCount >= BRIDGE_REINIT_MAX_PAGE_RELOADS) {
             // Already reloaded max times — further reloads won't help.
             // Switch to slow indefinite retry instead of destroying app state.
-            perfLog(
+            perfLogLazy(() => 
               `[Perf][Heartbeat][Reinit] max-reloads-reached count=${pageReloadCount} — switching to slow-retry reason=${reason}`
             );
             consecutiveBridgeReinitFailures = 0;
@@ -1227,7 +1227,7 @@ export async function initApp(): Promise<void> {
             return;
           }
 
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][Heartbeat][Reinit] all-retries-exhausted — reloading page reason=${reason}`
           );
           // Full page reload to force the WebView + SDK to
@@ -1271,16 +1271,16 @@ export async function initApp(): Promise<void> {
       // 7. Send initial images to repopulate the display
       await sendInitialImages(hub, store.getState());
 
-      perfLog(`[Perf][Heartbeat][Reinit] complete reason=${reason}`);
+      perfLogLazy(() => `[Perf][Heartbeat][Reinit] complete reason=${reason}`);
       scheduleFlush();
     } catch (err) {
       console.error("[EvenSolitaire] Bridge reinit failed:", err);
-      perfLog(`[Perf][Heartbeat][Reinit] failed reason=${reason}`);
+      perfLogLazy(() => `[Perf][Heartbeat][Reinit] failed reason=${reason}`);
       consecutiveBridgeReinitFailures += 1;
 
       if (consecutiveBridgeReinitFailures >= BRIDGE_REINIT_MAX_CONSECUTIVE_FAILURES) {
         if (pageReloadCount >= BRIDGE_REINIT_MAX_PAGE_RELOADS) {
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][Heartbeat][Reinit] max-reloads-reached count=${pageReloadCount} — switching to slow-retry reason=${reason}`
           );
           consecutiveBridgeReinitFailures = 0;
@@ -1292,7 +1292,7 @@ export async function initApp(): Promise<void> {
           return;
         }
 
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Heartbeat][Reinit] all-retries-exhausted — reloading page reason=${reason}`
         );
         bridgeReinitInProgress = false;
@@ -1386,7 +1386,7 @@ export async function initApp(): Promise<void> {
   }
 
   function handleCardAssetReadyDuringStartup(label: "cardSuitAssetsReady" | "cardAssetsReady"): void {
-    perfLog(`[Perf][Startup] ${label}`);
+    perfLogLazy(() => `[Perf][Startup] ${label}`);
     if (!startupPageReadyForAssetRefresh) {
       pendingStartupAssetRefresh = true;
       return;
@@ -1411,7 +1411,7 @@ export async function initApp(): Promise<void> {
       ),
     ]);
     startupPageReadyForAssetRefresh = setupOk;
-    perfLog(
+    perfLogLazy(() => 
       `[Perf][Startup] setupPage ok=${setupOk ? "y" : "n"} ms=${(perfNowMs() - setupStartMs).toFixed(
         1
       )}`
@@ -1423,13 +1423,13 @@ export async function initApp(): Promise<void> {
       }
       const initialImagesStartMs = perfNowMs();
       await sendInitialImages(hub, store.getState());
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Startup] initialImages ms=${(perfNowMs() - initialImagesStartMs).toFixed(1)}`
       );
     } else if (SUSPENSION_GUARD_ENABLED) {
       // Initial setupPage failed (e.g. after a page reload when BLE is dead).
       // Schedule a delayed reinit to give the BLE stack time to recover.
-      perfLog("[Perf][Startup] setupPage-failed — scheduling delayed reinit");
+      perfLogLazy(() => "[Perf][Startup] setupPage-failed — scheduling delayed reinit");
       fireEarlyShutdown("startup-setupPage-failed");
       setTimeout(() => {
         void attemptBridgeReinit("startup-setupPage-failed");
@@ -1442,9 +1442,9 @@ export async function initApp(): Promise<void> {
     if (SUSPENSION_GUARD_ENABLED) {
       setupVisibilityListener();
       startHeartbeat();
-      perfLog(`[Perf][Bootstrap][Config] suspensionGuard=y`);
+      perfLogLazy(() => `[Perf][Bootstrap][Config] suspensionGuard=y`);
     } else {
-      perfLog(`[Perf][Bootstrap][Config] suspensionGuard=n`);
+      perfLogLazy(() => `[Perf][Bootstrap][Config] suspensionGuard=n`);
     }
   }
 
@@ -1476,7 +1476,7 @@ export async function initApp(): Promise<void> {
           pendingSaveFirstQueuedAtMs > 0 ? perfNowMs() - pendingSaveFirstQueuedAtMs : 0;
         if (hasImagePressure && queuedAgeMs < AUTOSAVE_MAX_DEFER_MS) {
           const deferMs = health.linkSlow ? AUTOSAVE_DEFER_LINK_SLOW_MS : AUTOSAVE_DEFER_BACKLOG_MS;
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][Save] defer age=${queuedAgeMs.toFixed(1)}ms by=${deferMs}ms ` +
               `backlog=${health.backlogged ? "y" : "n"} link=${health.linkSlow ? "y" : "n"} ` +
               `q=${hub.getImageQueueDepth()}`
@@ -1491,7 +1491,7 @@ export async function initApp(): Promise<void> {
         await saveGame(payload.game, payload.moveAssist);
         lastPersistedSnapshot = { game: payload.game, moveAssist: payload.moveAssist };
         const durMs = perfNowMs() - startedAtMs;
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Save] dur=${durMs.toFixed(1)}ms age=${queuedAgeMs.toFixed(1)}ms ` +
             `backlog=${health.backlogged ? "y" : "n"} link=${health.linkSlow ? "y" : "n"} q=${hub.getImageQueueDepth()}`
         );
@@ -1536,7 +1536,7 @@ export async function initApp(): Promise<void> {
           (ts) => nowMs - ts < VISIBILITY_RECENT_RECOVERY_WINDOW_MS
         ).length;
         if (recentCount > 0) {
-          perfLog(
+          perfLogLazy(() => 
             `[Perf][Bridge][Interrupt] fast-reinit recentRecoveries=${recentCount}`
           );
           fireEarlyShutdown("interrupt-after-recent-recovery");
@@ -1570,7 +1570,7 @@ export async function initApp(): Promise<void> {
         if (pendingRecoveryCacheInvalidate) {
           pendingRecoveryCacheInvalidate = false;
           invalidateLastSentVisualCachesForRecovery();
-          perfLog("[Perf][Bridge][InterruptRecovery] force-refresh=y");
+          perfLogLazy(() => "[Perf][Bridge][InterruptRecovery] force-refresh=y");
         }
         const targetVersion = requestedFlushVersion;
         const flushStartedAtMs = perfNowMs();
@@ -1611,7 +1611,7 @@ export async function initApp(): Promise<void> {
           perfInputAtMs > 0 ? flushStartedAtMs - perfInputAtMs : -1;
         const inputToFlushEndMs =
           perfInputAtMs > 0 ? flushEndedAtMs - perfInputAtMs : -1;
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Flush] req=${targetVersion} dur=${(flushEndedAtMs - flushStartedAtMs).toFixed(
             1
           )}ms source=${perfDispatch.source} action=${perfDispatch.actionType} ` +

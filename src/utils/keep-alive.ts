@@ -15,7 +15,7 @@
  * Activation requires a user-gesture context (AudioContext autoplay policy).
  */
 
-import { perfLog } from "../perf/log";
+import { perfLogLazy } from "../perf/log";
 
 // ---------------------------------------------------------------------------
 // State
@@ -58,20 +58,21 @@ export function activateKeepAlive(): void {
     oscillator.start();
 
     active = true;
-    perfLog(`[Perf][KeepAlive][Audio] activated state=${audioCtx.state}`);
+    const activatedState = audioCtx.state;
+    perfLogLazy(() => `[Perf][KeepAlive][Audio] activated state=${activatedState}`);
 
     // Some Android WebViews suspend the AudioContext even while the page is
     // visible.  Attempt to resume whenever that happens.
     audioCtx.addEventListener("statechange", () => {
-      perfLog(`[Perf][KeepAlive][Audio] statechange=${audioCtx?.state ?? "null"}`);
+      perfLogLazy(() => `[Perf][KeepAlive][Audio] statechange=${audioCtx?.state ?? "null"}`);
       if (audioCtx?.state === "suspended") {
         audioCtx.resume().catch(() => {
-          perfLog("[Perf][KeepAlive][Audio] resume-failed");
+          perfLogLazy(() => "[Perf][KeepAlive][Audio] resume-failed");
         });
       }
     });
   } catch {
-    perfLog("[Perf][KeepAlive][Audio] init-failed");
+    perfLogLazy(() => "[Perf][KeepAlive][Audio] init-failed");
     // AudioContext not supported or blocked — continue without it.
   }
 
@@ -84,11 +85,11 @@ export function activateKeepAlive(): void {
           () =>
             new Promise<void>(() => {
               // Never resolves — holds the lock for the lifetime of the page.
-              perfLog("[Perf][KeepAlive][WebLock] acquired");
+              perfLogLazy(() => "[Perf][KeepAlive][WebLock] acquired");
             }),
         )
         .catch(() => {
-          perfLog("[Perf][KeepAlive][WebLock] request-failed");
+          perfLogLazy(() => "[Perf][KeepAlive][WebLock] request-failed");
         });
     }
   } catch {
@@ -129,6 +130,6 @@ export function deactivateKeepAlive(): void {
   }
   if (active) {
     active = false;
-    perfLog("[Perf][KeepAlive] deactivated");
+    perfLogLazy(() => "[Perf][KeepAlive] deactivated");
   }
 }

@@ -12,7 +12,7 @@ import {
   type EvenHubEvent,
 } from "@evenrealities/even_hub_sdk";
 import { log, warn, error } from "../utils/logger";
-import { perfLog, perfLogLazy, perfNowMs } from "../perf/log";
+import { perfLogLazy, perfNowMs } from "../perf/log";
 
 export type EvenHubEventHandler = (event: EvenHubEvent) => void;
 export type ImageUpdatePriority = "high" | "normal" | "low";
@@ -219,7 +219,7 @@ export class EvenHubBridge {
     try {
       this.bridge = await waitForEvenAppBridge();
       log("[EvenHubBridge] Bridge ready.");
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Bridge][Config] watchdog=${IMAGE_SEND_WATCHDOG_TRIGGER_MS}ms ` +
         `hardWedge=${IMAGE_SEND_HARD_WEDGE_TRIGGER_MS}ms ` +
         `bleGap=${IMAGE_DEFAULT_POST_SEND_GAP_MS}/80ms ` +
@@ -866,7 +866,7 @@ export class EvenHubBridge {
   private setImageSendWedged(active: boolean, reason: string): void {
     if (this.imageSendWedged === active) return;
     this.imageSendWedged = active;
-    perfLog(`[Perf][Bridge][Wedge] active=${active ? "y" : "n"} reason=${reason}`);
+    perfLogLazy(() => `[Perf][Bridge][Wedge] active=${active ? "y" : "n"} reason=${reason}`);
     this.logTransportDiagnostic(active ? "wedge-on" : "wedge-off", `cause=${reason}`);
   }
 
@@ -1012,7 +1012,7 @@ export class EvenHubBridge {
             // the strongest signal that BLE is dead and must trigger escalation.
             if (!lateOk) {
               this.consecutiveNonOkSendCount += 1;
-              perfLog(
+              perfLogLazy(() => 
                 `[Perf][Bridge][NonOk] count=${this.consecutiveNonOkSendCount} ` +
                   `send=${sendMs.toFixed(1)}ms cid=${queued.data.containerID ?? -1} source=late-return`
               );
@@ -1044,7 +1044,7 @@ export class EvenHubBridge {
             );
             // Errors on abandoned sends are always non-ok.
             this.consecutiveNonOkSendCount += 1;
-            perfLog(
+            perfLogLazy(() => 
               `[Perf][Bridge][NonOk] count=${this.consecutiveNonOkSendCount} ` +
                 `send=${sendMs.toFixed(1)}ms cid=${queued.data.containerID ?? -1} source=late-error`
             );
@@ -1261,7 +1261,7 @@ export class EvenHubBridge {
     if (active) {
       this.pruneQueuedImagesForInterruption();
     }
-    perfLog(`[Perf][Bridge][Interrupt] active=${active ? "y" : "n"} reason=${reason}`);
+    perfLogLazy(() => `[Perf][Bridge][Interrupt] active=${active ? "y" : "n"} reason=${reason}`);
     this.logTransportDiagnostic(active ? "interrupt-on" : "interrupt-off", `cause=${reason}`);
     for (const listener of this.imageInterruptionListeners) {
       try {
@@ -1362,7 +1362,7 @@ export class EvenHubBridge {
     // Track consecutive non-ok BLE results — strongest dead-link signal.
     if (!resultOk) {
       this.consecutiveNonOkSendCount += 1;
-      perfLog(
+      perfLogLazy(() => 
         `[Perf][Bridge][NonOk] count=${this.consecutiveNonOkSendCount} ` +
         `send=${sendMs.toFixed(1)}ms cid=${data.containerID ?? -1}`
       );
@@ -1378,7 +1378,7 @@ export class EvenHubBridge {
     if (sendMs >= IMAGE_CONSECUTIVE_STALL_THRESHOLD_MS) {
       this.consecutiveStallCount += 1;
       if (this.consecutiveStallCount >= IMAGE_CONSECUTIVE_STALL_COUNT) {
-        perfLog(
+        perfLogLazy(() => 
           `[Perf][Bridge][ConsecutiveStall] count=${this.consecutiveStallCount} ` +
           `lastSend=${sendMs.toFixed(1)}ms pending=${pendingDepth} ` +
           `cid=${data.containerID ?? -1}`

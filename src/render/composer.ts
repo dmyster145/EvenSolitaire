@@ -47,7 +47,7 @@ import type { AppState } from "../state/types";
 import type { EvenHubBridge } from "../evenhub/bridge";
 import { getPileView, getMenuLines, getFloatingCards, getInfoPanelText } from "../state/selectors";
 import { focusTargetToIndex } from "../state/ui-mode";
-import { perfLogLazy, perfNowMs } from "../perf/log";
+import { isPerfLoggingEnabled, perfLogLazy, perfNowMs } from "../perf/log";
 
 const EMPTY_PNG_U8 = new Uint8Array(0);
 
@@ -399,21 +399,22 @@ async function renderFullBoard3Tiles(
   bottomLeftPng: Uint8Array;
   bottomRightPng: Uint8Array;
 }> {
-  const totalStartMs = perfNowMs();
-  const boardRowsStartMs = perfNowMs();
+  const perfEnabled = isPerfLoggingEnabled();
+  const totalStartMs = perfEnabled ? perfNowMs() : 0;
+  const boardRowsStartMs = perfEnabled ? perfNowMs() : 0;
   const boardCtx = buildBoardViewContext(state, { focusIdx: options?.focusIdxOverride });
   const topView = topRowViewFromState(state, boardCtx);
   const tableauView = tableauViewFromState(state, boardCtx);
   const { topSourceCanvas, tableauSourceCanvas } = getReusableBoardRowSourceCanvases();
   const topCanvas = renderBoardTopToCanvas(topView, topSourceCanvas);
   const tableauCanvas = renderBoardTableauToCanvas(tableauView, tableauSourceCanvas);
-  const boardRowsMs = perfNowMs() - boardRowsStartMs;
-  const compositeStartMs = perfNowMs();
+  const boardRowsMs = perfEnabled ? perfNowMs() - boardRowsStartMs : 0;
+  const compositeStartMs = perfEnabled ? perfNowMs() : 0;
   const fullBoardCanvas = composeFullBoardCanvasFromBoardRowCanvases(topCanvas, tableauCanvas);
-  const compositeMs = perfNowMs() - compositeStartMs;
+  const compositeMs = perfEnabled ? perfNowMs() - compositeStartMs : 0;
   const srcHalfW = Math.floor(OVERLAY_W / 2);
   const bottomCropH = OVERLAY_H - TILE_CROP_SPLIT_Y;
-  const cropStartMs = perfNowMs();
+  const cropStartMs = perfEnabled ? perfNowMs() : 0;
   const [topTilePng, bottomLeftPng, bottomRightPng] = await Promise.all([
     cropScaleSourceToPngUint8Bytes(
       fullBoardCanvas,
@@ -434,8 +435,8 @@ async function renderFullBoard3Tiles(
       "tile-3-bottom-right"
     ),
   ]);
-  const cropMs = perfNowMs() - cropStartMs;
-  const totalMs = perfNowMs() - totalStartMs;
+  const cropMs = perfEnabled ? perfNowMs() - cropStartMs : 0;
+  const totalMs = perfEnabled ? perfNowMs() - totalStartMs : 0;
 
   perfLogLazy(
     () =>
@@ -451,13 +452,14 @@ async function renderFullBoard3TopTileOnly(
   state: AppState,
   options?: { focusIdxOverride?: number }
 ): Promise<Uint8Array> {
-  const totalStartMs = perfNowMs();
-  const topRowStartMs = perfNowMs();
+  const perfEnabled = isPerfLoggingEnabled();
+  const totalStartMs = perfEnabled ? perfNowMs() : 0;
+  const topRowStartMs = perfEnabled ? perfNowMs() : 0;
   const { topSourceCanvas } = getReusableBoardRowSourceCanvases();
   const boardCtx = buildBoardViewContext(state, { focusIdx: options?.focusIdxOverride });
   const topCanvas = renderBoardTopToCanvas(topRowViewFromState(state, boardCtx), topSourceCanvas);
-  const topRowMs = perfNowMs() - topRowStartMs;
-  const cropStartMs = perfNowMs();
+  const topRowMs = perfEnabled ? perfNowMs() - topRowStartMs : 0;
+  const cropStartMs = perfEnabled ? perfNowMs() : 0;
   if (!topCanvas) return EMPTY_PNG_U8;
   const topTilePng = await cropScaleSourceToPngUint8Bytes(
     topCanvas,
@@ -465,8 +467,8 @@ async function renderFullBoard3TopTileOnly(
     { width: IMAGE_TILE_TOP.width, height: IMAGE_TILE_TOP.height },
     "tile-3-top-only"
   );
-  const cropMs = perfNowMs() - cropStartMs;
-  const totalMs = perfNowMs() - totalStartMs;
+  const cropMs = perfEnabled ? perfNowMs() - cropStartMs : 0;
+  const totalMs = perfEnabled ? perfNowMs() - totalStartMs : 0;
   perfLogLazy(
     () =>
     `[Perf][Render][3TileTopOnly] row=${topRowMs.toFixed(1)}ms crop=${cropMs.toFixed(
@@ -483,21 +485,22 @@ async function renderFullBoard3BottomTilesOnly(
   bottomLeftPng: Uint8Array;
   bottomRightPng: Uint8Array;
 }> {
-  const totalStartMs = perfNowMs();
-  const boardRowsStartMs = perfNowMs();
+  const perfEnabled = isPerfLoggingEnabled();
+  const totalStartMs = perfEnabled ? perfNowMs() : 0;
+  const boardRowsStartMs = perfEnabled ? perfNowMs() : 0;
   const boardCtx = buildBoardViewContext(state, { focusIdx: options?.focusIdxOverride });
   const topView = topRowViewFromState(state, boardCtx);
   const tableauView = tableauViewFromState(state, boardCtx);
   const { topSourceCanvas, tableauSourceCanvas } = getReusableBoardRowSourceCanvases();
   const topCanvas = renderBoardTopToCanvas(topView, topSourceCanvas);
   const tableauCanvas = renderBoardTableauToCanvas(tableauView, tableauSourceCanvas);
-  const boardRowsMs = perfNowMs() - boardRowsStartMs;
-  const compositeStartMs = perfNowMs();
+  const boardRowsMs = perfEnabled ? perfNowMs() - boardRowsStartMs : 0;
+  const compositeStartMs = perfEnabled ? perfNowMs() : 0;
   const fullBoardCanvas = composeFullBoardCanvasFromBoardRowCanvases(topCanvas, tableauCanvas);
-  const compositeMs = perfNowMs() - compositeStartMs;
+  const compositeMs = perfEnabled ? perfNowMs() - compositeStartMs : 0;
   const srcHalfW = Math.floor(OVERLAY_W / 2);
   const bottomCropH = OVERLAY_H - TILE_CROP_SPLIT_Y;
-  const cropStartMs = perfNowMs();
+  const cropStartMs = perfEnabled ? perfNowMs() : 0;
   const [bottomLeftPng, bottomRightPng] = await Promise.all([
     cropScaleSourceToPngUint8Bytes(
       fullBoardCanvas,
@@ -512,8 +515,8 @@ async function renderFullBoard3BottomTilesOnly(
       "tile-3-bottom-right-only"
     ),
   ]);
-  const cropMs = perfNowMs() - cropStartMs;
-  const totalMs = perfNowMs() - totalStartMs;
+  const cropMs = perfEnabled ? perfNowMs() - cropStartMs : 0;
+  const totalMs = perfEnabled ? perfNowMs() - totalStartMs : 0;
 
   perfLogLazy(
     () =>
@@ -1133,7 +1136,8 @@ export async function flushDisplayUpdate(
   },
   options?: FlushDisplayUpdateOptions
 ): Promise<{ lastSent: typeof lastSent; didClearOverlay?: boolean }> {
-  const perfFlushStartMs = perfNowMs();
+  const perfEnabled = isPerfLoggingEnabled();
+  const perfFlushStartMs = perfEnabled ? perfNowMs() : 0;
   let perfPath = "none";
   let perfSentImages = 0;
   let perfSkippedImages = 0;

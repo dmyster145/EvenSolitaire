@@ -31,6 +31,7 @@ const h = vi.hoisted(() => {
     pngBytesToImageBitmap: vi.fn(async () => null),
     perfLog: vi.fn(),
     perfLogLazy: vi.fn(),
+    isPerfLoggingEnabled: vi.fn(() => false),
     perfNowMs: vi.fn(() => Date.now()),
   };
 });
@@ -80,6 +81,7 @@ vi.mock("../../src/render/png-utils", () => ({
 vi.mock("../../src/perf/log", () => ({
   perfLog: h.perfLog,
   perfLogLazy: h.perfLogLazy,
+  isPerfLoggingEnabled: h.isPerfLoggingEnabled,
   perfNowMs: h.perfNowMs,
 }));
 
