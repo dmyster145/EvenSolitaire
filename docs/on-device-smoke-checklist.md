@@ -1,4 +1,4 @@
-# EvenSolitaire On-Device Smoke Checklist
+# Solitaire On-Device Smoke Checklist
 
 Use this after major gameplay, HUD, or input changes. It is intentionally short and focused on regressions that are easy to miss on glasses.
 

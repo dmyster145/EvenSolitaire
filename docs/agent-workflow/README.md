@@ -1,4 +1,4 @@
-# Cursor Agent Workflow (EvenSolitaire)
+# Cursor Agent Workflow (Solitaire)
 
 This folder documents the **modular Cursor rules and workflow** used for high-efficiency Agent runs: less token waste, fewer rework loops, and reliable autonomous execution.
 

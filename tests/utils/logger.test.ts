@@ -5,14 +5,14 @@ describe("logger utils", () => {
   it("warn prefixes messages", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     warn("hello", 1);
-    expect(spy).toHaveBeenCalledWith("[EvenSolitaire] hello", 1);
+    expect(spy).toHaveBeenCalledWith("[Solitaire] hello", 1);
     spy.mockRestore();
   });
 
   it("error prefixes messages", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     error("boom", { a: 1 });
-    expect(spy).toHaveBeenCalledWith("[EvenSolitaire] boom", { a: 1 });
+    expect(spy).toHaveBeenCalledWith("[Solitaire] boom", { a: 1 });
     spy.mockRestore();
   });
 

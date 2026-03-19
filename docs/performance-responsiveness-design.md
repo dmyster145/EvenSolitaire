@@ -1,5 +1,6 @@
 # BLE Display Transport: Performance & Resilience Design
 
+
 Reference architecture for Even Realities G2 smart glasses apps that render UI as image tiles and text, sent over BLE via the Even Hub SDK.
 
 ---
@@ -208,33 +209,22 @@ Bridge reinit is triggered by any of:
 | **Short suspension + recent recovery** | Heartbeat gap > 5s with recent hang recoveries in the last 10s |
 | **Visibility change** | App returns to foreground with transport wedged/interrupted or non-OK sends |
 
-### 4.2 Early Shutdown
-
-Every reinit trigger (dead link, recovery burst, suspension, visibility change, interrupt-after-recovery) calls `fireEarlyShutdown()` immediately alongside `attemptBridgeReinit()`. This is a non-blocking async call that:
-
-1. Calls `hub.shutdown()` (`shutDownPageContainer` — releases BLE session)
-2. Starts a 1500ms settle timer
-3. Sets `earlyShutdownSettled = true` when the timer completes
-
-Because reinit always goes through a cooldown gate (2s after failure, 8s in slow-retry, 30s after success), the shutdown + settle runs in the background during that cooldown. By the time reinit actually starts, the settle has already elapsed and reinit skips straight to step 3 below.
-
-### 4.3 Reinit Flow
+### 4.2 Reinit Flow
 
 ```
-1. Stop timers       (flush, blink, watchdogs, probes)
-2. Shutdown/settle   (skip if early shutdown settled, wait remainder if in-flight,
-                      or do full shutdown + 1500ms settle as fallback)
-3. Init bridge       (re-acquire SDK handle via waitForEvenAppBridge)
-4. Setup page        (re-establish display containers, 3s timeout cap)
-5. Re-subscribe      (SDK event listeners)
-6. Reset state       (all recovery counters, reload count, slow-retry flag,
-                      early-shutdown flag)
-7. Send initial      (repopulate display from current app state)
+1. Stop timers      (flush, blink, watchdogs, probes)
+2. Shutdown bridge   (shutDownPageContainer — releases BLE session)
+3. Settle delay      (1500ms — let SDK/BLE state clear)
+4. Init bridge       (re-acquire SDK handle via waitForEvenAppBridge)
+5. Setup page        (re-establish display containers, 3s timeout cap)
+6. Re-subscribe      (SDK event listeners)
+7. Reset state       (all recovery counters, reload count, slow-retry flag)
+8. Send initial      (repopulate display from current app state)
 ```
 
-The shutdown-before-reinit step is critical: calling `setupPage` without first releasing the previous BLE page container can cause the SDK to refuse reconnection indefinitely.
+The shutdown-before-reinit step (2-3) is critical: calling `setupPage` without first releasing the previous BLE page container can cause the SDK to refuse reconnection indefinitely.
 
-### 4.4 Retry and Reload Escalation
+### 4.3 Retry and Reload Escalation
 
 When `setupPage` returns false (BLE link dead):
 
@@ -248,7 +238,7 @@ Attempt 2 → setupPage fails → exhausted:
 
 Page reloads are capped at 2 to avoid destroying app state in an infinite reload loop. After the cap, the app switches to slow indefinite retry.
 
-### 4.5 Cooldown System
+### 4.4 Cooldown System
 
 Three cooldown tiers prevent reinit attempts from firing too frequently:
 
@@ -258,11 +248,11 @@ Three cooldown tiers prevent reinit attempts from firing too frequently:
 | **After failure** | 2s | Retrying after a failed setupPage |
 | **Slow retry** | 8s | After max reloads reached; indefinite retry mode |
 
-### 4.6 setupPage Timeout
+### 4.5 setupPage Timeout
 
 The SDK's `setupPage` can take 5-10s to return false on a dead BLE link. A `Promise.race` wrapper caps this at 3s so the retry cycle isn't bottlenecked by slow SDK responses. Applied to both startup and reinit paths.
 
-### 4.7 Reload Counter Persistence
+### 4.6 Reload Counter Persistence
 
 The page reload counter must survive `window.location.reload()`. Dual persistence:
 
@@ -352,7 +342,7 @@ All performance logs use the `[Perf][Module][Event]` format for structured timel
 - Stored in `localStorage` as JSON array (max 3000 entries)
 - Flushed on 1s interval with idle-gap and max-defer caps
 - Optional DOM panel with toggle/clear/copy/record controls
-- Available programmatically via `window.__evenSolitairePerf.dumpText()`
+- Available programmatically via `window.__solitairePerf.dumpText()`
 
 ### Dispatch Tracing
 

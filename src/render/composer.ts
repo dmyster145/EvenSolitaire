@@ -94,7 +94,7 @@ function createImageContainer(container: ImageContainerRect): ImageContainerProp
 }
 
 /** Info panel text container: visible on the left, also captures events. */
-function createInfoPanelTextContainer(content = "Even Solitaire"): TextContainerProperty {
+function createInfoPanelTextContainer(content = "Solitaire"): TextContainerProperty {
   return new TextContainerProperty({
     xPosition: INFO_TEXT_CONTAINER.x,
     yPosition: INFO_TEXT_CONTAINER.y,

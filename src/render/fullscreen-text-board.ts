@@ -163,7 +163,7 @@ function renderMenuScreen(state: AppState): string {
   const focusIndex = focusTargetToIndex(state.ui.focus);
 
   const lines: string[] = [];
-  lines.push("EVEN SOLITAIRE MENU");
+  lines.push("SOLITAIRE MENU");
   lines.push(`M${state.game.moves}  Focus:${focusLabelFromIndex(focusIndex)}  Assist:${state.ui.moveAssist ? "On" : "Off"}`);
   lines.push(
     renderRow([

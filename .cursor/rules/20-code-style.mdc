@@ -1,9 +1,9 @@
 ---
-description: TypeScript / Vite conventions for EvenSolitaire.
+description: TypeScript / Vite conventions for Solitaire.
 globs: ["**/*.ts", "**/*.tsx"]
 ---
 
-# Code Style (TS / EvenSolitaire)
+# Code Style (TS / Solitaire)
 
 - **Source of truth:** TypeScript strict; format/lint per existing `tsconfig.json` and any ESLint config in repo.
 - **Naming:** camelCase for functions/variables; PascalCase for types/classes; UPPER_SNAKE for action constants.

@@ -595,7 +595,7 @@ export async function initApp(): Promise<void> {
       }
       return updated;
     } catch (err) {
-      console.error("[EvenSolitaire] Stall indicator update failed:", err);
+      console.error("[Solitaire] Stall indicator update failed:", err);
       return false;
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
@@ -725,7 +725,7 @@ export async function initApp(): Promise<void> {
       })
       .catch((err) => {
         if (!timedOut) {
-          console.error("[EvenSolitaire] rebuildPage error:", err);
+          console.error("[Solitaire] rebuildPage error:", err);
         } else {
           perfLogLazy(() => 
             `[Perf][Flush][Hang] rebuild-late-error mode=input ` +
@@ -965,7 +965,7 @@ export async function initApp(): Promise<void> {
         scheduleFlush();
       }
     } catch (err) {
-      console.error("[EvenSolitaire] Flush hang recovery failed:", err);
+      console.error("[Solitaire] Flush hang recovery failed:", err);
     } finally {
       flushRecoveryInProgress = false;
     }
@@ -1274,7 +1274,7 @@ export async function initApp(): Promise<void> {
       perfLogLazy(() => `[Perf][Heartbeat][Reinit] complete reason=${reason}`);
       scheduleFlush();
     } catch (err) {
-      console.error("[EvenSolitaire] Bridge reinit failed:", err);
+      console.error("[Solitaire] Bridge reinit failed:", err);
       perfLogLazy(() => `[Perf][Heartbeat][Reinit] failed reason=${reason}`);
       consecutiveBridgeReinitFailures += 1;
 
@@ -1348,7 +1348,7 @@ export async function initApp(): Promise<void> {
       hub.notifySystemLifecycleEvent("foreground-exit");
       await hub.shutdown();
     } catch (err) {
-      console.error("[EvenSolitaire] Exit failed:", err);
+      console.error("[Solitaire] Exit failed:", err);
     } finally {
       exitInProgress = false;
     }
@@ -1436,7 +1436,7 @@ export async function initApp(): Promise<void> {
       }, BRIDGE_REINIT_FAILED_COOLDOWN_MS);
     }
   } catch (err) {
-    console.error("[EvenSolitaire] Initialization failed:", err);
+    console.error("[Solitaire] Initialization failed:", err);
   } finally {
     armFlushLoopAfterStartup();
     if (SUSPENSION_GUARD_ENABLED) {

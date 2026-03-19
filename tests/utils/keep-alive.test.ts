@@ -248,7 +248,7 @@ describe("keep-alive", () => {
     activateKeepAlive();
 
     expect(lockRequest).toHaveBeenCalledWith(
-      "evensolitaire_keep_alive",
+      "solitaire_keep_alive",
       expect.any(Function)
     );
 

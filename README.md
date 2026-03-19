@@ -1,4 +1,4 @@
-# EvenSolitaire
+# Solitaire
 
 Klondike Solitaire for **Even Realities G2** smart glasses: play with scroll/tap/double-tap controls, manage piles from a HUD-first interface, and use optional Move Assist when you want cleaner destination navigation.
 
@@ -27,7 +27,7 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE).
 ## Project structure
 
 ```text
-EvenSolitaire/
+Solitaire/
 ├── index.html          # Entry page; shows help/docs on phone, mounts app in #app
 ├── src/
 │   ├── main.ts         # Boots the app
@@ -55,8 +55,8 @@ EvenSolitaire/
    - Open a terminal (Command Prompt, PowerShell, or Terminal app).
    - Clone the repo (use the project’s clone URL from GitHub, or your fork):
      ```bash
-     git clone https://github.com/owner/EvenSolitaire.git
-     cd EvenSolitaire
+     git clone https://github.com/owner/Solitaire.git
+     cd Solitaire
      ```
    - Install dependencies:
      ```bash

@@ -6,7 +6,7 @@ import type { GameState } from "../game/types";
 import { getStored, setStored } from "./local";
 import { error as logError } from "../utils/logger";
 
-const SAVE_KEY = "evensolitaire_save";
+const SAVE_KEY = "solitaire_save";
 
 export interface SavePayload {
   game: GameState;
@@ -39,9 +39,9 @@ export function deserializeSave(raw: string): SavePayload | null {
 export async function saveGame(game: GameState, moveAssist: boolean): Promise<void> {
   try {
     const ok = await setStored(SAVE_KEY, serializeSave({ game, moveAssist }));
-    if (!ok) logError("[EvenSolitaire] Failed to save game: setStored returned false");
+    if (!ok) logError("[Solitaire] Failed to save game: setStored returned false");
   } catch (err) {
-    logError("[EvenSolitaire] Failed to save game:", err);
+    logError("[Solitaire] Failed to save game:", err);
   }
 }
 
@@ -54,7 +54,7 @@ export async function loadGame(): Promise<{ game: GameState; moveAssist: boolean
     if (!payload) return null;
     return { game: payload.game, moveAssist: payload.moveAssist };
   } catch (err) {
-    logError("[EvenSolitaire] Failed to load game:", err);
+    logError("[Solitaire] Failed to load game:", err);
     return null;
   }
 }

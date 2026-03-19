@@ -3,7 +3,7 @@
  * Disabled by default so instrumentation can stay in hot paths safely.
  */
 
-const STORAGE_KEY = "evensolitaire-perf-log-v1";
+const STORAGE_KEY = "solitaire-perf-log-v1";
 const MAX_ENTRIES = 3000;
 const FLUSH_INTERVAL_MS = 1000;
 const FLUSH_IDLE_GAP_MS = 1500;
@@ -18,14 +18,14 @@ const PERF_LOG_DOM_ENABLED = false;
 if (typeof window !== "undefined") {
   (
     window as Window & {
-      __evenSolitairePerfConfig?: {
+      __solitairePerfConfig?: {
         consoleEnabled: boolean;
         captureEnabled: boolean;
         domEnabled: boolean;
         anyEnabled: boolean;
       };
     }
-  ).__evenSolitairePerfConfig = {
+  ).__solitairePerfConfig = {
     consoleEnabled: PERF_LOG_CONSOLE_ENABLED,
     captureEnabled: PERF_LOG_CAPTURE_ENABLED,
     domEnabled: PERF_LOG_DOM_ENABLED,
@@ -242,8 +242,8 @@ function wireDomControls(): void {
 
   if (clearBtn instanceof HTMLButtonElement) {
     clearBtn.addEventListener("click", () => {
-      const api = (window as Window & { __evenSolitairePerf?: { clear: () => void } })
-        .__evenSolitairePerf;
+      const api = (window as Window & { __solitairePerf?: { clear: () => void } })
+        .__solitairePerf;
       if (api) api.clear();
       else clearDomOutput();
     });
@@ -251,8 +251,8 @@ function wireDomControls(): void {
 
   if (copyBtn instanceof HTMLButtonElement) {
     copyBtn.addEventListener("click", () => {
-      const api = (window as Window & { __evenSolitairePerf?: { copyAll: () => Promise<boolean> } })
-        .__evenSolitairePerf;
+      const api = (window as Window & { __solitairePerf?: { copyAll: () => Promise<boolean> } })
+        .__solitairePerf;
       if (api) {
         void api.copyAll();
       }
@@ -316,9 +316,9 @@ function ensureInitialized(): void {
 
   (
     window as Window & {
-      __evenSolitairePerf?: typeof api;
+      __solitairePerf?: typeof api;
     }
-  ).__evenSolitairePerf = api;
+  ).__solitairePerf = api;
 
   window.addEventListener("beforeunload", flushEntriesForced);
 }

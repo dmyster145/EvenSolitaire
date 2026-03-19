@@ -81,7 +81,7 @@ export function activateKeepAlive(): void {
     if (typeof navigator !== "undefined" && "locks" in navigator) {
       (navigator.locks as LockManager)
         .request(
-          "evensolitaire_keep_alive",
+          "solitaire_keep_alive",
           () =>
             new Promise<void>(() => {
               // Never resolves — holds the lock for the lifetime of the page.

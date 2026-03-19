@@ -1,4 +1,4 @@
-# EvenSolitaire for Even G2 (Cursor Build Starter)
+# Solitaire for Even G2 (Cursor Build Starter)
 
 ## Purpose
 
@@ -163,7 +163,7 @@ Use explicit UI modes to keep the interface stable and debuggable.
 ## Folder Structure (recommended)
 
 ```text
-even-solitaire/
+solitaire/
 ├─ app.json
 ├─ package.json
 ├─ tsconfig.json

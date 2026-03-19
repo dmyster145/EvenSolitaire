@@ -4,13 +4,13 @@
 const DEBUG = false;
 
 export function log(msg: string, ...args: unknown[]): void {
-  if (DEBUG) console.log(`[EvenSolitaire] ${msg}`, ...args);
+  if (DEBUG) console.log(`[Solitaire] ${msg}`, ...args);
 }
 
 export function warn(msg: string, ...args: unknown[]): void {
-  console.warn(`[EvenSolitaire] ${msg}`, ...args);
+  console.warn(`[Solitaire] ${msg}`, ...args);
 }
 
 export function error(msg: string, ...args: unknown[]): void {
-  console.error(`[EvenSolitaire] ${msg}`, ...args);
+  console.error(`[Solitaire] ${msg}`, ...args);
 }

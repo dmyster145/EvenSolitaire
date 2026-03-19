@@ -121,7 +121,7 @@ Comparing different ways to display the 7 tableau columns within the G2's ~42 ch
 Clean vertical list showing rank+suit for each card. Minimal visual noise.
 
 ```
-EVEN SOLITAIRE          M:12  Focus:T3
+SOLITAIRE          M:12  Focus:T3
 ┌────┐┌────┐ ┌────┐┌────┐┌────┐┌────┐
 │▦▦▦▦││5  ♠│ │A  ♥││2  ◆││    ││    │
 └────┘└────┘ └────┘└────┘└────┘└────┘
@@ -146,7 +146,7 @@ Scroll: focus  Tap: select  Dbl: menu
 Full card box showing only the top card, with hidden/visible count displayed inside.
 
 ```
-EVEN SOLITAIRE          M:12  Focus:T3
+SOLITAIRE          M:12  Focus:T3
 ┌────┐┌────┐ ┌────┐┌────┐┌────┐┌────┐
 │▦▦▦▦││5  ♠│ │A  ♥││2  ◆││    ││    │
 └────┘└────┘ └────┘└────┘└────┘└────┘
@@ -172,7 +172,7 @@ Scroll: focus  Tap: select  Dbl: menu
 Bordered table with columns separated by vertical lines.
 
 ```
-EVEN SOLITAIRE          M:12  Focus:T3
+SOLITAIRE          M:12  Focus:T3
 ┌────┐┌────┐ ┌────┐┌────┐┌────┐┌────┐
 │▦▦▦▦││5  ♠│ │A  ♥││2  ◆││    ││    │
 └────┘└────┘ └────┘└────┘└────┘└────┘
@@ -199,7 +199,7 @@ Scroll: focus  Tap: select  Dbl: menu
 Cards cascade with visual depth using indentation.
 
 ```
-EVEN SOLITAIRE          M:12  Focus:T3
+SOLITAIRE          M:12  Focus:T3
 ┌────┐┌────┐ ┌────┐┌────┐┌────┐┌────┐
 │▦▦▦▦││5  ♠│ │A  ♥││2  ◆││    ││    │
 └────┘└────┘ └────┘└────┘└────┘└────┘
@@ -225,7 +225,7 @@ Scroll: focus  Tap: select  Dbl: menu
 Focused column shows full card details, others show compact glyphs.
 
 ```
-EVEN SOLITAIRE          M:12  Focus:T3
+SOLITAIRE          M:12  Focus:T3
 ┌────┐┌────┐ ┌────┐┌────┐┌────┐┌────┐
 │▦▦▦▦││5  ♠│ │A  ♥││2  ◆││    ││    │
 └────┘└────┘ └────┘└────┘└────┘└────┘
@@ -252,7 +252,7 @@ Scroll: focus  Tap: select  Dbl: menu
 Simplified card representation - just top border + content + bottom border (3 lines).
 
 ```
-EVEN SOLITAIRE          M:12  Focus:T3
+SOLITAIRE          M:12  Focus:T3
 ┌────┐┌────┐ ┌────┐┌────┐┌────┐┌────┐
 │▦12 ││5 ♠ │ │A ♥ ││2 ◆ ││    ││    │
 └────┘└────┘ └────┘└────┘└────┘└────┘
@@ -278,7 +278,7 @@ Scroll: focus  Tap: select  Dbl: menu
 Shows card overlap with offset lines, similar to physical solitaire.
 
 ```
-EVEN SOLITAIRE          M:12  Focus:T3
+SOLITAIRE          M:12  Focus:T3
 ┌────┐┌────┐ ┌────┐┌────┐┌────┐┌────┐
 │▦12 ││5 ♠ │ │A ♥ ││2 ◆ ││    ││    │
 └────┘└────┘ └────┘└────┘└────┘└────┘
