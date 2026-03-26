@@ -324,7 +324,7 @@ export class EvenHubBridge {
     try {
       while (this.textQueue.size > 0) {
         if (!this.bridge || this.textSendBlocked) break;
-        if (this.imageInterrupted || (this.imageSurvivalMode && this.imageLinkSlow)) {
+        if (this.imageInterrupted || this.imageLinkSlow) {
           const isNewBlock = this.textGateActiveStartMs === 0;
           this.textSendBlocked = true;
           if (isNewBlock) {

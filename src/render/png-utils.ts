@@ -525,7 +525,7 @@ export function canvasToGreyscaleIndexedPngUint8Bytes(
 
       // Step 3: Encode as indexed PNG with 16-colour palette via UPNG
       const encodeStartMs = perfEnabled ? perfNowMs() : 0;
-      const pngArrayBuffer = UPNG.encode([greyRGBA.buffer], w, h, 16);
+      const pngArrayBuffer = UPNG.encode([greyRGBA.buffer], w, h, 4);
       const encodeMs = perfEnabled ? perfNowMs() - encodeStartMs : 0;
 
       // Step 4: Wrap as Uint8Array with FNV32 hash

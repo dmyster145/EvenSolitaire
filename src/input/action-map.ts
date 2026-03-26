@@ -32,11 +32,11 @@ function mapListEvent(event: List_ItemEvent, state: AppState): Action | null {
   const et = event.eventType;
   switch (et) {
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
-      return scrollAction(state, "prev");
-    case OsEventTypeList.SCROLL_BOTTOM_EVENT:
       if (isScrollDebounced("next") || isScrollSuppressed()) return null;
       return scrollAction(state, "next");
+    case OsEventTypeList.SCROLL_BOTTOM_EVENT:
+      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
+      return scrollAction(state, "prev");
     case OsEventTypeList.CLICK_EVENT:
       if (!tryConsumeTap("tap")) return null;
       return tapAction(state);
@@ -56,11 +56,11 @@ function mapTextEvent(event: Text_ItemEvent, state: AppState): Action | null {
   const et = event.eventType;
   switch (et) {
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
-      return scrollAction(state, "prev");
-    case OsEventTypeList.SCROLL_BOTTOM_EVENT:
       if (isScrollDebounced("next") || isScrollSuppressed()) return null;
       return scrollAction(state, "next");
+    case OsEventTypeList.SCROLL_BOTTOM_EVENT:
+      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
+      return scrollAction(state, "prev");
     case OsEventTypeList.CLICK_EVENT:
       if (!tryConsumeTap("tap")) return null;
       return tapAction(state);
@@ -80,11 +80,11 @@ function mapSysEvent(event: Sys_ItemEvent, state: AppState): Action | null {
   const et = event.eventType;
   switch (et) {
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
-      return scrollAction(state, "prev");
-    case OsEventTypeList.SCROLL_BOTTOM_EVENT:
       if (isScrollDebounced("next") || isScrollSuppressed()) return null;
       return scrollAction(state, "next");
+    case OsEventTypeList.SCROLL_BOTTOM_EVENT:
+      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
+      return scrollAction(state, "prev");
     case OsEventTypeList.CLICK_EVENT:
       if (!tryConsumeTap("tap")) return null;
       return tapAction(state);
