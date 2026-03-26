@@ -366,6 +366,111 @@ function rgbaToGreyscale4BitRGBA(data: Uint8ClampedArray, pixelCount: number): U
 }
 
 /**
+ * Convert RGBA ImageData to 1-bit monochrome indexed buffer.
+ * Uses BT.601 luminance; pixels at or above 128 map to white (255), below to black (0).
+ * Returns an RGBA buffer suitable for UPNG.encode with cnum=2 (indexed 1-bit).
+ */
+function rgbaToMonochrome1BitRGBA(data: Uint8ClampedArray, pixelCount: number): Uint8Array {
+  const out = new Uint8Array(pixelCount * 4);
+  for (let i = 0; i < pixelCount; i += 1) {
+    const si = i * 4;
+    const r = data[si]!;
+    const g = data[si + 1]!;
+    const b = data[si + 2]!;
+    const a = data[si + 3]!;
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    const v = lum >= 128 ? 255 : 0;
+    out[si] = v;
+    out[si + 1] = v;
+    out[si + 2] = v;
+    out[si + 3] = a;
+  }
+  return out;
+}
+
+/**
+ * Encode a canvas as a 1-bit monochrome indexed PNG for the G2 display.
+ * Thresholds each pixel to black or white (BT.601 lum >= 128 → white).
+ * Produces the smallest possible indexed PNG — ~4x fewer raw bits than 4-bit.
+ */
+export function canvasToMonochrome1BitPngUint8Bytes(
+  canvas: HTMLCanvasElement,
+  label = "canvas"
+): Promise<Uint8Array> {
+  const perfEnabled = isPerfLoggingEnabled();
+  const callStartMs = perfEnabled ? perfNowMs() : 0;
+  let pendingAtEnqueue = 0;
+  if (perfEnabled) {
+    pngEncodePendingCount += 1;
+    pngEncodeMaxPending = Math.max(pngEncodeMaxPending, pngEncodePendingCount);
+    pendingAtEnqueue = pngEncodePendingCount;
+  }
+  return enqueueSerializedPngEncode(async () => {
+    const taskStartMs = perfEnabled ? perfNowMs() : 0;
+    const pendingAtStart = perfEnabled ? pngEncodePendingCount : 0;
+    try {
+      const w = canvas.width;
+      const h = canvas.height;
+      if (w <= 0 || h <= 0) {
+        if (perfEnabled) {
+          const endMs = perfNowMs();
+          recordPngEncodePerf({
+            label,
+            width: w,
+            height: h,
+            qwaitMs: taskStartMs - callStartMs,
+            toBlobMs: 0,
+            readMs: 0,
+            encodeMs: endMs - taskStartMs,
+            totalMs: endMs - callStartMs,
+            bytes: 0,
+            pendingAtEnqueue,
+            pendingAtStart,
+          });
+        }
+        return EMPTY_PNG_UINT8;
+      }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return EMPTY_PNG_UINT8;
+
+      const getDataStartMs = perfEnabled ? perfNowMs() : 0;
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const getDataMs = perfEnabled ? perfNowMs() - getDataStartMs : 0;
+
+      const monoRGBA = rgbaToMonochrome1BitRGBA(imageData.data, w * h);
+
+      const encodeStartMs = perfEnabled ? perfNowMs() : 0;
+      const pngArrayBuffer = UPNG.encode([monoRGBA.buffer], w, h, 2);
+      const encodeMs = perfEnabled ? perfNowMs() - encodeStartMs : 0;
+
+      const bytes = arrayBufferToUint8Array(pngArrayBuffer);
+
+      if (perfEnabled) {
+        const endMs = perfNowMs();
+        recordPngEncodePerf({
+          label,
+          width: w,
+          height: h,
+          qwaitMs: taskStartMs - callStartMs,
+          toBlobMs: getDataMs,
+          readMs: encodeMs,
+          encodeMs: endMs - taskStartMs,
+          totalMs: endMs - callStartMs,
+          bytes: bytes.length,
+          pendingAtEnqueue,
+          pendingAtStart,
+        });
+      }
+      return bytes;
+    } finally {
+      if (perfEnabled) {
+        pngEncodePendingCount = Math.max(0, pngEncodePendingCount - 1);
+      }
+    }
+  });
+}
+
+/**
  * Encode a canvas as a 4-bit greyscale indexed PNG for the G2 display.
  * Pre-converts RGBA to the 16 grey levels the G2 micro-LED actually renders,
  * producing dramatically smaller PNGs (~60-70% smaller than 32-bit RGBA).

@@ -74,6 +74,7 @@ vi.mock("../../src/render/png-utils", () => ({
   canvasToPngBytes: h.canvasToPngBytes,
   canvasToPngUint8Bytes: h.canvasToPngUint8Bytes,
   canvasToGreyscaleIndexedPngUint8Bytes: h.canvasToPngUint8Bytes,
+  canvasToMonochrome1BitPngUint8Bytes: h.canvasToPngUint8Bytes,
   getPngBytesHash: h.getPngBytesHash,
   pngBytesToImageBitmap: h.pngBytesToImageBitmap,
 }));

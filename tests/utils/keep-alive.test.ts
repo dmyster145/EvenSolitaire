@@ -66,7 +66,7 @@ describe("keep-alive", () => {
 
     // Fresh AudioContext constructor for each test
     lastAudioCtx = createMockAudioContext();
-    MockAudioContextCtor = vi.fn(() => lastAudioCtx);
+    MockAudioContextCtor = vi.fn(function () { return lastAudioCtx; });
     (globalThis as unknown as { window: Record<string, unknown> }).window ??= {} as Record<string, unknown>;
     (window as unknown as Record<string, unknown>).AudioContext = MockAudioContextCtor;
     delete (window as unknown as Record<string, unknown>).webkitAudioContext;
