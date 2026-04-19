@@ -496,7 +496,6 @@ export function rootReducer(
       if (opt === "Reset") {
         return { ...state, ui: { ...state.ui, pendingResetConfirm: true, menuSelectedIndex: 0 } };
       }
-      if (opt === "Exit") return { ...state, ui: { ...state.ui, menuOpen: false } };
       return { ...state, ui: { ...state.ui, menuOpen: false } };
     }
 

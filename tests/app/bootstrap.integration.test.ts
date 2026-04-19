@@ -22,7 +22,6 @@ const h = vi.hoisted(() => {
     resetTapCooldown: vi.fn(),
     loadGame: vi.fn<() => Promise<{ game: GameState; moveAssist: boolean } | null>>(async () => null),
     saveGame: vi.fn<(game: GameState, moveAssist: boolean) => Promise<void>>(async () => {}),
-    setStorageBridge: vi.fn(),
     whenCardAssetsReady: vi.fn((_cb: () => void) => {}),
     whenCardSuitAssetsReady: vi.fn((_cb: () => void) => {}),
     perfLog,
@@ -55,9 +54,6 @@ vi.mock("../../src/storage/save-game", () => ({
   saveGame: h.saveGame,
 }));
 
-vi.mock("../../src/storage/local", () => ({
-  setStorageBridge: h.setStorageBridge,
-}));
 
 vi.mock("../../src/render/card-canvas", () => ({
   whenCardAssetsReady: h.whenCardAssetsReady,
@@ -234,7 +230,7 @@ describe("bootstrap integration (mocked bridge/runtime)", () => {
     await initApp();
 
     const hub = await getLatestHub();
-    expect(h.setStorageBridge).toHaveBeenCalledWith(h.storageBridge);
+
     expect(h.composeStartupPage).toHaveBeenCalledTimes(1);
     expect(h.sendInitialImages).toHaveBeenCalledTimes(1);
     const sentState = h.sendInitialImages.mock.calls[0]?.[1];

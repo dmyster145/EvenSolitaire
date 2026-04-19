@@ -1,6 +1,12 @@
 import { defineConfig } from "vite";
+import { readFileSync } from "fs";
+
+const appJson = JSON.parse(readFileSync("./app.json", "utf-8")) as { version: string };
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appJson.version),
+  },
   root: ".",
   server: {
     host: true,

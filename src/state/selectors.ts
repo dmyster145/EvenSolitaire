@@ -4,12 +4,12 @@ import { FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOC
 import type { Card, Suit, Rank } from "../game/types";
 import { getLegalDests } from "../game/validation";
 
-/** Menu lines for overlay: Move Assist: On/Off, Draw Card, Reset, Exit; or Reset confirmation Yes/No. */
+/** Menu lines for overlay: Move Assist: On/Off, Draw Card, Reset; or Reset confirmation Yes/No. */
 export function getMenuLines(state: AppState): string[] {
   if (!state.ui.menuOpen) return [];
   if (state.ui.pendingResetConfirm) return ["Yes", "No"];
   const moveAssistLabel = state.ui.moveAssist ? "Move Assist: On" : "Move Assist: Off";
-  return [moveAssistLabel, "Draw Card", "Reset", "Exit"];
+  return [moveAssistLabel, "Draw Card", "Reset"];
 }
 
 function getMenuHudLines(state: AppState): string[] {

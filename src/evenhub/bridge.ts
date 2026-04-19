@@ -119,6 +119,8 @@ const TEXT_UPDATE_SEND_TIMEOUT_MS = 1200;
 const TEXT_UPDATE_RETRY_COOLDOWN_MS = 600;
 const TEXT_SURVIVAL_GATE_RETRY_MS = 500;
 const IMAGE_DEFAULT_POST_SEND_GAP_MS = 40;
+const REBUILD_QUIESCE_MAX_WAIT_MS = 500;
+const REBUILD_QUIESCE_POLL_INTERVAL_MS = 15;
 
 function imagePriorityRank(priority: ImageUpdatePriority | undefined): number {
   switch (priority) {
@@ -135,6 +137,7 @@ export class EvenHubBridge {
   private bridge: EvenAppBridgeType | null = null;
   private imageQueue: QueuedImageUpdate[] = [];
   private isSendingImage = false;
+  private isRebuilding = false;
   private activeImageQueueRunnerId = 0;
   private nextImageQueueRunnerId = 0;
   private inFlightImageCoalesceKey: string | null = null;
@@ -282,11 +285,62 @@ export class EvenHubBridge {
 
   async rebuildPage(container: RebuildPageContainer): Promise<boolean> {
     if (!this.bridge) return false;
+    this.isRebuilding = true;
+    const quiesceStartMs = perfNowMs();
     try {
-      return await this.bridge.rebuildPageContainer(container);
-    } catch (err) {
-      error("[EvenHubBridge] rebuildPageContainer error:", err);
-      return false;
+      await this.quiesceInFlightSendsForRebuild();
+      const quiesceMs = perfNowMs() - quiesceStartMs;
+      const startedAtMs = perfNowMs();
+      try {
+        const ok = await this.bridge.rebuildPageContainer(container);
+        const rebuildMs = perfNowMs() - startedAtMs;
+        perfLogLazy(
+          () =>
+            `[Perf][Bridge][Rebuild] ok=${ok ? "y" : "n"} ` +
+            `quiesce=${quiesceMs.toFixed(1)}ms rebuild=${rebuildMs.toFixed(1)}ms ` +
+            `imgQ=${this.imageQueue.length} txtQ=${this.textQueue.size}`
+        );
+        return ok;
+      } catch (err) {
+        error("[EvenHubBridge] rebuildPageContainer error:", err);
+        return false;
+      }
+    } finally {
+      this.isRebuilding = false;
+      if (this.imageQueue.length > 0 || this.inFlightDeferredCoalesced.size > 0) {
+        void this.processImageQueue();
+      }
+      if (this.textQueue.size > 0) {
+        void this.processTextQueue();
+      }
+    }
+  }
+
+  private async quiesceInFlightSendsForRebuild(): Promise<void> {
+    const startMs = perfNowMs();
+    while (
+      (this.isSendingImage ||
+        this.inFlightQueuedImage != null ||
+        this.isSendingText ||
+        this.inFlightTextUpdate != null) &&
+      perfNowMs() - startMs < REBUILD_QUIESCE_MAX_WAIT_MS
+    ) {
+      await new Promise<void>((r) => setTimeout(r, REBUILD_QUIESCE_POLL_INTERVAL_MS));
+    }
+    const waitedMs = perfNowMs() - startMs;
+    const drained =
+      !this.isSendingImage &&
+      this.inFlightQueuedImage == null &&
+      !this.isSendingText &&
+      this.inFlightTextUpdate == null;
+    if (waitedMs > 0 || !drained) {
+      perfLogLazy(
+        () =>
+          `[Perf][Bridge][Rebuild] quiesce drained=${drained ? "y" : "n"} ` +
+          `wait=${waitedMs.toFixed(1)}ms img=${this.isSendingImage ? "y" : "n"} ` +
+          `txt=${this.isSendingText ? "y" : "n"} inflight-img=${this.inFlightQueuedImage ? "y" : "n"} ` +
+          `inflight-txt=${this.inFlightTextUpdate ? "y" : "n"}`
+      );
     }
   }
 
@@ -319,11 +373,11 @@ export class EvenHubBridge {
   }
 
   private async processTextQueue(): Promise<void> {
-    if (this.isSendingText || !this.bridge || this.textSendBlocked) return;
+    if (this.isSendingText || !this.bridge || this.textSendBlocked || this.isRebuilding) return;
     this.isSendingText = true;
     try {
       while (this.textQueue.size > 0) {
-        if (!this.bridge || this.textSendBlocked) break;
+        if (!this.bridge || this.textSendBlocked || this.isRebuilding) break;
         if (this.imageInterrupted || this.imageLinkSlow) {
           const isNewBlock = this.textGateActiveStartMs === 0;
           this.textSendBlocked = true;
@@ -949,14 +1003,14 @@ export class EvenHubBridge {
   }
 
   private async processImageQueue(): Promise<void> {
-    if (this.isSendingImage || !this.bridge || this.imageSendWedged) return;
+    if (this.isSendingImage || !this.bridge || this.imageSendWedged || this.isRebuilding) return;
     this.isSendingImage = true;
     const runnerId = ++this.nextImageQueueRunnerId;
     this.activeImageQueueRunnerId = runnerId;
     try {
       let firstIteration = true;
       while (this.imageQueue.length > 0) {
-        if (runnerId !== this.activeImageQueueRunnerId || this.imageSendWedged) break;
+        if (runnerId !== this.activeImageQueueRunnerId || this.imageSendWedged || this.isRebuilding) break;
         if (!firstIteration && !this.imageSendWedged && runnerId === this.activeImageQueueRunnerId) {
           const gapMs = this.imageLinkSlow ? 80 : IMAGE_DEFAULT_POST_SEND_GAP_MS;
           this.perfBleGapCount += 1;
@@ -964,14 +1018,14 @@ export class EvenHubBridge {
           await new Promise<void>((r) => setTimeout(r, gapMs));
         }
         firstIteration = false;
-        if (runnerId !== this.activeImageQueueRunnerId || this.imageSendWedged) break;
+        if (runnerId !== this.activeImageQueueRunnerId || this.imageSendWedged || this.isRebuilding) break;
         if (this.imageInterrupted) this.pruneQueuedImagesForInterruption();
         if (this.imageQueue.length <= 0) break;
         const queued = this.imageQueue.shift()!;
         if (await this.maybeThrottleImageSendForTransportPressure(queued)) {
           continue;
         }
-        if (runnerId !== this.activeImageQueueRunnerId || this.imageSendWedged) break;
+        if (runnerId !== this.activeImageQueueRunnerId || this.imageSendWedged || this.isRebuilding) break;
         this.inFlightImageCoalesceKey = queued.coalesceKey;
         const sendStartedAtMs = perfNowMs();
         if (queued.data.containerID != null) {

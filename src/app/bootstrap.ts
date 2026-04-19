@@ -15,7 +15,6 @@ import { EvenHubBridge } from "../evenhub/bridge";
 import { mapEvenHubEvent } from "../input/action-map";
 import { resetTapCooldown } from "../input/gestures";
 import { loadGame, saveGame } from "../storage/save-game";
-import { setStorageBridge } from "../storage/local";
 import { whenCardAssetsReady, whenCardSuitAssetsReady } from "../render/card-canvas";
 import { perfLogLazy, perfNowMs } from "../perf/log";
 import { getInfoPanelText } from "../state/selectors";
@@ -162,7 +161,7 @@ function isGameplayBurstAction(actionType: Action["type"] | "-"): boolean {
 export async function initApp(): Promise<void> {
   const hub = new EvenHubBridge();
   await hub.init();
-  setStorageBridge(hub.getStorageBridge());
+
 
   const saved = await loadGame();
   const initial = saved

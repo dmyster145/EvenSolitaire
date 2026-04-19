@@ -1,7 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setStorageBridge, getStored, setStored } from "../../src/storage/local";
+import { getStored, setStored } from "../../src/storage/local";
 import { deserializeSave, loadGame, saveGame, serializeSave } from "../../src/storage/save-game";
 import type { Card, GameState } from "../../src/game/types";
+
+// Mock the SDK bridge — tests configure mockBridge per-test to simulate bridge presence/absence.
+const mockBridge = {
+  getLocalStorage: vi.fn<(key: string) => Promise<string>>(async () => ""),
+  setLocalStorage: vi.fn<(key: string, value: string) => Promise<boolean>>(async () => true),
+};
+
+vi.mock("@evenrealities/even_hub_sdk", () => ({
+  waitForEvenAppBridge: vi.fn(async () => mockBridge),
+}));
+
+import { waitForEvenAppBridge, type EvenAppBridge } from "@evenrealities/even_hub_sdk";
+
+function fakeBridge(overrides: Partial<Pick<EvenAppBridge, "getLocalStorage" | "setLocalStorage">>): EvenAppBridge {
+  return {
+    ...mockBridge,
+    ...overrides,
+  } as unknown as EvenAppBridge;
+}
 
 function card(id: string, rank: Card["rank"], suit: Card["suit"], faceUp = true): Card {
   return { id, rank, suit, faceUp };
@@ -48,15 +67,15 @@ function installMemoryLocalStorage() {
 
 describe("storage/local runtime behavior", () => {
   beforeEach(() => {
-    setStorageBridge(null);
+    vi.mocked(waitForEvenAppBridge).mockRejectedValue(new Error("not in Even Hub"));
     installMemoryLocalStorage();
   });
 
   afterEach(() => {
-    setStorageBridge(null);
+    vi.clearAllMocks();
   });
 
-  it("reads and writes browser storage when bridge is not set", async () => {
+  it("reads and writes browser storage when bridge is not available", async () => {
     const writeOk = await setStored("k1", "v1");
     const read = await getStored("k1");
 
@@ -65,89 +84,59 @@ describe("storage/local runtime behavior", () => {
   });
 
   it("prefers bridge get when bridge returns non-empty value", async () => {
-    setStorageBridge({
-      async getLocalStorage() {
-        return "bridge-value";
-      },
-      async setLocalStorage() {
-        return true;
-      },
-    });
+    vi.mocked(waitForEvenAppBridge).mockResolvedValue(
+      fakeBridge({ getLocalStorage: async () => "bridge-value" })
+    );
 
     const read = await getStored("k2");
     expect(read).toBe("bridge-value");
   });
 
-  it("falls back to browser storage when bridge get returns empty", async () => {
-    await setStored("k3", "browser-value");
-    setStorageBridge({
-      async getLocalStorage() {
-        return "";
-      },
-      async setLocalStorage() {
-        return true;
-      },
-    });
+  it("returns null when bridge get returns empty string", async () => {
+    vi.mocked(waitForEvenAppBridge).mockResolvedValue(
+      fakeBridge({ getLocalStorage: async () => "" })
+    );
 
     const read = await getStored("k3");
-    expect(read).toBe("browser-value");
+    expect(read).toBeNull();
   });
 
-  it("falls back to browser storage when bridge get throws", async () => {
+  it("falls back to browser storage when bridge throws", async () => {
     await setStored("k4", "browser-value");
-    setStorageBridge({
-      async getLocalStorage() {
-        throw new Error("boom");
-      },
-      async setLocalStorage() {
-        return true;
-      },
-    });
+    vi.mocked(waitForEvenAppBridge).mockRejectedValue(new Error("boom"));
 
     const read = await getStored("k4");
     expect(read).toBe("browser-value");
   });
 
-  it("returns true from setStored when bridge write fails but browser write succeeds", async () => {
-    setStorageBridge({
-      async getLocalStorage() {
-        return "";
-      },
-      async setLocalStorage() {
-        return false;
-      },
-    });
+  it("returns true from setStored when bridge write succeeds without throwing", async () => {
+    vi.mocked(waitForEvenAppBridge).mockResolvedValue(
+      fakeBridge({ setLocalStorage: async () => false }) // return value ignored — no throw = success
+    );
 
     const ok = await setStored("k5", "v5");
     expect(ok).toBe(true);
   });
 
-  it("does not mirror to browser storage when bridge write succeeds", async () => {
+  it("falls back to browser storage when bridge throws on set", async () => {
     const local = installMemoryLocalStorage();
     const setItemSpy = vi.spyOn(local, "setItem");
-    setStorageBridge({
-      async getLocalStorage() {
-        return "";
-      },
-      async setLocalStorage() {
-        return true;
-      },
-    });
+    vi.mocked(waitForEvenAppBridge).mockRejectedValue(new Error("bridge unavailable"));
 
     const ok = await setStored("k6", "v6");
     expect(ok).toBe(true);
-    expect(setItemSpy).not.toHaveBeenCalled();
+    expect(setItemSpy).toHaveBeenCalled();
   });
 });
 
 describe("storage/save-game serialization", () => {
   beforeEach(() => {
-    setStorageBridge(null);
+    vi.mocked(waitForEvenAppBridge).mockRejectedValue(new Error("not in Even Hub"));
     installMemoryLocalStorage();
   });
 
   afterEach(() => {
-    setStorageBridge(null);
+    vi.clearAllMocks();
   });
 
   it("serializes and deserializes save payload", () => {

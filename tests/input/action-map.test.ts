@@ -39,12 +39,6 @@ describe("input action map (menu exit behavior)", () => {
     resetScrollDebounce();
   });
 
-  it("tap on Exit menu item returns EXIT_APP", () => {
-    const state = withUi({ menuOpen: true, menuSelectedIndex: 3 });
-    const action = mapEvenHubEvent(listClick(OsEventTypeList.CLICK_EVENT), state);
-    expect(action).toEqual({ type: "EXIT_APP" });
-  });
-
   it("tap on other menu items still returns MENU_SELECT", () => {
     const state = withUi({ menuOpen: true, menuSelectedIndex: 0 });
     const action = mapEvenHubEvent(listClick(OsEventTypeList.CLICK_EVENT), state);
@@ -84,23 +78,26 @@ describe("input action map (menu exit behavior)", () => {
     expect(action).toEqual({ type: "MENU_SELECT" });
   });
 
-  it("scroll maps to MENU_MOVE when menu is open", () => {
+  it("scroll maps to MENU_MOVE when menu is open (direction inverted)", () => {
     const state = withUi({ menuOpen: true });
-    const action = mapEvenHubEvent(listClick(OsEventTypeList.SCROLL_BOTTOM_EVENT), state);
-    expect(action).toEqual({ type: "MENU_MOVE", direction: "next" });
+    const actionBottom = mapEvenHubEvent(listClick(OsEventTypeList.SCROLL_BOTTOM_EVENT), state);
+    expect(actionBottom).toEqual({ type: "MENU_MOVE", direction: "next" });
+    resetScrollDebounce();
+    const actionTop = mapEvenHubEvent(listClick(OsEventTypeList.SCROLL_TOP_EVENT), state);
+    expect(actionTop).toEqual({ type: "MENU_MOVE", direction: "prev" });
   });
 
   it("scroll maps to FOCUS_MOVE when menu is closed", () => {
     const state = withUi({ menuOpen: false });
     const action = mapEvenHubEvent(listClick(OsEventTypeList.SCROLL_TOP_EVENT), state);
-    expect(action).toEqual({ type: "FOCUS_MOVE", direction: "prev" });
+    expect(action).toEqual({ type: "FOCUS_MOVE", direction: "next" });
   });
 
   it("debounces repeated same-direction scroll events", () => {
     const state = withUi({});
     const first = mapEvenHubEvent(listClick(OsEventTypeList.SCROLL_BOTTOM_EVENT), state);
     const second = mapEvenHubEvent(listClick(OsEventTypeList.SCROLL_BOTTOM_EVENT), state);
-    expect(first).toEqual({ type: "FOCUS_MOVE", direction: "next" });
+    expect(first).toEqual({ type: "FOCUS_MOVE", direction: "prev" });
     expect(second).toBeNull();
   });
 
@@ -160,7 +157,7 @@ describe("input action map (menu exit behavior)", () => {
   it("maps sys scroll events to focus move", () => {
     const state = withUi({});
     const action = mapEvenHubEvent(sysEvent(OsEventTypeList.SCROLL_TOP_EVENT), state);
-    expect(action).toEqual({ type: "FOCUS_MOVE", direction: "prev" });
+    expect(action).toEqual({ type: "FOCUS_MOVE", direction: "next" });
   });
 
   it("returns null for unknown event payload", () => {

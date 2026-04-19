@@ -1,16 +1,10 @@
 /**
  * Local storage helpers. Uses bridge when available (G2); falls back to localStorage in browser.
+ * Note: browser localStorage is NOT persisted across app restarts on G2 — bridge storage is required.
+ * Pattern matches EvenChess: call waitForEvenAppBridge() on every operation, do not check the
+ * boolean return value of setLocalStorage (trust it worked if it did not throw).
  */
-export type StorageBridge = {
-  getLocalStorage(key: string): Promise<string>;
-  setLocalStorage(key: string, value: string): Promise<boolean>;
-};
-
-let bridge: StorageBridge | null = null;
-
-export function setStorageBridge(b: StorageBridge | null): void {
-  bridge = b;
-}
+import { waitForEvenAppBridge } from "@evenrealities/even_hub_sdk";
 
 function readBrowserStorage(key: string): string | null {
   try {
@@ -30,29 +24,23 @@ function writeBrowserStorage(key: string, value: string): boolean {
 }
 
 export async function getStored(key: string): Promise<string | null> {
-  if (bridge) {
-    try {
-      const v = await bridge.getLocalStorage(key);
-      if (typeof v === "string" && v.length > 0) return v;
-      return readBrowserStorage(key);
-    } catch {
-      return readBrowserStorage(key);
-    }
+  try {
+    const bridge = await waitForEvenAppBridge();
+    const v = await bridge.getLocalStorage(key);
+    return typeof v === "string" && v.length > 0 ? v : null;
+  } catch {
+    // Not in Even Hub — fall back to browser localStorage (dev/browser only).
+    return readBrowserStorage(key);
   }
-  return readBrowserStorage(key);
 }
 
 export async function setStored(key: string, value: string): Promise<boolean> {
-  if (bridge) {
-    try {
-      const bridgeOk = await bridge.setLocalStorage(key, value);
-      if (bridgeOk) return true;
-    } catch {
-      // Fall through to browser storage fallback.
-    }
-    // Browser fallback only when bridge storage is unavailable/failing.
-    // Avoid a second synchronous write in the common bridge-success path.
+  try {
+    const bridge = await waitForEvenAppBridge();
+    await bridge.setLocalStorage(key, value);
+    return true;
+  } catch {
+    // Not in Even Hub — fall back to browser localStorage (dev/browser only).
     return writeBrowserStorage(key, value);
   }
-  return writeBrowserStorage(key, value);
 }

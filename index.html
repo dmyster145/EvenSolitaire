@@ -728,6 +728,7 @@
 
       <footer class="footer">
         <p>Solitaire docs | Based on Klondike Solitaire rules</p>
+        <p id="app-version" style="margin-top:6px;color:#232323;"></p>
       </footer>
     </div>
 
@@ -743,6 +744,10 @@
     </div>
 
     <script type="module" src="/src/main.ts"></script>
+    <script type="module">
+      const el = document.getElementById('app-version');
+      if (el) el.textContent = 'v' + __APP_VERSION__;
+    </script>
     <script>
       function syncDebugDocsVisibility() {
         const cfg = window.__solitairePerfConfig;

@@ -101,7 +101,10 @@ function mapSysEvent(event: Sys_ItemEvent, state: AppState): Action | null {
 }
 
 function scrollAction(state: AppState, direction: "next" | "prev"): Action {
-  if (state.ui.menuOpen) return { type: "MENU_MOVE", direction };
+  if (state.ui.menuOpen) {
+    const menuDirection = direction === "next" ? "prev" : "next";
+    return { type: "MENU_MOVE", direction: menuDirection };
+  }
   return { type: "FOCUS_MOVE", direction };
 }
 
@@ -109,7 +112,6 @@ function tapAction(state: AppState): Action {
   if (state.ui.menuOpen) {
     if (state.ui.pendingResetConfirm) return { type: "MENU_SELECT" };
     const opt = MENU_OPTIONS[state.ui.menuSelectedIndex];
-    if (opt === "Exit") return { type: "EXIT_APP" };
     return { type: "MENU_SELECT" };
   }
   if (state.game.won) {

@@ -398,11 +398,13 @@ describe("EvenHubBridge transport stress", () => {
     // Text gate retry after 500ms — interruption still active, gate should NOT release
     await vi.advanceTimersByTimeAsync(500);
 
-    // Resolve the slow image send and clear interruption with 3 fast sends
+    // Resolve the slow image send and clear interruption + linkSlow with enough fast sends.
+    // linkSlow recovery requires pushing the slow sample (2500ms) out of the 8-sample window,
+    // so 8 fast sends are needed before maxSendMs drops below IMAGE_LINK_SLOW_RECOVER_MAX_SEND_MS.
     resolves[1]?.({ ok: true });
     await vi.advanceTimersByTimeAsync(0);
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 8; i++) {
       await sendFastImage(bridge, ImageRawDataUpdate, 1, resolves, 50);
       await vi.advanceTimersByTimeAsync(100);
     }
