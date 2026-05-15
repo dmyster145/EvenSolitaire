@@ -20,6 +20,7 @@ export type Action =
   | { type: "CANCEL_SELECTION" }
   | { type: "UNDO" }
   | { type: "EXIT_APP" }
+  | { type: "OPEN_EXIT_APP_UI" }
   | { type: "OPEN_MENU" }
   | { type: "CLOSE_MENU" }
   | { type: "TOGGLE_MENU" }

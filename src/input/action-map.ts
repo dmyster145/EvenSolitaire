@@ -131,7 +131,7 @@ function tapAction(state: AppState): Action {
 }
 
 function doubleTapAction(state: AppState): Action {
-  if (state.ui.menuOpen) return { type: "TOGGLE_MENU" };
+  if (state.ui.menuOpen) return { type: "OPEN_EXIT_APP_UI" };
   if (state.game.won) return { type: "TOGGLE_MENU" };
   const hasSelection =
     state.ui.mode === "select_source" || state.ui.mode === "select_destination";

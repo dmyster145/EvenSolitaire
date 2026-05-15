@@ -45,10 +45,10 @@ describe("input action map (menu exit behavior)", () => {
     expect(action).toEqual({ type: "MENU_SELECT" });
   });
 
-  it("double tap with menu open returns TOGGLE_MENU (closes menu)", () => {
+  it("double tap with menu open returns OPEN_EXIT_APP_UI", () => {
     const state = withUi({ menuOpen: true, menuSelectedIndex: 2 });
     const action = mapEvenHubEvent(listClick(OsEventTypeList.DOUBLE_CLICK_EVENT), state);
-    expect(action).toEqual({ type: "TOGGLE_MENU" });
+    expect(action).toEqual({ type: "OPEN_EXIT_APP_UI" });
   });
 
   it("tap on win starts a new game", () => {
