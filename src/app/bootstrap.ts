@@ -19,6 +19,7 @@ import { resetActiveContainers } from "../evenhub/active-containers";
 import {
   ALL_CONTAINER_IDS,
   composeStartupPage,
+  composeInputModePage,
 } from "../render/page";
 import { sendFrame, resetSendMemo } from "../render/send";
 import { renderFrame, resetFrameMemo } from "../render/frame";
@@ -82,12 +83,37 @@ export async function initApp(): Promise<void> {
   scheduler.schedule();
 
   // ----- input -----
+  // ----- exit dialog state -----
+  // shutDownPageContainer(1) fires FOREGROUND_ENTER when the dialog appears and
+  // FOREGROUND_EXIT when the user taps "No" — inverted vs. a real background event.
+  // The flag prevents treating "No" as an app-backgrounded pause/freeze.
+  let exitDialogPending = false;
+  let exitDialogSafetyTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  function armExitDialog(): void {
+    exitDialogPending = true;
+    if (exitDialogSafetyTimeout) clearTimeout(exitDialogSafetyTimeout);
+    exitDialogSafetyTimeout = setTimeout(() => {
+      exitDialogPending = false;
+      exitDialogSafetyTimeout = null;
+    }, 20_000);
+  }
+
+  function clearExitDialog(): void {
+    exitDialogPending = false;
+    if (exitDialogSafetyTimeout) {
+      clearTimeout(exitDialogSafetyTimeout);
+      exitDialogSafetyTimeout = null;
+    }
+  }
+
   const guardedEventHandler = createEventGuard<EvenHubEvent>((event) => {
     handleSystemSysEvent(event);
     const action = mapEvenHubEvent(event, store.getState());
     if (!action) return;
     if (action.type === "NEW_GAME") resetTapCooldown();
     if (action.type === "OPEN_EXIT_APP_UI") {
+      armExitDialog();
       void hub.showExitUI();
       return;
     }
@@ -104,9 +130,41 @@ export async function initApp(): Promise<void> {
 
   function handleSystemSysEvent(event: EvenHubEvent): void {
     const et = event.sysEvent?.eventType;
+
     if (et === OsEventTypeList.ABNORMAL_EXIT_EVENT || et === OsEventTypeList.SYSTEM_EXIT_EVENT) {
+      clearExitDialog();
       void shutdown();
+      return;
     }
+
+    if (exitDialogPending) {
+      if (et === OsEventTypeList.FOREGROUND_ENTER_EVENT) {
+        // Dialog appeared. Containers are dead — clear the active set so any stray
+        // renders (blink timer etc.) don't try to send to dead containers.
+        // Pre-rebuild in the background so containers are live before "No" fires.
+        resetActiveContainers([]);
+        void hub.rebuildPage(composeInputModePage());
+        return;
+      }
+      if (et === OsEventTypeList.FOREGROUND_EXIT_EVENT) {
+        // "No" tapped — dialog dismissed. Rebuild unconditionally (covers the case
+        // where the FOREGROUND_ENTER pre-rebuild hadn't completed), then restore display.
+        clearExitDialog();
+        void rebuildAndRenderOnCancel();
+        return;
+      }
+    }
+  }
+
+  async function rebuildAndRenderOnCancel(): Promise<void> {
+    const ok = await hub.rebuildPage(composeInputModePage());
+    if (!ok && hub.isReady()) {
+      logError("[Solitaire] rebuildPage on exit cancel failed.");
+    }
+    resetActiveContainers(ALL_CONTAINER_IDS);
+    resetSendMemo();
+    resetFrameMemo();
+    scheduler.schedule();
   }
 
   // ----- store effects: render + autosave + blink tick -----
