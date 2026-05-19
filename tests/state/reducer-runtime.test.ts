@@ -112,7 +112,7 @@ describe("state reducer runtime flows", () => {
     expect(next.ui.selection.selectedCardCount).toBe(1);
   });
 
-  it("illegal destination select sets blink and re-focuses source", () => {
+  it("illegal destination select returns to browse with invalid-move message", () => {
     const game = emptyGame();
     game.waste = [card("w2c", 2, "C")];
     const state: AppState = {
@@ -127,27 +127,31 @@ describe("state reducer runtime flows", () => {
 
     const next = rootReducer(state, { type: "DEST_SELECT", dest: { area: "foundation", index: 0 } });
 
+    expect(next.ui.mode).toBe("browse");
+    expect(next.ui.selection).toEqual({});
     expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_WASTE));
-    expect(next.ui.selectionInvalidBlink).toEqual({ remaining: 4, visible: true });
+    expect(next.ui.message).toBe("Invalid move");
   });
 
-  it("blink tick clears selection when countdown reaches zero", () => {
+  it("explicit DEST_SELECT_INVALID returns to browse with invalid-move message", () => {
     const game = emptyGame();
+    game.waste = [card("w2c", 2, "C")];
     const state: AppState = {
       ...withGame(game),
       ui: {
         ...initialState.ui,
         mode: "select_destination",
+        focus: focusIndexToTarget(FOCUS_INDEX_STOCK),
         selection: { source: focusIndexToTarget(FOCUS_INDEX_WASTE), selectedCardCount: 1 },
-        selectionInvalidBlink: { remaining: 1, visible: true },
       },
     };
 
-    const next = rootReducer(state, { type: "BLINK_TICK" });
+    const next = rootReducer(state, { type: "DEST_SELECT_INVALID" });
 
     expect(next.ui.mode).toBe("browse");
     expect(next.ui.selection).toEqual({});
-    expect(next.ui.selectionInvalidBlink).toBeUndefined();
+    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_WASTE));
+    expect(next.ui.message).toBe("Invalid move");
   });
 
   it("cancel selection returns to browse and keeps source focus", () => {

@@ -28,9 +28,4 @@ export type Action =
   | { type: "MENU_SELECT" }
   | { type: "SHOW_MESSAGE"; message: string }
   | { type: "DISMISS_MESSAGE" }
-  | { type: "BLINK_TICK" }
-  | { type: "WIN_ANIMATION_START" }
-  | { type: "WIN_ANIMATION_TICK" }
-  | { type: "WIN_ANIMATION_SKIP" }
-  | { type: "DEMO_WIN_ANIMATION" }
   | { type: "RESTORE_SAVED_STATE"; game: GameState; moveAssist: boolean };

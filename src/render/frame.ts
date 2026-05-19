@@ -160,7 +160,6 @@ type BoardViewContext = {
   floatingCards: ReturnType<typeof getFloatingCards>;
   blinkVisible: boolean;
   menuLines: string[];
-  winAnimation: AppState["ui"]["winAnimation"] | undefined;
 };
 
 function buildBoardViewContext(state: AppState): BoardViewContext {
@@ -170,9 +169,8 @@ function buildBoardViewContext(state: AppState): BoardViewContext {
     focusIdx: focusTargetToIndex(state.ui.focus),
     selectionSource: state.ui.selection.source,
     floatingCards: getFloatingCards(state),
-    blinkVisible: state.ui.selectionInvalidBlink?.visible ?? true,
+    blinkVisible: true,
     menuLines: getMenuLines(state),
-    winAnimation: state.game.won ? state.ui.winAnimation : undefined,
   };
 }
 
@@ -196,8 +194,6 @@ function topRowViewFromState(state: AppState, boardCtx: BoardViewContext): TopRo
     );
   }
   const tableauFloatingCards = hasFloating && focusIdx >= 6 ? floatingCards : undefined;
-  const wa = boardCtx.winAnimation;
-  const flyingInTop = wa?.phase === "playing" && wa.flyingCard && wa.flyY < FULL_SCREEN_CENTER_Y;
   return {
     stockCount: pv.stockCount,
     wasteTop: pv.wasteTop,
@@ -211,10 +207,6 @@ function topRowViewFromState(state: AppState, boardCtx: BoardViewContext): TopRo
     foundationWithoutTop,
     menuOverlay: undefined,
     tableauFloatingCards,
-    flyingCard:
-      flyingInTop && wa?.flyingCard
-        ? { card: wa.flyingCard, centerX: wa.flyX, centerY: wa.flyY }
-        : undefined,
   };
 }
 
@@ -239,8 +231,6 @@ function tableauViewFromState(state: AppState, boardCtx: BoardViewContext): Tabl
     }
     return { hidden: pile.hidden, visible: [...pile.visible] };
   });
-  const wa = boardCtx.winAnimation;
-  const flyingInTableau = wa?.phase === "playing" && wa.flyingCard && wa.flyY >= FULL_SCREEN_CENTER_Y;
   return {
     piles,
     focusIndex: focusIdx >= 6 ? focusIdx - 6 : -1,
@@ -250,10 +240,6 @@ function tableauViewFromState(state: AppState, boardCtx: BoardViewContext): Tabl
     blinkVisible: boardCtx.blinkVisible,
     selectionCount: sourceTableauIdx !== null && hasFloating ? count : undefined,
     menuOverlay: undefined,
-    flyingCard:
-      flyingInTableau && wa?.flyingCard
-        ? { card: wa.flyingCard, centerX: wa.flyX, centerY: wa.flyY }
-        : undefined,
   };
 }
 

@@ -57,23 +57,19 @@ function bytesEqual(a: Uint8Array, b: Uint8Array | null): boolean {
   return true;
 }
 
-export async function sendFrame(hub: SendBridge, frame: Frame): Promise<void> {
-  if (isActive(IMAGE_TILE_TOP.id) && frame.topPng.length > 0 && !bytesEqual(frame.topPng, lastTopPng)) {
-    await hub.updateImage(packImage(IMAGE_TILE_TOP.id, IMAGE_TILE_TOP.name, frame.topPng));
-    lastTopPng = frame.topPng;
-  }
-  if (isActive(IMAGE_TILE_BOTTOM_LEFT.id) && frame.bottomLeftPng.length > 0 && !bytesEqual(frame.bottomLeftPng, lastBottomLeftPng)) {
-    await hub.updateImage(
-      packImage(IMAGE_TILE_BOTTOM_LEFT.id, IMAGE_TILE_BOTTOM_LEFT.name, frame.bottomLeftPng)
-    );
-    lastBottomLeftPng = frame.bottomLeftPng;
-  }
-  if (isActive(IMAGE_TILE_BOTTOM_RIGHT.id) && frame.bottomRightPng.length > 0 && !bytesEqual(frame.bottomRightPng, lastBottomRightPng)) {
-    await hub.updateImage(
-      packImage(IMAGE_TILE_BOTTOM_RIGHT.id, IMAGE_TILE_BOTTOM_RIGHT.name, frame.bottomRightPng)
-    );
-    lastBottomRightPng = frame.bottomRightPng;
-  }
+/**
+ * Send a frame. Text goes out FIRST (cheap) so the panel stays live even when
+ * the slow image tiles that follow are skipped. Image tiles can be suppressed
+ * entirely via `options.images = false`, or aborted mid-frame via
+ * `options.shouldAbortImages` (checked before each tile) so fresh navigation
+ * input isn't stuck behind an in-flight image flush — only one already-started
+ * tile can block, not the whole frame.
+ */
+export async function sendFrame(
+  hub: SendBridge,
+  frame: Frame,
+  options: { images?: boolean; shouldAbortImages?: () => boolean } = {}
+): Promise<void> {
   if (isActive(INFO_TEXT_CONTAINER.id) && frame.infoText !== lastInfoTextSent) {
     const ok = await hub.updateText(
       INFO_TEXT_CONTAINER.id,
@@ -81,6 +77,29 @@ export async function sendFrame(hub: SendBridge, frame: Frame): Promise<void> {
       frame.infoText
     );
     if (ok) lastInfoTextSent = frame.infoText;
+  }
+
+  if (options.images === false) return;
+  const aborted = options.shouldAbortImages ?? (() => false);
+
+  if (aborted()) return;
+  if (isActive(IMAGE_TILE_TOP.id) && frame.topPng.length > 0 && !bytesEqual(frame.topPng, lastTopPng)) {
+    await hub.updateImage(packImage(IMAGE_TILE_TOP.id, IMAGE_TILE_TOP.name, frame.topPng));
+    lastTopPng = frame.topPng;
+  }
+  if (aborted()) return;
+  if (isActive(IMAGE_TILE_BOTTOM_LEFT.id) && frame.bottomLeftPng.length > 0 && !bytesEqual(frame.bottomLeftPng, lastBottomLeftPng)) {
+    await hub.updateImage(
+      packImage(IMAGE_TILE_BOTTOM_LEFT.id, IMAGE_TILE_BOTTOM_LEFT.name, frame.bottomLeftPng)
+    );
+    lastBottomLeftPng = frame.bottomLeftPng;
+  }
+  if (aborted()) return;
+  if (isActive(IMAGE_TILE_BOTTOM_RIGHT.id) && frame.bottomRightPng.length > 0 && !bytesEqual(frame.bottomRightPng, lastBottomRightPng)) {
+    await hub.updateImage(
+      packImage(IMAGE_TILE_BOTTOM_RIGHT.id, IMAGE_TILE_BOTTOM_RIGHT.name, frame.bottomRightPng)
+    );
+    lastBottomRightPng = frame.bottomRightPng;
   }
 }
 

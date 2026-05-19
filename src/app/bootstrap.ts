@@ -4,9 +4,10 @@
  *   2. Restore saved game, build store.
  *   3. setupPage once; populate activeContainerIds.
  *   4. Subscribe events behind a single re-entrancy boolean.
- *   5. store.subscribe → scheduler.schedule (single-in-flight + queue-one-more).
+ *   5. store.subscribe → scheduler.schedule (single-in-flight + queue-one-more);
+ *      navigation-only changes debounce image tiles (text stays live).
  *   6. Debounced autosave on game/setting change.
- *   7. BLINK_TICK timer driven by selectionInvalidBlink state.
+ *   7. DISMISS_MESSAGE timer driven by transient ui.message state.
  *
  * No watchdogs, no priority queue, no bridge reinit, no flush-stall/hang detection,
  * no idle visual reconcile, no suspension guard. SDK + native layer own BLE health.
@@ -34,7 +35,8 @@ import { error as logError } from "../utils/logger";
 import type { GameState } from "../game/types";
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
-const BLINK_INTERVAL_MS = 120;
+const MESSAGE_DISMISS_MS = 1500;
+const IMAGE_COOLDOWN_MS = 250;
 
 export async function initApp(): Promise<void> {
   const hub = new EvenHubBridge();
@@ -49,10 +51,43 @@ export async function initApp(): Promise<void> {
     ? { game: saved.game, moveAssist: saved.moveAssist }
     : null;
 
+  // Image-tile sends are ~0.3-0.7s over BLE; text is cheap. During rapid
+  // navigation (spam-swipe) we push text every change for live feedback but
+  // suppress image tiles, then flush one image once input stops for
+  // IMAGE_COOLDOWN_MS. Material changes (a move/draw/setting) bypass this.
+  let suppressImages = false;
+  let imageDeferred = false;
+  let inputSeq = 0;
+  let imageCooldownTimer: ReturnType<typeof setTimeout> | null = null;
+
   const scheduler = createScheduler(async () => {
+    const startSeq = inputSeq;
     const frame = await renderFrame(store.getState());
-    await sendFrame(hub, frame);
+    if (suppressImages) {
+      imageDeferred = true;
+      await sendFrame(hub, frame, { images: false });
+    } else {
+      // Abort the image flush if fresh navigation arrives mid-send, so the
+      // next text update isn't stuck behind a whole frame of image tiles.
+      await sendFrame(hub, frame, { shouldAbortImages: () => inputSeq !== startSeq });
+      imageDeferred = inputSeq !== startSeq;
+    }
   });
+
+  function clearImageCooldownTimer(): void {
+    if (imageCooldownTimer) {
+      clearTimeout(imageCooldownTimer);
+      imageCooldownTimer = null;
+    }
+  }
+
+  // Force an image-inclusive render+send now (first paint, asset-ready,
+  // page rebuild, and material game/settings changes).
+  function scheduleWithImages(): void {
+    suppressImages = false;
+    clearImageCooldownTimer();
+    scheduler.schedule();
+  }
 
   // Schedule a render once card assets are ready. They may already be ready
   // (callbacks fire immediately) or arrive after setupPage.
@@ -61,7 +96,7 @@ export async function initApp(): Promise<void> {
     assetsReadyKinds += 1;
     // Two callbacks: card images and suit glyphs.
     if (assetsReadyKinds >= 2) {
-      scheduler.schedule();
+      scheduleWithImages();
     }
   }
   whenCardAssetsReady(onAssetReady);
@@ -80,7 +115,7 @@ export async function initApp(): Promise<void> {
   }
 
   // First paint (will await assets if needed via scheduler).
-  scheduler.schedule();
+  scheduleWithImages();
 
   // ----- input -----
   // ----- exit dialog state -----
@@ -164,12 +199,12 @@ export async function initApp(): Promise<void> {
     resetActiveContainers(ALL_CONTAINER_IDS);
     resetSendMemo();
     resetFrameMemo();
-    scheduler.schedule();
+    scheduleWithImages();
   }
 
-  // ----- store effects: render + autosave + blink tick -----
+  // ----- store effects: render + autosave + message dismiss + image cooldown -----
   let pendingSave: ReturnType<typeof setTimeout> | null = null;
-  let pendingBlink: ReturnType<typeof setTimeout> | null = null;
+  let pendingMessageDismiss: ReturnType<typeof setTimeout> | null = null;
   let saveInProgress = false;
   let pendingSavePayload: { game: GameState; moveAssist: boolean } | null = null;
 
@@ -186,18 +221,37 @@ export async function initApp(): Promise<void> {
       queueAutosave(state.game, state.ui.moveAssist);
     }
 
-    scheduler.schedule();
+    if (gameOrSettingsChanged) {
+      // Material change (move/draw/setting): show the board promptly.
+      scheduleWithImages();
+    } else {
+      // Navigation/selection-only (spam-swipe): push text immediately for
+      // live feedback, defer the image until the user pauses. Bumping the
+      // sequence also aborts any image flush already in flight.
+      inputSeq += 1;
+      suppressImages = true;
+      scheduler.schedule();
+      clearImageCooldownTimer();
+      imageCooldownTimer = setTimeout(() => {
+        imageCooldownTimer = null;
+        suppressImages = false;
+        if (imageDeferred) scheduler.schedule();
+      }, IMAGE_COOLDOWN_MS);
+    }
 
-    const blink = state.ui.selectionInvalidBlink;
-    const prevBlink = prevState.ui.selectionInvalidBlink;
-    const shouldScheduleBlink =
-      blink && blink.remaining > 0 && (!prevBlink || prevBlink.remaining !== blink.remaining);
-    if (shouldScheduleBlink) {
-      if (pendingBlink) clearTimeout(pendingBlink);
-      pendingBlink = setTimeout(() => {
-        pendingBlink = null;
-        store.dispatch({ type: "BLINK_TICK" });
-      }, BLINK_INTERVAL_MS);
+    // Transient message (e.g. "Invalid move"): re-arm a single auto-dismiss
+    // timer whenever the message changes, so only the latest one is tracked.
+    if (state.ui.message !== prevState.ui.message) {
+      if (pendingMessageDismiss) {
+        clearTimeout(pendingMessageDismiss);
+        pendingMessageDismiss = null;
+      }
+      if (state.ui.message) {
+        pendingMessageDismiss = setTimeout(() => {
+          pendingMessageDismiss = null;
+          store.dispatch({ type: "DISMISS_MESSAGE" });
+        }, MESSAGE_DISMISS_MS);
+      }
     }
   });
 
@@ -229,10 +283,11 @@ export async function initApp(): Promise<void> {
   async function shutdown(): Promise<void> {
     if (shutdownStarted) return;
     shutdownStarted = true;
-    if (pendingBlink) {
-      clearTimeout(pendingBlink);
-      pendingBlink = null;
+    if (pendingMessageDismiss) {
+      clearTimeout(pendingMessageDismiss);
+      pendingMessageDismiss = null;
     }
+    clearImageCooldownTimer();
     if (pendingSave) {
       clearTimeout(pendingSave);
       pendingSave = null;

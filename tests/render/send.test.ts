@@ -66,7 +66,14 @@ describe("sendFrame", () => {
     expect(hub.updateText).toHaveBeenCalledTimes(1);
   });
 
-  it("calls bridge methods sequentially in image -> text order", async () => {
+  it("suppresses image tiles but still sends text when options.images is false", async () => {
+    const hub = makeBridge();
+    await sendFrame(hub, frame(), { images: false });
+    expect(hub.updateImage).not.toHaveBeenCalled();
+    expect(hub.updateText).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls bridge methods sequentially in text -> image order", async () => {
     const hub = makeBridge();
     const calls: string[] = [];
     hub.updateImage.mockImplementation(async (data) => {
@@ -79,11 +86,23 @@ describe("sendFrame", () => {
     });
     await sendFrame(hub, frame());
     expect(calls).toEqual([
+      "text",
       `img:${IMAGE_TILE_TOP.id}`,
       `img:${IMAGE_TILE_BOTTOM_LEFT.id}`,
       `img:${IMAGE_TILE_BOTTOM_RIGHT.id}`,
-      "text",
     ]);
+  });
+
+  it("aborts remaining image tiles once shouldAbortImages turns true (text still sent)", async () => {
+    const hub = makeBridge();
+    let imageCalls = 0;
+    hub.updateImage.mockImplementation(async () => {
+      imageCalls += 1;
+      return 0 as never;
+    });
+    await sendFrame(hub, frame(), { shouldAbortImages: () => imageCalls >= 1 });
+    expect(hub.updateText).toHaveBeenCalledTimes(1);
+    expect(hub.updateImage).toHaveBeenCalledTimes(1);
   });
 
   it("stale-send guard: discards sends for container IDs not in the active set", async () => {

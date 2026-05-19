@@ -87,7 +87,6 @@ function applyLegalMoveAndReturnBrowseState(
       ...state.ui,
       mode: "browse",
       selection: {},
-      selectionInvalidBlink: undefined,
       message: nextGame.won ? "You win!" : undefined,
     },
   };
@@ -349,8 +348,10 @@ export function rootReducer(
         ...state,
         ui: {
           ...state.ui,
+          mode: "browse",
+          selection: {},
           focus: source,
-          selectionInvalidBlink: { remaining: 4, visible: true },
+          message: "Invalid move",
         },
       };
     }
@@ -383,33 +384,10 @@ export function rootReducer(
         ...state,
         ui: {
           ...state.ui,
+          mode: "browse",
+          selection: {},
           focus: src,
-          selectionInvalidBlink: { remaining: 4, visible: true },
-        },
-      };
-    }
-
-    case "BLINK_TICK": {
-      const blink = state.ui.selectionInvalidBlink;
-      if (!blink) return state;
-      const remaining = blink.remaining - 1;
-      const visible = !blink.visible;
-      if (remaining === 0) {
-        return {
-          ...state,
-          ui: {
-            ...state.ui,
-            mode: "browse",
-            selection: {},
-            selectionInvalidBlink: undefined,
-          },
-        };
-      }
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          selectionInvalidBlink: { remaining, visible },
+          message: "Invalid move",
         },
       };
     }
@@ -424,7 +402,6 @@ export function rootReducer(
           ...state.ui,
           mode: "browse",
           selection: {},
-          selectionInvalidBlink: undefined,
           message: undefined,
           focus: source ?? state.ui.focus,
         },

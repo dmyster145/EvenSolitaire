@@ -42,7 +42,6 @@ export function getHudLines(state: AppState): string[] {
     return getMenuHudLines(state);
   }
   if (state.game.won) {
-    if (state.ui.winAnimation?.phase === "playing") return ["You win!", "Tap to skip"];
     return ["You win!", "Tap for new game"];
   }
   const modePrompt =
@@ -205,6 +204,12 @@ export function getInfoPanelText(state: AppState): string {
       lines.push("");
       lines.push(...selectedSection);
     }
+  }
+
+  // Transient status line (e.g. "Invalid move"). Cheap text-container update —
+  // deliberately not drawn on an image tile, which would cost a full BLE send.
+  if (state.ui.message && !state.ui.menuOpen && !g.won) {
+    lines.unshift(state.ui.message, "");
   }
 
   return lines.join("\n");
