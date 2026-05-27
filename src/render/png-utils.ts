@@ -2,7 +2,7 @@
 import UPNG from "upng-js";
 import { isPerfLoggingEnabled, perfLogLazy, perfNowMs } from "../perf/log";
 
-export type PngBytes = number[] | Uint8Array;
+export type PngBytes = number[] | Uint8Array<ArrayBuffer>;
 
 let pngEncodeQueueTail: Promise<void> = Promise.resolve();
 let pngEncodePendingCount = 0;
@@ -40,7 +40,7 @@ let pngEncodePerfMaxEncodeMs = 0;
 let pngEncodePerfMaxTotalMs = 0;
 let pngEncodePerfSlowCount = 0;
 let pngEncodePerfLabels = new Map<string, number>();
-const pngBytesUint8Cache = new WeakMap<number[], Uint8Array>();
+const pngBytesUint8Cache = new WeakMap<number[], Uint8Array<ArrayBuffer>>();
 const pngBytesHashCache = new WeakMap<PngBytes, number>();
 const EMPTY_PNG_UINT8 = new Uint8Array(0);
 
@@ -128,7 +128,7 @@ function arrayBufferToNumberArray(buffer: ArrayBuffer): number[] {
   return out;
 }
 
-function arrayBufferToUint8Array(buffer: ArrayBuffer): Uint8Array {
+function arrayBufferToUint8Array(buffer: ArrayBuffer): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(buffer);
   let hash = FNV32_OFFSET;
   for (let i = 0; i < bytes.length; i += 1) {
@@ -139,7 +139,7 @@ function arrayBufferToUint8Array(buffer: ArrayBuffer): Uint8Array {
   return bytes;
 }
 
-function numberArrayToUint8Array(bytes: number[]): Uint8Array {
+function numberArrayToUint8Array(bytes: number[]): Uint8Array<ArrayBuffer> {
   const cached = pngBytesUint8Cache.get(bytes);
   if (cached && cached.length === bytes.length) return cached;
   const out = Uint8Array.from(bytes);
@@ -345,7 +345,7 @@ const GREYSCALE_4BIT_PALETTE = (() => {
  * Returns an RGBA buffer where each pixel maps to a palette entry,
  * suitable for UPNG.encode with cnum=16 (indexed 4-bit).
  */
-function rgbaToGreyscale4BitRGBA(data: Uint8ClampedArray, pixelCount: number): Uint8Array {
+function rgbaToGreyscale4BitRGBA(data: Uint8ClampedArray, pixelCount: number): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(pixelCount * 4);
   for (let i = 0; i < pixelCount; i += 1) {
     const si = i * 4;
@@ -370,7 +370,7 @@ function rgbaToGreyscale4BitRGBA(data: Uint8ClampedArray, pixelCount: number): U
  * Uses BT.601 luminance; pixels at or above 128 map to white (255), below to black (0).
  * Returns an RGBA buffer suitable for UPNG.encode with cnum=2 (indexed 1-bit).
  */
-function rgbaToMonochrome1BitRGBA(data: Uint8ClampedArray, pixelCount: number): Uint8Array {
+function rgbaToMonochrome1BitRGBA(data: Uint8ClampedArray, pixelCount: number): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(pixelCount * 4);
   for (let i = 0; i < pixelCount; i += 1) {
     const si = i * 4;
