@@ -112,6 +112,7 @@ function tapAction(state: AppState): Action {
   if (state.ui.menuOpen) {
     if (state.ui.pendingResetConfirm) return { type: "MENU_SELECT" };
     const opt = MENU_OPTIONS[state.ui.menuSelectedIndex];
+    if (opt === "Exit") return { type: "OPEN_EXIT_APP_UI" };
     return { type: "MENU_SELECT" };
   }
   if (state.game.won) {
@@ -131,7 +132,9 @@ function tapAction(state: AppState): Action {
 }
 
 function doubleTapAction(state: AppState): Action {
-  if (state.ui.menuOpen) return { type: "OPEN_EXIT_APP_UI" };
+  // ER exit UI is now reached via the "Exit" option in the menu.
+  // Double-tap while the menu is open just closes it.
+  if (state.ui.menuOpen) return { type: "TOGGLE_MENU" };
   if (state.game.won) return { type: "TOGGLE_MENU" };
   const hasSelection =
     state.ui.mode === "select_source" || state.ui.mode === "select_destination";

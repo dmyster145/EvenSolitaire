@@ -473,7 +473,9 @@ export function rootReducer(
       if (opt === "Reset") {
         return { ...state, ui: { ...state.ui, pendingResetConfirm: true, menuSelectedIndex: 0 } };
       }
-      if (opt === "Exit Menu") {
+      if (opt === "Exit") {
+        // Handled by action-map, which dispatches OPEN_EXIT_APP_UI directly to the
+        // bridge. Keep this branch as a defensive fallback that at least closes the menu.
         return { ...state, ui: { ...state.ui, menuOpen: false } };
       }
       return { ...state, ui: { ...state.ui, menuOpen: false } };

@@ -20,12 +20,36 @@ import {
 } from "@evenrealities/even_hub_sdk";
 import { log, warn, error } from "../utils/logger";
 
-export type EvenHubEventHandler = (event: EvenHubEvent) => void;
-
-export interface BridgeStorage {
-  get(key: string): Promise<string>;
-  set(key: string, value: string): Promise<boolean>;
+/**
+ * @evenrealities/even_hub_sdk@0.0.12 workaround.
+ *
+ * 0.0.12's ImageRawDataUpdate.toJson unconditionally tags payloads with
+ * compressMode:2 (LZ4), but the bundle ships no LZ4 code — bytes go out raw.
+ * The host receives uncompressed data labeled as LZ4 and returns sendFailed
+ * for every image, so text renders but images don't.
+ *
+ * Wrap toJson once at init to strip compressMode, restoring the pre-0.0.12
+ * wire shape. Remove once the SDK either ships real compression or stops
+ * tagging uncompressed data.
+ */
+function patchImageCompressModeBug(): void {
+  const cls = ImageRawDataUpdate as unknown as {
+    toJson?: (model?: unknown) => Record<string, unknown>;
+    __compressModePatched?: boolean;
+  };
+  if (typeof cls.toJson !== "function" || cls.__compressModePatched) return;
+  const orig = cls.toJson.bind(ImageRawDataUpdate);
+  cls.toJson = (model?: unknown) => {
+    const json = orig(model);
+    if (json && typeof json === "object" && "compressMode" in json) {
+      delete (json as Record<string, unknown>).compressMode;
+    }
+    return json;
+  };
+  cls.__compressModePatched = true;
 }
+
+export type EvenHubEventHandler = (event: EvenHubEvent) => void;
 
 const BRIDGE_INIT_TIMEOUT_MS = 6000;
 
@@ -49,6 +73,7 @@ export class EvenHubBridge {
   private bridge: EvenAppBridgeType | null = null;
 
   async init(): Promise<void> {
+    patchImageCompressModeBug();
     try {
       this.bridge = await withTimeout(
         waitForEvenAppBridge(),
@@ -125,15 +150,6 @@ export class EvenHubBridge {
       error("[EvenHubBridge] Event subscription error:", err);
       return () => undefined;
     }
-  }
-
-  getStorage(): BridgeStorage | null {
-    if (!this.bridge) return null;
-    const b = this.bridge;
-    return {
-      get: (key) => b.getLocalStorage(key),
-      set: (key, value) => b.setLocalStorage(key, value),
-    };
   }
 
   async showExitUI(): Promise<void> {

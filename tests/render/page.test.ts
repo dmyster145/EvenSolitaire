@@ -46,10 +46,10 @@ function summarize(page: AnyContainer): unknown {
 }
 
 describe("page factories", () => {
-  it("startup page matches the expected 3-tile + info-text layout", () => {
+  it("startup page matches the expected 3-tile + info-text + gesture-capture layout", () => {
     expect(summarize(composeStartupPage() as unknown as AnyContainer)).toMatchInlineSnapshot(`
       {
-        "containerTotalNum": 4,
+        "containerTotalNum": 5,
         "imageObject": [
           {
             "height": 100,
@@ -79,6 +79,15 @@ describe("page factories", () => {
         "textObject": [
           {
             "eventCapture": 1,
+            "height": 288,
+            "id": 5,
+            "name": "gesture",
+            "width": 576,
+            "x": 0,
+            "y": 0,
+          },
+          {
+            "eventCapture": 0,
             "height": 244,
             "id": 4,
             "name": "info",
@@ -97,9 +106,20 @@ describe("page factories", () => {
     );
   });
 
-  it("ALL_CONTAINER_IDS covers all live container IDs including the info text", () => {
-    expect([...ALL_CONTAINER_IDS].sort()).toEqual([1, 2, 3, 4]);
+  it("ALL_CONTAINER_IDS covers all live container IDs including the info text and gesture capture", () => {
+    expect([...ALL_CONTAINER_IDS].sort()).toEqual([1, 2, 3, 4, 5]);
     expect(ALL_CONTAINER_IDS).toContain(CONTAINER_ID_INFO);
     expect(CONTAINER_NAME_INFO).toBe("info");
+  });
+
+  it("exactly one container has isEventCapture: 1 (SDK requirement)", () => {
+    const page = composeStartupPage() as unknown as AnyContainer;
+    const allContainers: AnyContainer[] = [
+      ...((page.imageObject as AnyContainer[] | undefined) ?? []),
+      ...((page.textObject as AnyContainer[] | undefined) ?? []),
+    ];
+    const captureContainers = allContainers.filter((c) => c.isEventCapture === 1);
+    expect(captureContainers).toHaveLength(1);
+    expect(captureContainers[0]!.containerName).toBe("gesture");
   });
 });

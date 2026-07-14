@@ -1,6 +1,6 @@
 {
   "name": "solitaire",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
     "test:coverage": "node scripts/run-coverage.mjs"
   },
   "dependencies": {
-    "@evenrealities/even_hub_sdk": "^0.0.10",
+    "@evenrealities/even_hub_sdk": "^0.0.12",
     "upng-js": "^2.1.0"
   },
   "devDependencies": {

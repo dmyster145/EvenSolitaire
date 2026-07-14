@@ -21,7 +21,8 @@ export const G2_IMAGE_MIN_W = 20;
 export const G2_IMAGE_MIN_H = 20;
 export const G2_IMAGE_MAX_W = 200;
 export const G2_IMAGE_MAX_H = 100;
-export const G2_MAX_CONTAINER_TOTAL = 4;
+/** Even Hub G2 supports up to 12 containers per page (max 4 images + 8 text/list). */
+export const G2_MAX_CONTAINER_TOTAL = 12;
 
 /** Virtual top area: stock, waste, 4 foundations in 2 rows (576×176). */
 export const VIRTUAL_IMAGE_TOP = {
@@ -88,7 +89,7 @@ export const IMAGE_TILE_BOTTOM_RIGHT = {
   height: TILE_H,
 };
 
-/** Info panel + event capture text container (visible on the left, also captures scroll/tap). */
+/** Info panel text container (visible on the left). Event capture lives on GESTURE_CAPTURE_CONTAINER. */
 export const INFO_TEXT_CONTAINER = {
   id: 4,
   name: "info",
@@ -97,6 +98,26 @@ export const INFO_TEXT_CONTAINER = {
   width: INFO_PANEL_W,
   // Extend to the bottom of the canvas (beyond the 200px board height) for more HUD lines.
   height: CANVAS_H - TILE_BOARD_Y,
+};
+
+/**
+ * Invisible gesture-capture container anchored at the top-left, sized to the
+ * full display. All scroll/tap events land here instead of INFO_TEXT_CONTAINER,
+ * so text updates to the info panel don't jump/scroll as the user swipes.
+ *
+ * Must be large enough that the SDK's scroll indicator has no reason to show
+ * (a small capture container renders a scroll bar even for a single space).
+ * Declared FIRST in the textObject array so it sits at the bottom of z-order
+ * and the visible info panel + image tiles render on top of it.
+ * Matches the Even_SmartThings capture pattern (`CONTAINER_ID_BOOT_EVENT`).
+ */
+export const GESTURE_CAPTURE_CONTAINER = {
+  id: 5,
+  name: "gesture",
+  x: 0,
+  y: 0,
+  width: CANVAS_W,
+  height: CANVAS_H,
 };
 
 export interface ImageContainerRect {
