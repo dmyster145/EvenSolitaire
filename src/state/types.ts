@@ -2,6 +2,9 @@
  * Full app state: game state + UI state (Phase 2).
  */
 import type { GameState as EngineState } from "../game/types";
+import type { WinAnimationState } from "../features/win-animation";
+
+export type { WinAnimationState };
 
 export type FocusArea = "stock" | "waste" | "foundation" | "tableau" | "menu";
 
@@ -43,6 +46,14 @@ export interface UIState {
   moveAssist: boolean;
   /** When true, menu shows "Reset game?" with Yes/No instead of main options. */
   pendingResetConfirm?: boolean;
+  /** Win celebration cascade; absent when not running. Driven by WIN_ANIMATION_TICK. */
+  winAnimation?: WinAnimationState;
+  /**
+   * True while the finished board is held on screen before the cascade starts.
+   * Renders through the 2x2 quadrant path so the page swap and the initial
+   * four-tile paint happen during the hold instead of stalling the cascade.
+   */
+  winBoardHold?: boolean;
 }
 
 export interface AppState {

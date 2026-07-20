@@ -89,6 +89,33 @@ export const IMAGE_TILE_BOTTOM_RIGHT = {
   height: TILE_H,
 };
 
+/**
+ * Win-animation 2x2 tiles (ids 6/7 pair with the shared bottom tiles 2/3).
+ *
+ * These use the SAME source->screen mapping as the 3-tile gameplay layout:
+ *   screen_x = BOARD_RIGHT_X + src_x * TILE_W / (CANVAS_W / 2)
+ *   screen_y = TILE_BOARD_Y  + src_y * TILE_H / TILE_CROP_SPLIT_Y
+ * so the board is the same size and position in both. The only difference is
+ * that gameplay's single centered top tile clips the virtual board's top-left
+ * and top-right corners, which the 2x2 reveals — the flying card needs them.
+ */
+export const IMAGE_TILE_TOP_LEFT = {
+  id: 6,
+  name: "tile-tl",
+  x: BOARD_RIGHT_X,
+  y: TILE_BOARD_Y,
+  width: TILE_W,
+  height: TILE_H,
+};
+export const IMAGE_TILE_TOP_RIGHT = {
+  id: 7,
+  name: "tile-tr",
+  x: BOARD_RIGHT_X + TILE_W,
+  y: TILE_BOARD_Y,
+  width: TILE_W,
+  height: TILE_H,
+};
+
 /** Info panel text container (visible on the left). Event capture lives on GESTURE_CAPTURE_CONTAINER. */
 export const INFO_TEXT_CONTAINER = {
   id: 4,

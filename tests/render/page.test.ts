@@ -18,10 +18,18 @@ vi.mock("@evenrealities/even_hub_sdk", () => {
 import {
   composeStartupPage,
   composeInputModePage,
+  composeWinAnimationPage,
   ALL_CONTAINER_IDS,
   CONTAINER_ID_INFO,
   CONTAINER_NAME_INFO,
 } from "../../src/render/page";
+import {
+  IMAGE_TILE_TOP,
+  IMAGE_TILE_TOP_LEFT,
+  IMAGE_TILE_TOP_RIGHT,
+  IMAGE_TILE_BOTTOM_LEFT,
+  IMAGE_TILE_BOTTOM_RIGHT,
+} from "../../src/render/layout";
 
 type AnyContainer = Record<string, unknown>;
 
@@ -121,5 +129,30 @@ describe("page factories", () => {
     const captureContainers = allContainers.filter((c) => c.isEventCapture === 1);
     expect(captureContainers).toHaveLength(1);
     expect(captureContainers[0]!.containerName).toBe("gesture");
+  });
+});
+
+describe("win animation page", () => {
+  it("declares four image containers and both text containers", () => {
+    const page = composeWinAnimationPage();
+
+    expect(page.imageObject ?? []).toHaveLength(4);
+    expect(page.textObject ?? []).toHaveLength(2);
+    expect(page.containerTotalNum).toBe(6);
+  });
+
+  it("swaps the centered top tile for the top-left/top-right pair", () => {
+    const ids = (composeWinAnimationPage().imageObject ?? []).map((c) => c.containerID);
+
+    expect(ids).not.toContain(IMAGE_TILE_TOP.id);
+    expect(ids).toContain(IMAGE_TILE_TOP_LEFT.id);
+    expect(ids).toContain(IMAGE_TILE_TOP_RIGHT.id);
+    // Bottom tiles are shared with gameplay — same rect, same ids.
+    expect(ids).toContain(IMAGE_TILE_BOTTOM_LEFT.id);
+    expect(ids).toContain(IMAGE_TILE_BOTTOM_RIGHT.id);
+  });
+
+  it("keeps the gameplay page on three image containers", () => {
+    expect(composeInputModePage().imageObject ?? []).toHaveLength(3);
   });
 });

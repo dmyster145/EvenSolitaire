@@ -26,6 +26,11 @@ export type Action =
   | { type: "TOGGLE_MENU" }
   | { type: "MENU_MOVE"; direction: "next" | "prev" }
   | { type: "MENU_SELECT" }
+  | { type: "WIN_BOARD_HOLD"; active: boolean }
+  | { type: "WIN_ANIMATION_START"; fromWin?: boolean }
+  | { type: "WIN_ANIMATION_TICK" }
+  | { type: "WIN_ANIMATION_SKIP" }
+  | { type: "WIN_ANIMATION_DISMISS" }
   | { type: "SHOW_MESSAGE"; message: string }
   | { type: "DISMISS_MESSAGE" }
   | { type: "RESTORE_SAVED_STATE"; game: GameState; moveAssist: boolean };

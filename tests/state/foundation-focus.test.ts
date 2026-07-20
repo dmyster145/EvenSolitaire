@@ -19,6 +19,17 @@ function card(id: string, rank: Card["rank"], suit: Card["suit"], faceUp = true)
   return { id, rank, suit, faceUp };
 }
 
+/**
+ * A mid-game fixture: one card left in stock so the state does not satisfy the endgame
+ * single-tap-to-foundation condition, which would otherwise commit moves these tests
+ * expect to merely focus a destination.
+ */
+function midGame(): GameState {
+  const game = emptyGame();
+  game.stock = [card("s9s", 9, "S", false)];
+  return game;
+}
+
 function emptyGame(): GameState {
   return {
     stock: [],
@@ -102,7 +113,7 @@ describe("source select auto-destination focus", () => {
   });
 
   it("focuses foundation for tableau Ace but still requires confirm tap", () => {
-    const game = emptyGame();
+    const game = midGame();
     game.tableau[0].visible = [card("t7h", 7, "H"), card("t6c", 6, "C"), card("tas", 1, "S")];
     game.tableau[1].visible = [card("t7d", 7, "D")];
     game.tableau[2].visible = [card("t2d", 2, "D")];
@@ -174,7 +185,7 @@ describe("source select auto-destination focus", () => {
   });
 
   it("auto-focuses foundation when tableau source has no legal tableau destination", () => {
-    const game = emptyGame();
+    const game = midGame();
     game.foundations[0].cards = [card("f5c", 5, "C")];
     game.tableau[0].visible = [card("t6c", 6, "C")];
 
@@ -197,7 +208,7 @@ describe("source select auto-destination focus", () => {
   });
 
   it("auto-focuses foundation for tableau source when both foundation and tableau destinations are legal", () => {
-    const game = emptyGame();
+    const game = midGame();
     game.foundations[0].cards = [card("f5c", 5, "C")];
     game.tableau[0].visible = [card("t6c", 6, "C")];
     game.tableau[1].visible = [card("t7h", 7, "H")];
@@ -237,7 +248,7 @@ describe("source select auto-destination focus", () => {
 
     expect(next.ui.mode).toBe("select_destination");
     expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU));
-    expect(next.ui.message).toBe("No legal move from selected pile");
+    expect(next.ui.message).toBeUndefined();
   });
 
   it("does not auto-focus for tableau source when multiple legal tableau destinations exist", () => {
@@ -281,6 +292,54 @@ describe("source select auto-destination focus", () => {
 
     expect(next.ui.mode).toBe("select_destination");
     expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + 1));
+  });
+
+  it("keeps focus on a multi-card tableau source so the next tap can grow the run", () => {
+    const game = emptyGame();
+    game.tableau[0].visible = [card("t8c", 8, "C"), card("t7d", 7, "D")];
+    game.tableau[1].visible = [card("t9d", 9, "D"), card("t8s", 8, "S")];
+
+    const state: AppState = {
+      ...withGame(game),
+      ui: {
+        ...initialState.ui,
+        mode: "browse",
+        moveAssist: true,
+        focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+      },
+    };
+
+    const selected = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) });
+
+    expect(selected.ui.mode).toBe("select_destination");
+    expect(selected.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU));
+
+    // Second tap on the source pile grows the selection to 8C+7D instead of committing a move.
+    const grown = rootReducer(selected, { type: "DEST_SELECT", dest: { area: "tableau", index: 0 } });
+
+    expect(grown.ui.selection.selectedCardCount).toBe(2);
+    expect(grown.game.tableau[0].visible.map((c) => c.id)).toEqual(["t8c", "t7d"]);
+    expect(grown.game.tableau[1].visible.map((c) => c.id)).toEqual(["t9d", "t8s"]);
+  });
+
+  it("still auto-focuses foundation for a multi-card tableau source when the top card can go home", () => {
+    const game = midGame();
+    game.foundations[0].cards = [card("f5c", 5, "C")];
+    game.tableau[0].visible = [card("t7h", 7, "H"), card("t6c", 6, "C")];
+
+    const state: AppState = {
+      ...withGame(game),
+      ui: {
+        ...initialState.ui,
+        mode: "browse",
+        moveAssist: true,
+        focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+      },
+    };
+
+    const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) });
+
+    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION));
   });
 
   it("does not auto-focus waste source when move assist is off", () => {

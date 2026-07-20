@@ -80,7 +80,7 @@ describe("state reducer runtime flows", () => {
     expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION));
   });
 
-  it("source select sets no-legal-move message when source has none", () => {
+  it("source select shows no message when source has no legal move", () => {
     const game = emptyGame();
     game.waste = [card("w2c", 2, "C")];
     const state: AppState = {
@@ -91,7 +91,7 @@ describe("state reducer runtime flows", () => {
     const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_WASTE) });
 
     expect(next.ui.mode).toBe("select_destination");
-    expect(next.ui.message).toBe("No legal move from selected pile");
+    expect(next.ui.message).toBeUndefined();
   });
 
   it("destination select on same tableau cycles selected count and wraps", () => {
@@ -247,5 +247,84 @@ describe("state reducer runtime flows", () => {
     expect(next.ui.menuOpen).toBe(false);
     expect(next.ui.pendingResetConfirm).toBeUndefined();
     expect(next.ui.moveAssist).toBe(true);
+  });
+});
+
+describe("endgame single-tap to foundation", () => {
+  beforeEach(() => clearUndo());
+
+  /** Stock and waste empty, no face-down cards — every remaining card is foundation-bound. */
+  function endgameGame(): GameState {
+    const game = emptyGame();
+    game.foundations[0].cards = [card("f1c", 1, "C")];
+    game.tableau[0].visible = [card("t2c", 2, "C")];
+    game.tableau[1].visible = [card("t5h", 5, "H")];
+    return game;
+  }
+
+  function browseAt(game: GameState, focusIndex: number, moveAssist = false): AppState {
+    return {
+      ...withGame(game),
+      ui: { ...initialState.ui, mode: "browse", moveAssist, focus: focusIndexToTarget(focusIndex) },
+    };
+  }
+
+  it("moves the top tableau card home on a single tap", () => {
+    const state = browseAt(endgameGame(), FOCUS_INDEX_FIRST_TABLEAU);
+
+    const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) });
+
+    expect(next.ui.mode).toBe("browse");
+    expect(next.ui.selection).toEqual({});
+    expect(next.game.foundations[0].cards.map((c) => c.id)).toEqual(["f1c", "t2c"]);
+    expect(next.game.tableau[0].visible).toHaveLength(0);
+  });
+
+  it("applies with move assist off as well", () => {
+    const state = browseAt(endgameGame(), FOCUS_INDEX_FIRST_TABLEAU, false);
+
+    const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) });
+
+    expect(next.game.foundations[0].cards).toHaveLength(2);
+  });
+
+  it("falls back to normal selection when the tapped card has no foundation home", () => {
+    const state = browseAt(endgameGame(), FOCUS_INDEX_FIRST_TABLEAU + 1);
+
+    const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + 1) });
+
+    expect(next.ui.mode).toBe("select_destination");
+    expect(next.game.tableau[1].visible.map((c) => c.id)).toEqual(["t5h"]);
+  });
+
+  it("does not auto-move while face-down tableau cards remain", () => {
+    const game = endgameGame();
+    game.tableau[3].hidden = [card("h9s", 9, "S", false)];
+
+    const state = browseAt(game, FOCUS_INDEX_FIRST_TABLEAU);
+    const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) });
+
+    expect(next.ui.mode).toBe("select_destination");
+    expect(next.game.foundations[0].cards).toHaveLength(1);
+  });
+
+  it("does not auto-move while stock or waste still hold cards", () => {
+    const withStock = endgameGame();
+    withStock.stock = [card("s4d", 4, "D", false)];
+    const afterStockTap = rootReducer(browseAt(withStock, FOCUS_INDEX_FIRST_TABLEAU), {
+      type: "SOURCE_SELECT",
+      target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+    });
+    expect(afterStockTap.ui.mode).toBe("select_destination");
+    expect(afterStockTap.game.foundations[0].cards).toHaveLength(1);
+
+    const withWaste = endgameGame();
+    withWaste.waste = [card("w4d", 4, "D")];
+    const afterWasteTap = rootReducer(browseAt(withWaste, FOCUS_INDEX_FIRST_TABLEAU), {
+      type: "SOURCE_SELECT",
+      target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+    });
+    expect(afterWasteTap.ui.mode).toBe("select_destination");
+    expect(afterWasteTap.game.foundations[0].cards).toHaveLength(1);
   });
 });

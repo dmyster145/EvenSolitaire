@@ -106,4 +106,34 @@ describe("validation", () => {
     const stackDests = getLegalDests(state, { area: "tableau", pileIndex: 0, count: 2 });
     expect(stackDests.some((d) => d.area === "foundation" && d.index === 0)).toBe(false);
   });
+
+  it("allows moving a multi-card run that is a valid descending alternating sequence", () => {
+    const state = customFoundationBlockingState();
+    // pile 0 = 6C, 5D (valid run); pile 1 gets a red 7 to receive the black 6.
+    state.tableau[1].visible = [card("t7h", 7, "H")];
+
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 2 }, { area: "tableau", index: 1 })).toBe(true);
+  });
+
+  it("rejects a multi-card selection that is not an ordered alternating run", () => {
+    const state = customFoundationBlockingState();
+    // pile 0 = 8C, 3H — 3H does not follow 8C, so the pair must not move as a unit.
+    state.tableau[0].visible = [card("t8c", 8, "C"), card("t3h", 3, "H")];
+    state.tableau[1].visible = [card("t9d", 9, "D")];
+
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 2 }, { area: "tableau", index: 1 })).toBe(false);
+    expect(getLegalDests(state, { area: "tableau", pileIndex: 0, count: 2 })).toEqual([]);
+
+    // The single top card is still free to move on its own.
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 1 }, { area: "tableau", index: 1 })).toBe(false);
+  });
+
+  it("rejects a multi-card run with a same-color adjacency", () => {
+    const state = customFoundationBlockingState();
+    // 6C, 5S descends correctly but both are black.
+    state.tableau[0].visible = [card("t6c", 6, "C"), card("t5s", 5, "S")];
+    state.tableau[1].visible = [card("t7h", 7, "H")];
+
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 2 }, { area: "tableau", index: 1 })).toBe(false);
+  });
 });

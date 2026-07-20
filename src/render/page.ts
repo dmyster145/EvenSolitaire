@@ -11,6 +11,8 @@ import {
 } from "@evenrealities/even_hub_sdk";
 import {
   IMAGE_TILE_TOP,
+  IMAGE_TILE_TOP_LEFT,
+  IMAGE_TILE_TOP_RIGHT,
   IMAGE_TILE_BOTTOM_LEFT,
   IMAGE_TILE_BOTTOM_RIGHT,
   INFO_TEXT_CONTAINER,
@@ -25,6 +27,16 @@ export const CONTAINER_NAME_INFO = INFO_TEXT_CONTAINER.name;
 
 export const ALL_CONTAINER_IDS: ReadonlyArray<number> = [
   IMAGE_TILE_TOP.id,
+  IMAGE_TILE_BOTTOM_LEFT.id,
+  IMAGE_TILE_BOTTOM_RIGHT.id,
+  INFO_TEXT_CONTAINER.id,
+  GESTURE_CAPTURE_CONTAINER.id,
+];
+
+/** Live containers while the win animation's 2x2 board is up. */
+export const WIN_ANIMATION_CONTAINER_IDS: ReadonlyArray<number> = [
+  IMAGE_TILE_TOP_LEFT.id,
+  IMAGE_TILE_TOP_RIGHT.id,
   IMAGE_TILE_BOTTOM_LEFT.id,
   IMAGE_TILE_BOTTOM_RIGHT.id,
   INFO_TEXT_CONTAINER.id,
@@ -50,6 +62,25 @@ export function composeInputModePage(): RebuildPageContainer {
     containerTotalNum: 5,
     imageObject: [
       createImageContainer(IMAGE_TILE_TOP),
+      createImageContainer(IMAGE_TILE_BOTTOM_LEFT),
+      createImageContainer(IMAGE_TILE_BOTTOM_RIGHT),
+    ],
+    textObject: [createGestureCaptureContainer(), createInfoPanelTextContainer()],
+  });
+}
+
+/**
+ * Win-animation page: 2x2 image tiles so the flying card is visible across the
+ * whole virtual board, including the top corners the gameplay layout clips.
+ * 4 images is the G2 per-page image maximum.
+ */
+export function composeWinAnimationPage(): RebuildPageContainer {
+  assertG2ContainerBudget(4, 2);
+  return new RebuildPageContainer({
+    containerTotalNum: 6,
+    imageObject: [
+      createImageContainer(IMAGE_TILE_TOP_LEFT),
+      createImageContainer(IMAGE_TILE_TOP_RIGHT),
       createImageContainer(IMAGE_TILE_BOTTOM_LEFT),
       createImageContainer(IMAGE_TILE_BOTTOM_RIGHT),
     ],

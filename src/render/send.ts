@@ -18,6 +18,8 @@ import { ImageRawDataUpdate, ImageRawDataUpdateResult } from "@evenrealities/eve
 import { isActive } from "../evenhub/active-containers";
 import {
   IMAGE_TILE_TOP,
+  IMAGE_TILE_TOP_LEFT,
+  IMAGE_TILE_TOP_RIGHT,
   IMAGE_TILE_BOTTOM_LEFT,
   IMAGE_TILE_BOTTOM_RIGHT,
   INFO_TEXT_CONTAINER,
@@ -31,25 +33,57 @@ export interface SendBridge {
 
 /** Output of renderFrame in src/render/frame.ts. Kept here to avoid pulling canvas code into transport tests. */
 export interface Frame {
+  /** Centered top tile: gameplay's 3-tile layout only. */
   topPng: Uint8Array;
+  /** Top-left / top-right tiles: win animation's 2x2 layout only. */
+  topLeftPng?: Uint8Array;
+  topRightPng?: Uint8Array;
   bottomLeftPng: Uint8Array;
   bottomRightPng: Uint8Array;
   infoText: string;
+  /** Container ids in the order they should be sent; omit for the default order. */
+  tileOrder?: ReadonlyArray<number>;
 }
 
-let lastTopPng: Uint8Array | null = null;
-let lastBottomLeftPng: Uint8Array | null = null;
-let lastBottomRightPng: Uint8Array | null = null;
+/**
+ * Order tiles go out in, as container ids. Defaults to the declaration order
+ * below; the win animation overrides it so tiles are sent along the card's
+ * direction of travel (see renderWinAnimationFrame).
+ */
+const DEFAULT_TILE_ORDER: ReadonlyArray<number> = [
+  IMAGE_TILE_TOP.id,
+  IMAGE_TILE_TOP_LEFT.id,
+  IMAGE_TILE_TOP_RIGHT.id,
+  IMAGE_TILE_BOTTOM_LEFT.id,
+  IMAGE_TILE_BOTTOM_RIGHT.id,
+];
+
+const TILE_BY_ID = new Map<number, { id: number; name: string }>([
+  [IMAGE_TILE_TOP.id, IMAGE_TILE_TOP],
+  [IMAGE_TILE_TOP_LEFT.id, IMAGE_TILE_TOP_LEFT],
+  [IMAGE_TILE_TOP_RIGHT.id, IMAGE_TILE_TOP_RIGHT],
+  [IMAGE_TILE_BOTTOM_LEFT.id, IMAGE_TILE_BOTTOM_LEFT],
+  [IMAGE_TILE_BOTTOM_RIGHT.id, IMAGE_TILE_BOTTOM_RIGHT],
+]);
+
+function pngForTile(frame: Frame, id: number): Uint8Array | undefined {
+  if (id === IMAGE_TILE_TOP.id) return frame.topPng;
+  if (id === IMAGE_TILE_TOP_LEFT.id) return frame.topLeftPng;
+  if (id === IMAGE_TILE_TOP_RIGHT.id) return frame.topRightPng;
+  if (id === IMAGE_TILE_BOTTOM_LEFT.id) return frame.bottomLeftPng;
+  if (id === IMAGE_TILE_BOTTOM_RIGHT.id) return frame.bottomRightPng;
+  return undefined;
+}
+
+const lastSentByTile = new Map<number, Uint8Array>();
 let lastInfoTextSent: string | null = null;
 
 export function resetSendMemo(): void {
-  lastTopPng = null;
-  lastBottomLeftPng = null;
-  lastBottomRightPng = null;
+  lastSentByTile.clear();
   lastInfoTextSent = null;
 }
 
-function bytesEqual(a: Uint8Array, b: Uint8Array | null): boolean {
+function bytesEqual(a: Uint8Array, b: Uint8Array | undefined): boolean {
   if (!b || a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
@@ -64,6 +98,12 @@ function bytesEqual(a: Uint8Array, b: Uint8Array | null): boolean {
  * `options.shouldAbortImages` (checked before each tile) so fresh navigation
  * input isn't stuck behind an in-flight image flush — only one already-started
  * tile can block, not the whole frame.
+ *
+ * Tiles go out one at a time over BLE, so their ORDER is visible: with a fixed
+ * top-then-bottom order a card travelling upward has its leading edge appear in
+ * the top tile a whole send before the bottom tile catches up, which reads as
+ * the card jumping ahead of itself. `frame.tileOrder` lets the caller sequence
+ * tiles along the direction of travel so the trail extends smoothly instead.
  */
 export async function sendFrame(
   hub: SendBridge,
@@ -82,24 +122,20 @@ export async function sendFrame(
   if (options.images === false) return;
   const aborted = options.shouldAbortImages ?? (() => false);
 
-  if (aborted()) return;
-  if (isActive(IMAGE_TILE_TOP.id) && frame.topPng.length > 0 && !bytesEqual(frame.topPng, lastTopPng)) {
-    await hub.updateImage(packImage(IMAGE_TILE_TOP.id, IMAGE_TILE_TOP.name, frame.topPng));
-    lastTopPng = frame.topPng;
-  }
-  if (aborted()) return;
-  if (isActive(IMAGE_TILE_BOTTOM_LEFT.id) && frame.bottomLeftPng.length > 0 && !bytesEqual(frame.bottomLeftPng, lastBottomLeftPng)) {
-    await hub.updateImage(
-      packImage(IMAGE_TILE_BOTTOM_LEFT.id, IMAGE_TILE_BOTTOM_LEFT.name, frame.bottomLeftPng)
-    );
-    lastBottomLeftPng = frame.bottomLeftPng;
-  }
-  if (aborted()) return;
-  if (isActive(IMAGE_TILE_BOTTOM_RIGHT.id) && frame.bottomRightPng.length > 0 && !bytesEqual(frame.bottomRightPng, lastBottomRightPng)) {
-    await hub.updateImage(
-      packImage(IMAGE_TILE_BOTTOM_RIGHT.id, IMAGE_TILE_BOTTOM_RIGHT.name, frame.bottomRightPng)
-    );
-    lastBottomRightPng = frame.bottomRightPng;
+  // Caller-supplied order first, then anything it did not mention.
+  const order = frame.tileOrder
+    ? [...frame.tileOrder, ...DEFAULT_TILE_ORDER.filter((id) => !frame.tileOrder!.includes(id))]
+    : DEFAULT_TILE_ORDER;
+
+  for (const id of order) {
+    if (aborted()) return;
+    const tile = TILE_BY_ID.get(id);
+    if (!tile || !isActive(id)) continue;
+    const png = pngForTile(frame, id);
+    if (!png || png.length === 0) continue;
+    if (bytesEqual(png, lastSentByTile.get(id))) continue;
+    await hub.updateImage(packImage(tile.id, tile.name, png));
+    lastSentByTile.set(id, png);
   }
 }
 

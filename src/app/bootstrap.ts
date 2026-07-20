@@ -19,8 +19,10 @@ import { EvenHubBridge } from "../evenhub/bridge";
 import { resetActiveContainers } from "../evenhub/active-containers";
 import {
   ALL_CONTAINER_IDS,
+  WIN_ANIMATION_CONTAINER_IDS,
   composeStartupPage,
   composeInputModePage,
+  composeWinAnimationPage,
 } from "../render/page";
 import { sendFrame, resetSendMemo } from "../render/send";
 import { renderFrame, resetFrameMemo } from "../render/frame";
@@ -33,6 +35,7 @@ import { whenCardAssetsReady, whenCardSuitAssetsReady } from "../render/card-can
 import { activateKeepAlive, isKeepAliveActive } from "../utils/keep-alive";
 import { error as logError } from "../utils/logger";
 import type { GameState } from "../game/types";
+import { WIN_ANIMATION_TICK_MS, WIN_BOARD_HOLD_MS } from "../state/constants";
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 const MESSAGE_DISMISS_MS = 1500;
@@ -61,6 +64,17 @@ export async function initApp(): Promise<void> {
   let imageCooldownTimer: ReturnType<typeof setTimeout> | null = null;
 
   const scheduler = createScheduler(async () => {
+    try {
+      await renderAndSendOnce();
+    } finally {
+      // This frame's stamps are on the glasses (or the frame failed); either way
+      // advance physics now. Arming in `finally` keeps one bad frame from
+      // stalling the cascade forever.
+      scheduleNextWinAnimationTick();
+    }
+  });
+
+  async function renderAndSendOnce(): Promise<void> {
     const startSeq = inputSeq;
     const frame = await renderFrame(store.getState());
     if (suppressImages) {
@@ -72,7 +86,7 @@ export async function initApp(): Promise<void> {
       await sendFrame(hub, frame, { shouldAbortImages: () => inputSeq !== startSeq });
       imageDeferred = inputSeq !== startSeq;
     }
-  });
+  }
 
   function clearImageCooldownTimer(): void {
     if (imageCooldownTimer) {
@@ -207,6 +221,85 @@ export async function initApp(): Promise<void> {
   let pendingMessageDismiss: ReturnType<typeof setTimeout> | null = null;
   let saveInProgress = false;
   let pendingSavePayload: { game: GameState; moveAssist: boolean } | null = null;
+  let winAnimationTimer: ReturnType<typeof setTimeout> | null = null;
+  let winBoardHoldTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearWinAnimationTimer(): void {
+    if (winAnimationTimer) {
+      clearTimeout(winAnimationTimer);
+      winAnimationTimer = null;
+    }
+  }
+
+  /**
+   * Arm the next physics tick, paced by RENDER COMPLETION rather than a wall clock.
+   *
+   * A fixed interval loses trail: the scheduler is single-in-flight with a queue
+   * depth of one, so ticks that fire while a send is in flight get coalesced and
+   * their stamps are never drawn — the arc comes out as disconnected fragments.
+   * Ticking only after a frame has actually gone out guarantees every stamp is
+   * painted exactly once, so the trail stays continuous no matter how slow the
+   * link is. A slow link makes the cascade take longer; it can no longer make it
+   * come apart.
+   */
+  function scheduleNextWinAnimationTick(): void {
+    if (winAnimationTimer) return;
+    if (store.getState().ui.winAnimation?.phase !== "playing") return;
+    winAnimationTimer = setTimeout(() => {
+      winAnimationTimer = null;
+      if (store.getState().ui.winAnimation?.phase !== "playing") return;
+      // Never advance physics while a frame is still going out: schedule() would
+      // fold this tick into the follow-up slot and its stamps would be dropped.
+      // Wait for the in-flight frame instead — the trail must not skip.
+      if (scheduler.isBusy()) {
+        scheduleNextWinAnimationTick();
+        return;
+      }
+      store.dispatch({ type: "WIN_ANIMATION_TICK" });
+    }, WIN_ANIMATION_TICK_MS);
+  }
+
+  /**
+   * The animation runs on a 2x2 image page so the flying card is visible across
+   * the whole board; gameplay runs on the 3-tile page. Swap containers on the
+   * way in and out, holding the tick timer until the new page is live so no
+   * frame is sent to a container that no longer exists.
+   */
+  let winAnimationPageActive = false;
+  let winAnimationPageSwapInFlight = false;
+
+  async function swapToPage(
+    page: ReturnType<typeof composeWinAnimationPage> | ReturnType<typeof composeInputModePage>,
+    containerIds: ReadonlyArray<number>
+  ): Promise<void> {
+    resetActiveContainers([]);
+    const ok = await hub.rebuildPage(page);
+    if (!ok && hub.isReady()) {
+      logError("[Solitaire] rebuildPage for win-animation swap failed.");
+    }
+    resetActiveContainers(containerIds);
+    resetSendMemo();
+    resetFrameMemo();
+  }
+
+  async function syncWinAnimationPage(useAnimationPage: boolean): Promise<void> {
+    if (winAnimationPageSwapInFlight || useAnimationPage === winAnimationPageActive) return;
+    winAnimationPageSwapInFlight = true;
+    try {
+      if (useAnimationPage) {
+        await swapToPage(composeWinAnimationPage(), WIN_ANIMATION_CONTAINER_IDS);
+        winAnimationPageActive = true;
+      } else {
+        await swapToPage(composeInputModePage(), ALL_CONTAINER_IDS);
+        winAnimationPageActive = false;
+      }
+      // Kick the loop: this render's completion arms the first tick, and each
+      // tick's render arms the next. Self-sustaining, one tick per frame.
+      scheduleWithImages();
+    } finally {
+      winAnimationPageSwapInFlight = false;
+    }
+  }
 
   store.subscribe((state, prevState) => {
     if (state === prevState) return;
@@ -221,8 +314,12 @@ export async function initApp(): Promise<void> {
       queueAutosave(state.game, state.ui.moveAssist);
     }
 
-    if (gameOrSettingsChanged) {
-      // Material change (move/draw/setting): show the board promptly.
+    const winAnimationChanged = state.ui.winAnimation !== prevState.ui.winAnimation;
+
+    if (gameOrSettingsChanged || winAnimationChanged) {
+      // Material change (move/draw/setting), or an animation tick: show the board
+      // promptly. Animation frames must NOT take the deferred path below — image
+      // suppression would hold back every frame of the cascade.
       scheduleWithImages();
     } else {
       // Navigation/selection-only (spam-swipe): push text immediately for
@@ -238,6 +335,64 @@ export async function initApp(): Promise<void> {
         if (imageDeferred) scheduler.schedule();
       }, IMAGE_COOLDOWN_MS);
     }
+
+    // Auto-play the cascade on a win, after holding the finished board so the
+    // player can actually look at it. Guarded on winAnimation being absent and
+    // on no hold already pending, so it arms once.
+    if (state.game.won && !state.ui.winAnimation && !winBoardHoldTimer) {
+      // Arm before dispatching: the dispatch re-enters this subscription
+      // synchronously and must see the hold already pending.
+      winBoardHoldTimer = setTimeout(() => {
+        winBoardHoldTimer = null;
+        // Re-check: the player may have tapped for a new game during the hold,
+        // in which case starting now would snapshot empty foundations and run
+        // the demo deck over a fresh board.
+        const current = store.getState();
+        if (!current.game.won || current.ui.winAnimation) return;
+        store.dispatch({ type: "WIN_ANIMATION_START", fromWin: true });
+      }, WIN_BOARD_HOLD_MS);
+      store.dispatch({ type: "WIN_BOARD_HOLD", active: true });
+      return;
+    }
+    if (!state.game.won && winBoardHoldTimer) {
+      clearTimeout(winBoardHoldTimer);
+      winBoardHoldTimer = null;
+    }
+
+    // Cascade finished — by running out of cards or by the user tapping to skip.
+    // A real win deals a fresh game (the page swap back to the 3-tile layout is
+    // driven by `animating` going false below). A menu preview must leave the
+    // in-progress game exactly as it was.
+    const finished =
+      state.ui.winAnimation?.phase === "done" && prevState.ui.winAnimation?.phase === "playing";
+    if (finished) {
+      if (state.ui.winAnimation?.fromWin) {
+        resetTapCooldown();
+        store.dispatch({ type: "NEW_GAME" });
+      } else {
+        store.dispatch({ type: "WIN_ANIMATION_DISMISS" });
+      }
+    }
+
+    const animating = state.ui.winAnimation?.phase === "playing";
+    // The 2x2 page goes up for the HOLD, not just the cascade, so the rebuild
+    // and the four-tile initial paint are absorbed by the hold window instead of
+    // stalling the moment the animation should start. The board is pixel
+    // identical in both layouts, so the swap is invisible.
+    const wantAnimationPage = animating || (state.ui.winBoardHold ?? false);
+    if (wantAnimationPage !== winAnimationPageActive) {
+      // Ticking is gated on the 2x2 page being live, so the first stamped frame
+      // lands on containers that exist.
+      clearWinAnimationTimer();
+      void syncWinAnimationPage(wantAnimationPage);
+    } else if (!animating) {
+      clearWinAnimationTimer();
+    }
+    // NB: no arming here. The tick is armed only when a render+send completes,
+    // in the scheduler callback. Arming from this subscription would start a
+    // timer while that render is still in flight; the tick would then land
+    // mid-send, get folded into the scheduler's follow-up slot, and its stamps
+    // would never be drawn — which is exactly the partial-trail bug.
 
     // Transient message (e.g. "Invalid move"): re-arm a single auto-dismiss
     // timer whenever the message changes, so only the latest one is tracked.
@@ -288,6 +443,11 @@ export async function initApp(): Promise<void> {
       pendingMessageDismiss = null;
     }
     clearImageCooldownTimer();
+    clearWinAnimationTimer();
+    if (winBoardHoldTimer) {
+      clearTimeout(winBoardHoldTimer);
+      winBoardHoldTimer = null;
+    }
     if (pendingSave) {
       clearTimeout(pendingSave);
       pendingSave = null;

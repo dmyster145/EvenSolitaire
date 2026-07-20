@@ -109,6 +109,9 @@ function scrollAction(state: AppState, direction: "next" | "prev"): Action {
 }
 
 function tapAction(state: AppState): Action {
+  // Skip takes priority over everything: the cascade can run on an unfinished
+  // game via the "Play Animation" menu item, so the user needs a way out.
+  if (state.ui.winAnimation?.phase === "playing") return { type: "WIN_ANIMATION_SKIP" };
   if (state.ui.menuOpen) {
     if (state.ui.pendingResetConfirm) return { type: "MENU_SELECT" };
     const opt = MENU_OPTIONS[state.ui.menuSelectedIndex];

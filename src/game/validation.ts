@@ -31,6 +31,10 @@ export function canMoveToTableau(
   state: GameState,
   source: Source
 ): Dest[] {
+  // A multi-card pickup moves as a unit, so the run itself must already be a valid
+  // descending alternating-color sequence — otherwise dropping it on a legal card for
+  // the bottom of the run would smuggle unrelated cards along with it.
+  if (!isOrderedRun(state, source)) return [];
   const card = getSourceCard(state, source);
   if (!card) return [];
   const dests: Dest[] = [];
@@ -40,6 +44,21 @@ export function canMoveToTableau(
     }
   }
   return dests;
+}
+
+/** True when the selected tableau run descends by one in alternating colors. Trivially true for waste and single cards. */
+function isOrderedRun(state: GameState, source: Source): boolean {
+  if (source.area === "waste" || source.count <= 1) return true;
+  const pile = state.tableau[source.pileIndex];
+  const start = pile.visible.length - source.count;
+  if (start < 0) return false;
+  for (let i = start; i < pile.visible.length - 1; i++) {
+    const upper = pile.visible[i];
+    const lower = pile.visible[i + 1];
+    if (upper.rank !== lower.rank + 1) return false;
+    if (!oppositeColor(upper.suit, lower.suit)) return false;
+  }
+  return true;
 }
 
 function getSourceCard(state: GameState, source: Source): Card | null {

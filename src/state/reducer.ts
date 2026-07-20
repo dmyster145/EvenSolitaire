@@ -15,6 +15,7 @@ import type { Source } from "../game/validation";
 import type { Dest } from "../game/validation";
 import { focusIndexToTarget, focusTargetToIndex, focusTargetToDest } from "./ui-mode";
 import { pushUndo, popUndo, clearUndo } from "../features/undo";
+import { startWinAnimation, stepWinAnimation, skipWinAnimation } from "../features/win-animation";
 
 function getFocusIndex(state: AppState): number {
   return focusTargetToIndex(state.ui.focus);
@@ -72,6 +73,16 @@ function resolveFocusAfterFoundationMove(state: AppState, sourceFocus: AppState[
   return nextFocusWithTopCard(state, sourceIndex);
 }
 
+/**
+ * True once the deal is fully resolved: stock and waste empty and no face-down tableau cards.
+ * From here every remaining card only ever goes to a foundation, so the destination step is
+ * pure ceremony and a single tap commits the move.
+ */
+function isEndgameAutoMoveState(game: AppState["game"]): boolean {
+  if (game.stock.length > 0 || game.waste.length > 0) return false;
+  return game.tableau.every((pile) => pile.hidden.length === 0);
+}
+
 function applyLegalMoveAndReturnBrowseState(
   state: AppState,
   sourceFocus: AppState["ui"]["focus"],
@@ -105,10 +116,17 @@ type LegalDestCacheEntry = {
   focusIndexes: Set<number>;
 };
 
-function getAutoDestinationFocusTarget(source: Source, dests: Dest[]): AppState["ui"]["focus"] | null {
+function getAutoDestinationFocusTarget(
+  game: AppState["game"],
+  source: Source,
+  dests: Dest[],
+): AppState["ui"]["focus"] | null {
   // Move Assist: prefer foundation first for both waste and tableau selections.
   // If foundation is not legal, waste falls back to the leftmost legal tableau destination.
-  // Tableau keeps source focus unless there is exactly one legal non-foundation destination.
+  // Tableau keeps source focus unless there is exactly one legal non-foundation destination
+  // AND the pile has no deeper run to select — otherwise auto-focusing the destination would
+  // steal the follow-up tap that cycles the selected card count, making multi-card runs
+  // unselectable (e.g. 8C+7D can never be picked up if 7D alone has a lone legal home).
   const foundationDest = dests.find((d) => d.area === "foundation");
   if (foundationDest && foundationDest.area === "foundation") {
     return focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION + foundationDest.index);
@@ -124,6 +142,7 @@ function getAutoDestinationFocusTarget(source: Source, dests: Dest[]): AppState[
 
   if (source.area === "tableau") {
     if (dests.length !== 1) return null;
+    if (game.tableau[source.pileIndex].visible.length > 1) return null;
     const onlyDest = dests[0];
     if (onlyDest.area === "tableau") {
       return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + onlyDest.index);
@@ -317,9 +336,17 @@ export function rootReducer(
       if (!source) return state;
       const dests = getCachedLegalDestEntry(state.game, source).dests;
 
+      // Endgame: one tap sends the top tableau card straight home, no destination step.
+      if (source.area === "tableau" && isEndgameAutoMoveState(state.game)) {
+        const foundationDest = dests.find((d) => d.area === "foundation");
+        if (foundationDest) {
+          return applyLegalMoveAndReturnBrowseState(state, action.target, source, foundationDest);
+        }
+      }
+
       let autoDestinationFocus: AppState["ui"]["focus"] | null = null;
       if (state.ui.moveAssist) {
-        autoDestinationFocus = getAutoDestinationFocusTarget(source, dests);
+        autoDestinationFocus = getAutoDestinationFocusTarget(state.game, source, dests);
       }
       return {
         ...state,
@@ -328,7 +355,8 @@ export function rootReducer(
           mode: "select_destination",
           focus: autoDestinationFocus ?? state.ui.focus,
           selection: { source: action.target, selectedCardCount: 1 },
-          message: dests.length === 0 ? "No legal move from selected pile" : undefined,
+          // No "no legal move" toast — the info panel's legal-move count already says this.
+          message: undefined,
         },
       };
     }
@@ -470,6 +498,12 @@ export function rootReducer(
       if (opt === "Move Assist") {
         return { ...state, ui: { ...state.ui, moveAssist: !state.ui.moveAssist } };
       }
+      if (opt === "Play Animation") {
+        return rootReducer(
+          { ...state, ui: { ...state.ui, menuOpen: false } },
+          { type: "WIN_ANIMATION_START" }
+        );
+      }
       if (opt === "Reset") {
         return { ...state, ui: { ...state.ui, pendingResetConfirm: true, menuSelectedIndex: 0 } };
       }
@@ -479,6 +513,46 @@ export function rootReducer(
         return { ...state, ui: { ...state.ui, menuOpen: false } };
       }
       return { ...state, ui: { ...state.ui, menuOpen: false } };
+    }
+
+    case "WIN_BOARD_HOLD": {
+      if ((state.ui.winBoardHold ?? false) === action.active) return state;
+      return { ...state, ui: { ...state.ui, winBoardHold: action.active } };
+    }
+
+    case "WIN_ANIMATION_START": {
+      if (state.ui.winAnimation?.phase === "playing") return state;
+      return {
+        ...state,
+        ui: {
+          ...state.ui,
+          menuOpen: false,
+          // The hold has done its job; the 2x2 page is already live.
+          winBoardHold: false,
+          winAnimation: startWinAnimation(state.game, action.fromWin ?? false),
+        },
+      };
+    }
+
+    case "WIN_ANIMATION_TICK": {
+      const wa = state.ui.winAnimation;
+      if (!wa || wa.phase !== "playing") return state;
+      const next = stepWinAnimation(wa);
+      if (next === wa) return state;
+      return { ...state, ui: { ...state.ui, winAnimation: next } };
+    }
+
+    case "WIN_ANIMATION_SKIP": {
+      const wa = state.ui.winAnimation;
+      if (!wa) return state;
+      return { ...state, ui: { ...state.ui, winAnimation: skipWinAnimation(wa.fromWin) } };
+    }
+
+    // Tear down a finished preview without touching the game. The win case goes
+    // through NEW_GAME instead, which clears winAnimation as part of the reset.
+    case "WIN_ANIMATION_DISMISS": {
+      if (!state.ui.winAnimation) return state;
+      return { ...state, ui: { ...state.ui, winAnimation: undefined } };
     }
 
     case "SHOW_MESSAGE":

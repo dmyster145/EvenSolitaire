@@ -195,6 +195,28 @@ describe("info panel text", () => {
     expect(getInfoPanelText(twoCardsSelected)).toContain("1 Legal Move");
   });
 
+  it("shows the legal move count even when move assist is off", () => {
+    const game = customMoveAssistCountSelectionState();
+    const state: AppState = {
+      ...withGame(game),
+      ui: {
+        ...initialState.ui,
+        mode: "select_source",
+        focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+        moveAssist: false,
+        selection: {
+          source: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+          selectedCardCount: 1,
+        },
+      },
+    };
+
+    const text = getInfoPanelText(state);
+
+    expect(text).toContain("Move Assist: OFF");
+    expect(text).toContain("2 Legal Moves");
+  });
+
   it("jumps long tableau lists so the active card marker is visible", () => {
     const game = customTableauInfoState();
     game.tableau[0] = {

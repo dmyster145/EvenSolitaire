@@ -5,7 +5,7 @@ import { extendTapCooldown, recordTap, resetTapCooldown } from "../../src/input/
 import { resetScrollDebounce } from "../../src/input/debounce";
 import { initialState } from "../../src/state/reducer";
 import { focusIndexToTarget } from "../../src/state/ui-mode";
-import { FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE } from "../../src/state/constants";
+import { FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, MENU_OPTIONS } from "../../src/state/constants";
 import type { AppState } from "../../src/state/types";
 
 function withUi(ui: Partial<AppState["ui"]>): AppState {
@@ -46,8 +46,8 @@ describe("input action map (menu exit behavior)", () => {
   });
 
   it("tap on the Exit menu option returns OPEN_EXIT_APP_UI", () => {
-    // Exit is the last MENU_OPTIONS entry.
-    const state = withUi({ menuOpen: true, menuSelectedIndex: 3 });
+    // Derived, not hardcoded: adding a menu option must not silently retarget this test.
+    const state = withUi({ menuOpen: true, menuSelectedIndex: MENU_OPTIONS.indexOf("Exit") });
     const action = mapEvenHubEvent(listClick(OsEventTypeList.CLICK_EVENT), state);
     expect(action).toEqual({ type: "OPEN_EXIT_APP_UI" });
   });

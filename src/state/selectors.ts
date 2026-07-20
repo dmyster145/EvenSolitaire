@@ -4,12 +4,12 @@ import { FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOC
 import type { Card, Suit, Rank } from "../game/types";
 import { getLegalDests } from "../game/validation";
 
-/** Menu lines for overlay: Move Assist: On/Off, Draw Card, Reset, Exit; or Reset confirmation Yes/No. */
+/** Menu lines for overlay: Move Assist: On/Off, Draw Card, Play Animation, Reset, Exit; or Reset confirmation Yes/No. */
 export function getMenuLines(state: AppState): string[] {
   if (!state.ui.menuOpen) return [];
   if (state.ui.pendingResetConfirm) return ["Yes", "No"];
   const moveAssistLabel = state.ui.moveAssist ? "Move Assist: On" : "Move Assist: Off";
-  return [moveAssistLabel, "Draw Card", "Reset", "Exit"];
+  return [moveAssistLabel, "Draw Card", "Play Animation", "Reset", "Exit"];
 }
 
 function getMenuHudLines(state: AppState): string[] {
@@ -40,6 +40,9 @@ export function getHudLines(state: AppState): string[] {
   const ui = state.ui;
   if (ui.menuOpen) {
     return getMenuHudLines(state);
+  }
+  if (state.ui.winAnimation?.phase === "playing") {
+    return ["You win!", "Tap to skip"];
   }
   if (state.game.won) {
     return ["You win!", "Tap for new game"];
@@ -160,6 +163,10 @@ export function getInfoPanelText(state: AppState): string {
 
   if (state.ui.menuOpen) {
     lines.push(...getMenuHudLines(state));
+  } else if (state.ui.winAnimation?.phase === "playing") {
+    // Keep the panel quiet during the cascade; pile detail is noise here.
+    lines.push("You win!");
+    lines.push("Tap to skip");
   } else if (g.won) {
     lines.push("You win!");
     lines.push("Tap for new game");
@@ -171,7 +178,7 @@ export function getInfoPanelText(state: AppState): string {
     const hasSelectedCard = !!state.ui.selection.source;
     const prePileCardLineCount =
       1 + // Move Assist line
-      (state.ui.moveAssist ? 1 : 0) + // Legal moves line (only when Move Assist is on)
+      1 + // Legal moves line
       1 + // spacer line
       1 + // pile label
       (pileIdx === FOCUS_INDEX_STOCK ? 1 : 0); // stock count line
@@ -184,10 +191,10 @@ export function getInfoPanelText(state: AppState): string {
 
     lines.push(state.ui.moveAssist ? "Move Assist: ON" : "Move Assist: OFF");
 
-    if (state.ui.moveAssist) {
-      const count = countLegalMovesForFocus(state, pileIdx);
-      lines.push(`${count} Legal Move${count !== 1 ? "s" : ""}`);
-    }
+    // Shown regardless of Move Assist: it is the only feedback that a pile is dead,
+    // now that the "no legal move" message is gone.
+    const legalMoveCount = countLegalMovesForFocus(state, pileIdx);
+    lines.push(`${legalMoveCount} Legal Move${legalMoveCount !== 1 ? "s" : ""}`);
 
     lines.push("");
     lines.push(infoPanelPileLabelFromIndex(pileIdx));
