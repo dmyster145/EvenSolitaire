@@ -73,7 +73,7 @@ describe("win animation physics", () => {
     game.foundations[0].cards = [card("f1s", 1, "S"), card("f2s", 2, "S")];
     game.foundations[2].cards = [card("f1h", 1, "H")];
 
-    const wa = startWinAnimation(game);
+    const wa = startWinAnimation(game, true);
 
     expect(wa.foundationCards.map((p) => p.length)).toEqual([2, 0, 1, 0]);
   });
@@ -82,7 +82,7 @@ describe("win animation physics", () => {
     const game = emptyGame();
     game.foundations[0].cards = [card("f1s", 1, "S"), card("f2s", 2, "S")];
 
-    const wa = stepWinAnimation(startWinAnimation(game), fixedRng(), 1);
+    const wa = stepWinAnimation(startWinAnimation(game, true), fixedRng(), 1);
 
     expect(wa.flyingCard?.id).toBe("f2s");
     expect(wa.foundationCards[0].map((c) => c.id)).toEqual(["f1s"]);
@@ -93,7 +93,7 @@ describe("win animation physics", () => {
     const game = emptyGame();
     game.foundations[3].cards = [card("f1d", 1, "D")];
 
-    const wa = stepWinAnimation(startWinAnimation(game), fixedRng(), 1);
+    const wa = stepWinAnimation(startWinAnimation(game, true), fixedRng(), 1);
 
     expect(wa.flyingCard?.id).toBe("f1d");
   });
@@ -424,6 +424,26 @@ describe("win animation provenance", () => {
       { type: "MENU_SELECT" }
     );
   }
+
+  it("previews a FULL deck even when foundations already hold cards", () => {
+    // The bug: keying the preview off the real foundations meant that with one
+    // or two cards up — most of a game — the cascade was over in a second.
+    const game = emptyGame();
+    game.foundations[0].cards = [card("f1s", 1, "S")];
+
+    const preview = startWinAnimation(game, false);
+
+    expect(preview.foundationCards.reduce((n, p) => n + p.length, 0)).toBe(52);
+  });
+
+  it("a real win animates the actual foundations, not a demo deck", () => {
+    const game = emptyGame();
+    game.foundations[0].cards = [card("f1s", 1, "S"), card("f2s", 2, "S")];
+
+    const won = startWinAnimation(game, true);
+
+    expect(won.foundationCards.reduce((n, p) => n + p.length, 0)).toBe(2);
+  });
 
   it("marks a menu preview as not from a win", () => {
     expect(menuPreview().ui.winAnimation?.fromWin).toBe(false);

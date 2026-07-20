@@ -119,14 +119,18 @@ const IDLE = {
 };
 
 /**
- * Snapshot the foundations to animate. When they are empty — the "Play Animation"
- * menu item on an unfinished game — fall back to a full deck so there is always
- * something to watch.
+ * Snapshot the foundations to animate.
+ *
+ * A real win animates the actual foundations, which by definition hold all 52
+ * cards. The "Play Animation" menu preview ALWAYS uses a full deck instead, so
+ * it renders as if the game were won regardless of the state of play — keying
+ * off the real foundations would make the preview last a second or two whenever
+ * the player happens to have only a card or two up, which is most of the game.
  */
 export function startWinAnimation(game: GameState, fromWin = false): WinAnimationState {
   const snapshot = game.foundations.map((f) => [...f.cards]);
   const total = snapshot.reduce((sum, pile) => sum + pile.length, 0);
-  const foundationCards = total > 0 ? snapshot : demoFoundationCards();
+  const foundationCards = fromWin && total > 0 ? snapshot : demoFoundationCards();
   return {
     phase: "playing",
     fromWin,
