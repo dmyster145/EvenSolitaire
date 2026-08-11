@@ -82,8 +82,9 @@
       }
 
       .spade-icon {
-        width: 48px;
-        height: 48px;
+        width: 52px;
+        height: 56px;
+        fill: var(--text-primary);
       }
 
       .logo-text {
@@ -99,10 +100,6 @@
         font-size: 20px;
         vertical-align: middle;
         margin: 0 1px;
-      }
-
-      .knight-icon {
-        display: none;
       }
 
       .subtitle {
@@ -429,11 +426,12 @@
     <div class="container">
       <header class="header">
         <div class="logo">
-          <img src="/spade-icon.png" class="spade-icon" alt="" aria-hidden="true" />
-          <span class="logo-text">SOLITAIRE</span>
-          <svg class="knight-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M19 22H5v-2h14v2M17.16 8.26A3.99 3.99 0 0 0 18 6c0-.23-.03-.46-.06-.69l1.56-.56-.37-1.45-1.67.6a4.007 4.007 0 0 0-2.7-1.86l.2-1.04h-1.5l-.2 1.04c-1.14.18-2.13.78-2.78 1.67l-1.5-.54-.36 1.45 1.33.48C10.08 5.4 10 5.68 10 6c0 .93.32 1.78.85 2.46L4 20h2l4.46-8.91c.75.52 1.65.84 2.62.9l.92 3.56 1.94-.5-.86-3.31a4.01 4.01 0 0 0 2.08-3.48z"/>
+          <!-- Pixel-art spade, traced to vector from the 13x14 source grid. Sized to an exact
+               4x multiple so every art pixel lands on whole pixels and the steps stay sharp. -->
+          <svg class="spade-icon" viewBox="0 0 13 14" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M6 0h1v14h-1zM5 1h1v2h-1zM7 1h1v13h-1zM4 2h1v2h-1zM8 2h1v8h-1zM3 3h1v2h-1zM9 3h1v8h-1zM2 4h1v2h-1zM5 4h1v10h-1zM10 4h1v7h-1zM1 5h1v2h-1zM4 5h1v5h-1zM11 5h1v5h-1zM0 6h1v3h-1zM3 6h1v5h-1zM12 6h1v3h-1zM2 7h1v1h-1zM1 8h1v2h-1zM2 9h1v2h-1zM4 12h1v2h-1zM8 12h1v2h-1zM3 13h1v1h-1zM9 13h1v1h-1z"/>
           </svg>
+          <span class="logo-text">SOLITAIRE</span>
         </div>
         <p class="subtitle">Klondike Solitaire for Even Realities G2</p>
       </header>
@@ -466,6 +464,7 @@
             <ul>
               <li>Restores game state when a save exists</li>
               <li>Restores your <strong>Move Assist</strong> setting with the save</li>
+              <li><strong>Move Assist is on by default</strong> for a new install. Turning it off sticks.</li>
               <li>After a win, tap starts a new game; double-tap opens the menu</li>
             </ul>
 
@@ -490,7 +489,8 @@
             <h3>Focus Navigation</h3>
             <p>Focus is your cursor. It moves by mode:</p>
             <ul>
-              <li>Browse mode skips empty non-stock piles and skips foundations</li>
+              <li>Browse mode skips empty piles and skips foundations</li>
+              <li>The stock stays reachable while it or the waste still holds cards. Once both are empty, scrolling skips it too</li>
               <li>Destination mode moves across tableau and foundation drop targets</li>
               <li>With Move Assist ON, illegal destinations are skipped</li>
             </ul>
@@ -534,11 +534,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr><td>Stock</td><td>Draw three cards. If stock is empty and waste has cards, waste recycles first, then draw continues.</td></tr>
+                <tr><td>Stock</td><td>Draw three cards. When the stock is empty and the waste still has cards, the waste recycles and the same tap deals. On the last pass, when three or fewer cards are left in the whole cycle, the recycle takes its own tap so you can see the stock refill.</td></tr>
                 <tr><td>Waste</td><td>Select waste top as source. With Move Assist ON, focus auto-jumps to a legal foundation first; if none exists, it jumps to the leftmost legal tableau destination.</td></tr>
-                <tr><td>Tableau</td><td>Select as source, or place a carried run. With Move Assist ON, if a legal foundation move exists, focus auto-jumps to foundation; placement still requires a confirming tap. If no legal foundation exists, focus auto-jumps only when the currently selected stack has exactly one legal destination.</td></tr>
+                <tr><td>Tableau</td><td>Select as source, or place a carried run. With Move Assist ON, focus auto-jumps to a legal foundation first, then to the leftmost legal tableau pile. It stays put when the pile has more face-up cards below the top one, so you can still tap to grow the run. Placement always needs a second tap.</td></tr>
                 <tr><td>Foundation</td><td>While carrying cards, attempts placement to that foundation (legal moves only).</td></tr>
-                <tr><td>Menu Open</td><td>Activates the highlighted menu option.</td></tr>
+                <tr><td>Menu Open</td><td>Activates the highlighted menu option. This holds during the win animation too.</td></tr>
                 <tr><td>Win State</td><td>Start a new game.</td></tr>
               </tbody>
             </table>
@@ -554,9 +554,17 @@
             <ol>
               <li><strong>Scroll</strong> to the source pile (stock, waste, or tableau)</li>
               <li><strong>Tap</strong> to draw or pick up cards</li>
-              <li>With Move Assist ON, focus may auto-jump to a legal destination (waste or tableau prefers foundation when legal; waste otherwise uses the leftmost legal tableau destination; tableau otherwise jumps only when the currently selected stack has exactly one legal destination). Placement always requires a confirming tap.</li>
+              <li>With Move Assist ON, focus may auto-jump to a legal destination. A foundation wins when one is legal, otherwise the leftmost legal tableau pile.</li>
               <li><strong>Tap</strong> again to place</li>
             </ol>
+
+            <h3>Finishing a Game</h3>
+            <p>Once the stock and waste are empty and every tableau card is face-up, every remaining card is headed for a foundation.</p>
+            <ul>
+              <li>With Move Assist ON, focus moves to the next pile that can go home after each card lands. You can finish the game on taps alone, no scrolling.</li>
+              <li>Scrolling still reaches every pile, so you can park a card on another column first if you need to.</li>
+              <li>With Move Assist OFF, a tap on a tableau card sends it straight home in one step.</li>
+            </ul>
 
             <h3>Selecting Tableau Runs (Multi-card Moves)</h3>
             <p>In destination mode, tapping the <strong>same tableau column</strong> cycles carried run size (1, 2, 3, ... up to visible count, then back to 1).</p>
@@ -564,8 +572,8 @@
 
             <h3>Invalid Moves and Canceling</h3>
             <ul>
-              <li>Illegal placements blink briefly, then focus snaps back to source</li>
-              <li>If a selected source has no legal moves, the HUD may show <code>0 Legal Moves</code></li>
+              <li>An illegal placement shows <code>Invalid move</code> and returns focus to the source pile</li>
+              <li>If a selected source has no legal moves, the info panel shows <code>0 Legal Moves</code></li>
               <li><strong>Double-tap</strong> cancels the current selection and returns to browsing</li>
             </ul>
 
@@ -607,14 +615,18 @@
             <h3>App-Specific Clarifications</h3>
             <ul>
               <li><strong>Board draw:</strong> Tapping the stock draws <strong>three cards</strong> (or fewer when fewer cards remain)</li>
-              <li><strong>Menu draw assist:</strong> The menu’s <strong>Draw Card</strong> option draws <strong>one card</strong> (and handles recycle first when needed)</li>
-              <li><strong>Auto-destination priority (Move Assist ON):</strong> Selecting from waste or tableau auto-focuses foundation first when a legal foundation move exists. If no legal foundation exists, waste auto-focuses the leftmost legal tableau destination, while tableau auto-focuses only when the currently selected stack has exactly one legal destination. Placement still requires a confirming tap.</li>
-              <li><strong>Recycle:</strong> The waste can be recycled when the stock is empty</li>
+              <li><strong>Menu draw assist:</strong> The menu's <strong>Draw Card</strong> option draws <strong>one card</strong> (and handles recycle first when needed)</li>
+              <li><strong>Auto-destination priority (Move Assist ON):</strong> A legal foundation wins. Otherwise focus goes to the leftmost legal tableau pile. A tableau pile with more face-up cards below its top card keeps focus instead, so the run-size tap stays available. Placement always needs a confirming tap.</li>
+              <li><strong>Recycle:</strong> The waste can be recycled when the stock is empty. Draw order carries through the recycle, exactly as in standard Klondike.</li>
               <li><strong>Win condition:</strong> You win when all four foundations have 13 cards</li>
             </ul>
 
             <div class="tip">
-              <strong>Tip:</strong> Turn on <strong>Move Assist</strong> to skip illegal destinations while learning the rules.
+              <strong>Tip:</strong> <strong>Move Assist</strong> is on by default. Leave it on while learning, since it skips illegal destinations for you.
+            </div>
+
+            <div class="tip">
+              <strong>Stuck on the last few cards?</strong> Draw order never changes through a recycle, so with three cards left the same one keeps coming up. The menu's <strong>Draw Card</strong> pulls a single card, which shifts the order and reaches the other two.
             </div>
           </div>
         </details>
@@ -627,20 +639,23 @@
             <p>Double-tap in normal play to open menu. Scroll to choose, tap to confirm, double-tap to close.</p>
 
             <h3>Move Assist</h3>
-            <p>Toggles destination filtering and legal-move counts in the info panel.</p>
+            <p>On by default. Filters where focus can land while you are carrying a card.</p>
             <ul>
-              <li><strong>On:</strong> Destination scrolling skips illegal drops while carrying cards</li>
+              <li><strong>On:</strong> Destination scrolling skips illegal drops, focus auto-jumps to the best destination, and the endgame advances pile to pile on its own</li>
               <li><strong>Off:</strong> You can scroll to any tableau or foundation destination</li>
             </ul>
 
             <h3>Draw Card</h3>
-            <p>Draws one card from stock as an assist action. This is separate from board stock draw, which draws three.</p>
+            <p>Draws one card from stock as an assist action. This is separate from board stock draw, which draws three. Use it to shift draw order when the last few cards keep repeating.</p>
+
+            <h3>Play Animation</h3>
+            <p>Replays the winning card cascade on demand. Started this way it runs over your game in progress, so the panel labels it <code>Preview</code> and a tap skips back to your game. Nothing about the board changes.</p>
 
             <h3>Reset</h3>
             <p>Shows a <code>Yes</code>/<code>No</code> confirmation before starting a new game.</p>
 
             <h3>Exit</h3>
-            <p>Saves current game state, then exits the app. Use double-tap if you only want to close menu.</p>
+            <p>Opens the Even Realities exit prompt. Your game is already saved. Use double-tap if you only want to close the menu.</p>
           </div>
         </details>
       </section>
@@ -649,25 +664,25 @@
         <details>
           <summary>Status &amp; Feedback</summary>
           <div class="section-content">
-            <h3>HUD Prompts</h3>
-            <p>The HUD changes by mode. Common lines include:</p>
+            <h3>Info Panel</h3>
+            <p>The panel on the left of the display is the only status readout. In normal play it shows:</p>
             <ul>
-              <li><code>Select source pile</code></li>
-              <li><code>Focus: Stock</code>, <code>Focus: Waste</code>, <code>Focus: T1</code> ... <code>Focus: T7</code></li>
-              <li><code>MENU</code> with the selected option marked by <code>&gt;</code></li>
-              <li><code>You win! Tap for new game</code></li>
-              <li>Short state messages such as <code>0 Legal Moves</code></li>
+              <li><code>Move Assist: ON</code> or <code>Move Assist: OFF</code></li>
+              <li>A legal move count for the focused pile, shown whether Move Assist is on or off. <code>0 Legal Moves</code> is how you spot a dead pile.</li>
+              <li>The focused pile's label and its cards. The stock also shows <code>Cards Left</code>.</li>
+              <li><code>Selected Pile</code> and the card or run you are carrying</li>
             </ul>
 
-            <h3>Info Panel / Focus Details</h3>
-            <ul>
-              <li>Shows cards in the focused pile (or the active source pile while carrying cards)</li>
-              <li>Shows <code>Move Assist: ON/OFF</code></li>
-              <li>When Move Assist is ON, shows a legal move count for the focused pile</li>
-            </ul>
+            <h3>When Space Runs Short</h3>
+            <p>The panel fits nine rows. When both the focused pile and a carried selection are listed, the Move Assist and legal-move lines step aside to make room. Long card lists shorten with a <code>...</code> line rather than running off the bottom.</p>
 
-            <h3>Menu in HUD</h3>
-            <p>The menu lives in the HUD panel. Reset swaps options to a <code>Yes</code>/<code>No</code> confirmation prompt.</p>
+            <h3>Other States</h3>
+            <ul>
+              <li>Menu: <code>MENU</code> with the selected option marked by <code>&gt;</code>. Reset swaps the options for a <code>Yes</code>/<code>No</code> prompt.</li>
+              <li>Win: <code>You win!</code> and <code>Tap for new game</code></li>
+              <li>Animation started from the menu: <code>Preview</code> and <code>Tap to skip</code></li>
+              <li>Brief messages such as <code>Invalid move</code> and <code>Stock reset</code> appear at the top for a moment</li>
+            </ul>
           </div>
         </details>
       </section>
@@ -695,14 +710,14 @@
         <details>
           <summary>Debug Console (Perf Panel)</summary>
           <div class="section-content">
-            <p>The floating perf console panel is preserved on this page and uses the same DOM IDs and controls as the original Solitaire <code>index.html</code>.</p>
+            <p>A floating panel that prints performance output while you play.</p>
 
             <h3>Panel Controls</h3>
             <ul>
               <li><strong>Hide / Show</strong></li>
               <li><strong>Clear</strong></li>
               <li><strong>Copy All</strong></li>
-              <li><strong>Stop / Start</strong> — pause or resume recording perf output</li>
+              <li><strong>Stop / Start</strong>, to pause or resume recording</li>
             </ul>
 
             <h3>When It Appears</h3>
@@ -717,10 +732,12 @@
           <div class="section-content">
             <h3>Playing Efficiently</h3>
             <ul>
-              <li>Use <strong>Move Assist</strong> while learning. It cuts destination-scrolling noise.</li>
+              <li>Leave <strong>Move Assist</strong> on while learning. It cuts destination-scrolling noise.</li>
               <li>If a tableau selection looks wrong, double-tap to cancel and reselect.</li>
               <li>Tapping the same tableau column while carrying cards changes the run size.</li>
               <li>Watch for newly exposed tableau cards. The app flips them automatically.</li>
+              <li>Check the legal move count before committing to a pile. <code>0 Legal Moves</code> means it is dead for now.</li>
+              <li>When the endgame starts, stop scrolling and just tap. Move Assist walks the piles for you.</li>
             </ul>
           </div>
         </details>

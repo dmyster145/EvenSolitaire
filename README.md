@@ -1,8 +1,8 @@
 # Solitaire
 
-Klondike Solitaire for **Even Realities G2** smart glasses: play with scroll/tap/double-tap controls, manage piles from a HUD-first interface, and use optional Move Assist when you want cleaner destination navigation.
+Klondike Solitaire for **Even Realities G2** smart glasses. Three gestures run the whole game: scroll, tap, double-tap. Piles and status live in a text panel rather than a board overlay, and Move Assist points you at legal destinations so you scroll less.
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE).
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 ## Screenshots
 
@@ -20,7 +20,7 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE).
 
 - **Runtime:** TypeScript, Vite
 - **Game rules / engine:** Internal Klondike engine in `src/game/` (deal, validation, moves, win detection)
-- **Glasses:** [Even Hub SDK](https://www.npmjs.com/package/@evenrealities/even_hub_sdk) — containers, image/text updates, event mapping
+- **Glasses:** [Even Hub SDK](https://www.npmjs.com/package/@evenrealities/even_hub_sdk) for containers, image/text updates, and event mapping
 - **Rendering:** Canvas-based board rendering + composed image tiles for G2 layouts
 - **Tests:** Vitest
 
@@ -39,15 +39,15 @@ Solitaire/
 │   ├── input/          # SDK event → Action mapping (scroll/tap/double-tap), gesture debounce
 │   ├── storage/        # Save/load game + settings (Even Hub storage or localStorage fallback)
 │   ├── perf/           # Optional perf logging/debug panel wiring
-│   ├── features/       # Undo and helper utilities
+│   ├── features/       # Undo stack, hint lookup, win-animation physics
 │   └── utils/          # Shared logging helpers
 └── tests/              # Unit tests for game logic, state, input mapping, render helpers
 ```
 
 ## Prerequisites
 
-- **Even Realities** — G2 glasses and the [Even App](https://www.evenrealities.com/) (so you can open the widget and see the Solitaire HUD on your glasses).
-- **Node.js** — v20 or newer. [Download Node.js](https://nodejs.org/) if needed; the standard installer is enough.
+- **Even Realities:** G2 glasses and the [Even App](https://www.evenrealities.com/), so you can open the widget and see Solitaire on your glasses.
+- **Node.js:** v20 or newer. [Download Node.js](https://nodejs.org/) if needed. The standard installer is enough.
 
 ## Setup
 
@@ -55,8 +55,8 @@ Solitaire/
    - Open a terminal (Command Prompt, PowerShell, or Terminal app).
    - Clone the repo (use the project’s clone URL from GitHub, or your fork):
      ```bash
-     git clone https://github.com/owner/Solitaire.git
-     cd Solitaire
+     git clone https://github.com/dmyster145/EvenSolitaire.git
+     cd EvenSolitaire
      ```
    - Install dependencies:
      ```bash
@@ -75,13 +75,13 @@ Solitaire/
 
 4. **Try it**
    - On your **phone:** Open the same URL in a browser to see the [help/docs page](index.html).
-   - On your **glasses:** Scroll to move focus, tap to draw/select/place, double-tap to open the menu (Move Assist, Draw Card, Reset, Exit).
+   - On your **glasses:** Scroll to move focus, tap to draw/select/place, double-tap to open the menu (Move Assist, Draw Card, Play Animation, Reset, Exit).
 
 ## Usage on the glasses
 
-- **Scroll** — Move focus across piles, move menu selection, or move destination focus while carrying cards.
-- **Tap** — Draw from stock, pick a source pile, place cards, choose a menu item, or start a new game after a win.
-- **Double-tap** — Open/close the menu, cancel selection while carrying cards, or open the menu on the win prompt.
+- **Scroll:** Move focus across piles, move the menu selection, or move destination focus while carrying cards.
+- **Tap:** Draw from stock, pick a source pile, place cards, choose a menu item, or start a new game after a win.
+- **Double-tap:** Open or close the menu, cancel a selection while carrying cards, or open the menu on the win prompt.
 
 ## Scripts
 
@@ -108,13 +108,15 @@ Output is in `dist/`. Deploy that folder to any static host, then open the deplo
 ## Features (summary)
 
 - **Klondike Solitaire gameplay:** Standard tableau/foundation rules with automatic flip of newly exposed tableau cards.
-- **Stock draw behavior:** Tapping the stock draws **three** cards (or fewer if fewer remain).
-- **Menu assist draw:** The menu’s **Draw Card** option draws **one** card to help when you are stuck.
-- **Move Assist:** Optional destination filtering and legal-move counts in the info panel while navigating moves. With Move Assist ON, destination scroll skips illegal drops; selecting from waste or tableau auto-focuses a legal foundation first when available (otherwise waste falls back to the leftmost legal tableau destination and tableau keeps source focus unless it has exactly one legal tableau destination). Placement still requires a confirming tap.
-- **HUD-first menu:** Settings menu is shown in the HUD/info panel (not a board overlay) and includes Move Assist, Draw Card, Reset, and Exit.
-- **Save & resume:** Autosaves game state and Move Assist setting; restores on launch when valid data exists.
-- **Exit behavior:** Choosing **Exit** saves the current game state, then closes the app.
-- **Win prompt:** Shows `You win!` and `Tap for new game`; tap starts a new game, double-tap opens the menu.
+- **Stock draw behavior:** Tapping the stock draws **three** cards (or fewer if fewer remain). When the stock is empty the waste recycles on the same tap. On the last pass, with three or fewer cards left in the cycle, the recycle gets its own tap so you can see the stock refill.
+- **Menu assist draw:** The menu’s **Draw Card** option draws **one** card. Draw order carries through a recycle, so with only a few cards left the same one keeps surfacing. Drawing one shifts the order and reaches the others.
+- **Move Assist:** On by default. Destination scrolling skips illegal drops, and picking up a card jumps focus to a legal foundation when one exists, otherwise to the leftmost legal tableau pile. A pile with more face-up cards under its top card keeps focus instead, so the run-size tap stays available. Placement always needs a confirming tap.
+- **Tap-through endgame:** Once the stock and waste are empty and every tableau card is face-up, Move Assist moves focus to the next pile that can go home after each card lands, so the finish takes taps and no scrolling. Scrolling still reaches every pile if you want to reroute a card.
+- **Legal move count:** The info panel always shows how many legal moves the focused pile has, with or without Move Assist. `0 Legal Moves` is how you spot a dead pile.
+- **Menu in the info panel:** The menu renders as text in the left panel rather than a board overlay. Options are Move Assist, Draw Card, Play Animation, Reset, and Exit.
+- **Save & resume:** Autosaves game state and the Move Assist setting, and restores both on launch when valid data exists.
+- **Exit behavior:** **Exit** opens the Even Realities exit prompt. The game is already autosaved by then.
+- **Win prompt:** Shows `You win!` and `Tap for new game`. Tap starts a new game, double-tap opens the menu. Running the cascade from **Play Animation** instead labels it `Preview`, and a tap returns you to the game in progress.
 
 Full behavior, controls, and app-specific rule notes are on the in-app help page ([index.html](index.html)).
 
@@ -126,6 +128,6 @@ Current default runtime profile is the full-board **3-tile** layout (top + botto
 
 ## License & credits
 
-- **Even Hub SDK** — [@evenrealities/even_hub_sdk](https://www.npmjs.com/package/@evenrealities/even_hub_sdk) for G2 container updates, event input, and bridge integration.
-- **Klondike Solitaire rules** — The app follows standard Klondike rules with documented G2-specific control and menu adaptations (see [index.html](index.html)).
-- **License** — MIT License. See [LICENSE](LICENSE).
+- **Even Hub SDK:** [@evenrealities/even_hub_sdk](https://www.npmjs.com/package/@evenrealities/even_hub_sdk) for G2 container updates, event input, and bridge integration.
+- **Klondike Solitaire rules:** The app follows standard Klondike, with G2-specific control and menu adaptations documented on the help page ([index.html](index.html)).
+- **License:** MIT License. See [LICENSE](LICENSE).
