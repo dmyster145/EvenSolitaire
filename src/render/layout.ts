@@ -201,35 +201,6 @@ export const CARD_ELEVATION_OFFSET_Y = 10;
 
 /** Menu overlay: full-screen center Y (boundary between top and tableau canvases). */
 export const FULL_SCREEN_CENTER_Y = TOP_AREA_H;
-/** Menu typography: title stands out, options have selected/unselected sizes. */
-export const MENU_TITLE_FONT_SIZE = 22;
-export const MENU_FONT_SIZE = 20;
-export const MENU_FONT_SIZE_UNSELECTED = 16;
-export const MENU_LINE_HEIGHT = 28;
-/** Menu font: Aptos Display–style (clean sans-serif), with fallbacks. */
-export const MENU_FONT_FAMILY = '"Aptos Display", "Segoe UI Variable", "Segoe UI", sans-serif';
-/** Extra pixels between characters in menu text. */
-export const MENU_LETTER_SPACING = 2;
-/** Menu box: width, height, corner radius, and content layout (screen Y positions). */
-export const MENU_BOX_WIDTH = 240;
-export const MENU_PADDING_BELOW_OPTIONS = 20;
-/** Height fits title, divider, 4 options, and padding; extra 12px so first option sits above canvas seam. */
-export const MENU_BOX_HEIGHT = 108 + 2 * MENU_LINE_HEIGHT + MENU_PADDING_BELOW_OPTIONS + 12;
-export const MENU_BOX_RADIUS = 10;
-export const MENU_TITLE_FIRST = "Even";
-export const MENU_TITLE_DOT = "\u00B7";
-export const MENU_TITLE_SECOND = "Solitaire";
-/** Vertical offset (px) for the dot so it sits centered between the two words. */
-export const MENU_TITLE_DOT_OFFSET_Y = 2;
-/** Screen Y for title baseline center, divider top edge, and first option center. */
-export const MENU_TITLE_CENTER_Y = FULL_SCREEN_CENTER_Y - MENU_BOX_HEIGHT / 2 + 22 + MENU_PADDING_BELOW_OPTIONS / 2;
-export const MENU_DIVIDER_PADDING_ABOVE = 8;
-export const MENU_DIVIDER_PADDING_BELOW = 8;
-export const MENU_DIVIDER_Y = MENU_TITLE_CENTER_Y + MENU_TITLE_FONT_SIZE / 2 + 4 + MENU_DIVIDER_PADDING_ABOVE;
-export const MENU_DIVIDER_HEIGHT = 1;
-/** First option center Y. Offset +6 so the second line (Draw Card) sits below the canvas seam with room for ascenders. */
-export const MENU_FIRST_OPTION_CENTER_Y = MENU_DIVIDER_Y + MENU_DIVIDER_HEIGHT + MENU_DIVIDER_PADDING_BELOW + MENU_LINE_HEIGHT / 2 + 6;
-
 /** Full-screen width/height for win animation coordinates. */
 export const FULL_SCREEN_W = CANVAS_W;
 export const FULL_SCREEN_H = CANVAS_H;

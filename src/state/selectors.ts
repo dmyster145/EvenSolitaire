@@ -36,28 +36,6 @@ function getMenuHudLines(state: AppState): string[] {
   return lines;
 }
 
-export function getHudLines(state: AppState): string[] {
-  const ui = state.ui;
-  if (ui.menuOpen) {
-    return getMenuHudLines(state);
-  }
-  if (state.ui.winAnimation?.phase === "playing") {
-    return ["You win!", "Tap for new game"];
-  }
-  if (state.game.won) {
-    return ["You win!", "Tap for new game"];
-  }
-  const modePrompt =
-    ui.mode === "select_destination"
-      ? "Select destination"
-      : ui.mode === "select_source"
-        ? "Select source"
-        : "Select source pile";
-  const focusIdx = focusTargetToIndex(state.ui.focus);
-  const focusLabel = focusLabelFromIndex(focusIdx);
-  const msg = ui.message ? [ui.message] : [];
-  return [modePrompt, `Focus: ${focusLabel}`, ...msg];
-}
 
 function focusLabelFromIndex(index: number): string {
   if (index === 0) return "Stock";
@@ -83,17 +61,8 @@ export function getPileView(state: AppState): {
   };
 }
 
-export function getFocusTarget(state: AppState) {
-  return state.ui.focus;
-}
 
-export function getSelectionSource(state: AppState) {
-  return state.ui.selection.source;
-}
 
-export function getMenuSelectedIndex(state: AppState) {
-  return state.ui.menuSelectedIndex;
-}
 
 /** Cards currently "picked up" when in select_destination (waste top or tableau sub-stack). */
 export function getFloatingCards(state: AppState): Card[] {
@@ -113,11 +82,6 @@ export function getFloatingCards(state: AppState): Card[] {
   return [];
 }
 
-/** Number of cards to highlight in-place when in select_source mode. */
-export function getSelectionHighlightCount(state: AppState): number {
-  if (state.ui.mode !== "select_source" || !state.ui.selection.source) return 0;
-  return state.ui.selection.selectedCardCount ?? 1;
-}
 
 const SUIT_NAMES: Record<Suit, string> = {
   S: "Spades",
@@ -161,12 +125,24 @@ export function getInfoPanelText(state: AppState): string {
   const focusIdx = focusTargetToIndex(state.ui.focus);
   const g = state.game;
 
+  // Decided up front, not at the unshift below, because the transient message costs two rows
+  // of the same nine-row budget the lists are sized against. Leaving it out of that sum let
+  // an "Invalid move" toast push the focused pile's top card off the bottom of the container.
+  const showsMessage = !!state.ui.message && !state.ui.menuOpen && !g.won;
+
   if (state.ui.menuOpen) {
     lines.push(...getMenuHudLines(state));
   } else if (state.ui.winAnimation?.phase === "playing") {
-    // Keep the panel quiet during the cascade; pile detail is noise here.
-    lines.push("You win!");
-    lines.push("Tap for new game");
+    // Keep the panel quiet during the cascade; pile detail is noise here. fromWin separates a
+    // real win from the menu's "Play Animation" preview, which runs a demo deck over an
+    // unfinished game -- there the tap only skips back to the game in progress.
+    if (state.ui.winAnimation.fromWin) {
+      lines.push("You win!");
+      lines.push("Tap for new game");
+    } else {
+      lines.push("Preview");
+      lines.push("Tap to skip");
+    }
   } else if (g.won) {
     lines.push("You win!");
     lines.push("Tap for new game");
@@ -184,6 +160,7 @@ export function getInfoPanelText(state: AppState): string {
     const showsStatusLines = !showsSelected;
 
     const fixedLineCount =
+      (showsMessage ? 2 : 0) + // transient message + its spacer, unshifted at the end
       (showsStatusLines ? 3 : 0) + // Move Assist, legal moves, spacer
       1 + // pile label
       (pileIdx === FOCUS_INDEX_STOCK ? 1 : 0) + // stock count line
@@ -196,9 +173,12 @@ export function getInfoPanelText(state: AppState): string {
     const maxSelectedCardLines = showsSelected
       ? Math.max(1, Math.min(selectedCards.length, listBudget - 1))
       : 0;
+    // Both arms clamp to listBudget: the browse-mode window is normally the smaller of the
+    // two, but a transient message shrinks the budget beneath it and would otherwise push the
+    // pile's last row off the bottom.
     const maxCardLines = hasSelectedCard
       ? Math.max(1, Math.min(INFO_PANEL_CARD_WINDOW_LINES, listBudget - maxSelectedCardLines))
-      : INFO_PANEL_CARD_WINDOW_LINES_NO_SELECTION;
+      : Math.max(1, Math.min(INFO_PANEL_CARD_WINDOW_LINES_NO_SELECTION, listBudget));
 
     if (showsStatusLines) {
       lines.push(state.ui.moveAssist ? "Move Assist: ON" : "Move Assist: OFF");
@@ -230,8 +210,9 @@ export function getInfoPanelText(state: AppState): string {
 
   // Transient status line (e.g. "Invalid move"). Cheap text-container update —
   // deliberately not drawn on an image tile, which would cost a full BLE send.
-  if (state.ui.message && !state.ui.menuOpen && !g.won) {
-    lines.unshift(state.ui.message, "");
+  // Its two rows are already reserved in fixedLineCount above.
+  if (showsMessage) {
+    lines.unshift(state.ui.message!, "");
   }
 
   return lines.join("\n");
@@ -252,7 +233,7 @@ function getInfoPanelActiveTableauCardIndex(
 ): number {
   if (focusIdx < FOCUS_INDEX_FIRST_TABLEAU) return -1;
   if (pileCardCount <= 0) return -1;
-  if (state.ui.mode !== "select_source" && state.ui.mode !== "select_destination") return -1;
+  if (state.ui.mode !== "select_destination") return -1;
   const source = state.ui.selection.source;
   if (!source || source.area !== "tableau") return -1;
   if (focusIdx !== FOCUS_INDEX_FIRST_TABLEAU + source.index) return -1;
@@ -334,7 +315,7 @@ function countLegalMovesForFocus(state: AppState, focusIdx: number): number {
     const selectionSource = state.ui.selection.source;
     const sourceFocusIdx = selectionSource ? focusTargetToIndex(selectionSource) : -1;
     if (
-      (state.ui.mode === "select_source" || state.ui.mode === "select_destination") &&
+      state.ui.mode === "select_destination" &&
       selectionSource?.area === "tableau" &&
       sourceFocusIdx === focusIdx
     ) {

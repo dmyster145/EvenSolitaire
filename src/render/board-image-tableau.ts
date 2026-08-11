@@ -9,20 +9,10 @@ import {
   STACK_OFFSET_Y_PEEK,
   CARD_ELEVATION_OFFSET_Y,
   MAX_PEEK_ITEMS,
-  FULL_SCREEN_CENTER_Y,
-  MENU_FONT_SIZE,
-  MENU_FONT_FAMILY,
-  MENU_LETTER_SPACING,
-  MENU_LINE_HEIGHT,
-  MENU_BOX_WIDTH,
-  MENU_BOX_HEIGHT,
-  MENU_BOX_RADIUS,
-  MENU_FIRST_OPTION_CENTER_Y,
 } from "./layout";
-import { BG_BOARD, FG_CARD_LIGHT, MENU_BG_FAINT } from "./palette";
-import { drawFaceUpCard, drawFacedownCard, drawEmptySlot, pathRoundRect } from "./card-canvas";
-import { drawCenteredTextWithLetterSpacing } from "./text-utils";
-import { canvasToPngBytes, pngBytesToImageBitmap } from "./png-utils";
+import { BG_BOARD } from "./palette";
+import { drawFaceUpCard, drawFacedownCard, drawEmptySlot } from "./card-canvas";
+
 import type { Card } from "../game/types";
 
 const W = VIRTUAL_IMAGE_TABLEAU.width;
@@ -42,57 +32,12 @@ export interface TableauRowViewModel {
   floatingCards?: Card[];
   /** Global focus index 0–12; tableau draws floating card when 6–12. */
   floatingCardAtSlot?: number;
-  /** False during invalid-drop blink (hide floating card). */
-  blinkVisible?: boolean;
-  /** When menu open, draw overlay and menu lines; selectedIndex for ♠ prefix/suffix. */
-  menuOverlay?: { menuOpen: boolean; lines: string[]; selectedIndex: number; resetConfirm?: boolean };
   /** When source is tableau, number of cards selected (1 = top card); used to raise exactly one card in pile. */
   selectionCount?: number;
-  /** Win animation: one card in flight (center in full-screen coords); only set when centerY is in bottom half. */
-  flyingCard?: { card: Card; centerX: number; centerY: number };
 }
 
 function slotCenterX(i: number): number {
   return i * SLOT_STEP + CARD_X_OFFSET;
-}
-
-/**
- * When previousFramePng is set (win animation trail), draw previous frame then the flying card on top.
- * Otherwise render the full board from scratch.
- */
-export function renderBoardTableau(view: TableauRowViewModel, previousFramePng?: number[]): Promise<number[]> {
-  if (previousFramePng && previousFramePng.length > 0) {
-    return (async () => {
-      const img = await pngBytesToImageBitmap(previousFramePng);
-      if (!img) return [];
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = W;
-        canvas.height = H;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return [];
-        ctx.drawImage(img, 0, 0);
-        if (view.flyingCard && view.flyingCard.centerY >= FULL_SCREEN_CENTER_Y) {
-          const { card, centerX, centerY } = view.flyingCard;
-          const localY = centerY - FULL_SCREEN_CENTER_Y;
-          const x = Math.floor(centerX - CARD_TABLEAU_W / 2);
-          const y = Math.floor(localY - CARD_TABLEAU_H / 2);
-          drawFaceUpCard(ctx, x, y, CARD_TABLEAU_W, CARD_TABLEAU_H, card);
-        }
-        return canvasToPngBytes(canvas, "row-tableau-trail");
-      } finally {
-        try {
-          img.close();
-        } catch {
-          // Best effort cleanup only.
-        }
-      }
-    })();
-  }
-
-  const canvas = renderBoardTableauToCanvas(view);
-  if (!canvas) return Promise.resolve([]);
-  return canvasToPngBytes(canvas, "row-tableau");
 }
 
 export function renderBoardTableauToCanvas(
@@ -188,7 +133,6 @@ export function renderBoardTableauToCanvas(
     floats.length > 0 &&
     slotForFloating >= 6 &&
     slotForFloating <= 12 &&
-    (view.blinkVisible !== false) &&
     !focusOnSourceColumn
   ) {
     const fx = slotCenterX(colForFloating);
@@ -204,7 +148,11 @@ export function renderBoardTableauToCanvas(
         ? BASE_Y - stackOffset - CARD_ELEVATION_OFFSET_Y
         : BASE_Y - (floats.length - 1 - j) * STACK_OFFSET_Y_PEEK;
       const cardBottom = cy + CARD_TABLEAU_H;
-      if (cy >= 0 && cardBottom <= H) {
+      // Overlap, not containment: the clip above exists precisely so a card hanging off the
+      // canvas edge still draws its visible part. Demanding the whole card fit dropped the
+      // raised lead card of any 4+ card carry entirely (cy goes negative once the stack
+      // offset exceeds the elevation headroom), taking its focus outline with it.
+      if (cardBottom > 0 && cy < H) {
         drawFaceUpCard(ctx, fx, cy, CARD_TABLEAU_W, CARD_TABLEAU_H, floats[j]!, {
           // Keep the active (back) card outlined and also outline the visible front card
           // so destination focus is obvious when carrying multi-card tableau stacks.
@@ -215,53 +163,5 @@ export function renderBoardTableauToCanvas(
     ctx.restore();
   }
 
-  if (view.menuOverlay?.menuOpen) {
-    ctx.fillStyle = "rgba(0,0,0,0.75)";
-    ctx.fillRect(0, 0, W, H);
-    if (view.menuOverlay.lines.length > 0) {
-      const boxLeft = W / 2 - MENU_BOX_WIDTH / 2;
-      const boxTopScreen = FULL_SCREEN_CENTER_Y - MENU_BOX_HEIGHT / 2;
-      const boxTopLocal = boxTopScreen - FULL_SCREEN_CENTER_Y;
-      ctx.fillStyle = MENU_BG_FAINT;
-      ctx.strokeStyle = FG_CARD_LIGHT;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      pathRoundRect(ctx, boxLeft, boxTopLocal, MENU_BOX_WIDTH, MENU_BOX_HEIGHT, MENU_BOX_RADIUS);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = FG_CARD_LIGHT;
-      ctx.font = `${MENU_FONT_SIZE}px ${MENU_FONT_FAMILY}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const selectedIndex = view.menuOverlay.selectedIndex ?? -1;
-      const SPADE = "\u2660";
-      view.menuOverlay.lines.forEach((line, i) => {
-        const lineCenterScreenY = MENU_FIRST_OPTION_CENTER_Y + i * MENU_LINE_HEIGHT;
-        if (lineCenterScreenY >= FULL_SCREEN_CENTER_Y && lineCenterScreenY < FULL_SCREEN_CENTER_Y + H) {
-          ctx.font = `${MENU_FONT_SIZE}px ${MENU_FONT_FAMILY}`;
-          const displayText = i === selectedIndex ? `${SPADE} ${line} ${SPADE}` : line;
-          drawCenteredTextWithLetterSpacing(ctx, displayText, W / 2, lineCenterScreenY - FULL_SCREEN_CENTER_Y, MENU_LETTER_SPACING);
-        }
-      });
-    }
-  }
-
-  if (view.flyingCard) {
-    const { card, centerX, centerY } = view.flyingCard;
-    const localY = centerY - FULL_SCREEN_CENTER_Y;
-    const x = Math.floor(centerX - CARD_TABLEAU_W / 2);
-    const y = Math.floor(localY - CARD_TABLEAU_H / 2);
-    drawFaceUpCard(ctx, x, y, CARD_TABLEAU_W, CARD_TABLEAU_H, card);
-  }
-
   return targetCanvas;
-}
-
-/** Deterministic placeholder frame used in tests and startup fallback paths. */
-export function renderBoardTableauPlaceholder(focusIndex: number): Promise<number[]> {
-  return renderBoardTableau({
-    piles: Array(7).fill({ hidden: 0, visible: [] }),
-    focusIndex,
-    sourceIndex: null,
-  });
 }

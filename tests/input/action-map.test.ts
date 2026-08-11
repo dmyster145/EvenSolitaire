@@ -172,4 +172,38 @@ describe("input action map (menu exit behavior)", () => {
     const action = mapEvenHubEvent({} as Parameters<typeof mapEvenHubEvent>[0], state);
     expect(action).toBeNull();
   });
+
+  describe("guard ordering", () => {
+    const playing = { phase: "playing" } as AppState["ui"]["winAnimation"];
+
+    it("a tap during the cascade skips the animation", () => {
+      const action = mapEvenHubEvent(listClick(OsEventTypeList.CLICK_EVENT), withUi({ winAnimation: playing }));
+      expect(action).toEqual({ type: "WIN_ANIMATION_SKIP" });
+    });
+
+    it("an open menu keeps its tap during the cascade instead of losing it to skip", () => {
+      // The panel renders the menu ahead of the animation, so an open menu is what the user
+      // is looking at; stealing its tap made every item need two presses.
+      const action = mapEvenHubEvent(
+        listClick(OsEventTypeList.CLICK_EVENT),
+        withUi({ winAnimation: playing, menuOpen: true, menuSelectedIndex: 0 })
+      );
+      expect(action).toEqual({ type: "MENU_SELECT" });
+    });
+
+    it("a scroll discarded by tap-suppression does not consume the next real scroll", () => {
+      // isScrollDebounced advances the debounce clock when it lets an event through, so it
+      // has to run after suppression -- otherwise a discarded event starts the window for
+      // the next genuine one and swallows it.
+      const state = withUi({});
+      recordTap(); // opens the post-tap scroll-suppression window
+
+      expect(mapEvenHubEvent(listClick(OsEventTypeList.SCROLL_TOP_EVENT), state)).toBeNull();
+
+      resetTapCooldown();
+      // Suppression window is closed for this call; the debounce clock must still be clean.
+      const action = mapEvenHubEvent(listClick(OsEventTypeList.SCROLL_TOP_EVENT), state);
+      expect(action).toEqual({ type: "FOCUS_MOVE", direction: "next" });
+    });
+  });
 });

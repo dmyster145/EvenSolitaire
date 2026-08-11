@@ -35,7 +35,7 @@ import { winAnimationTileOrder } from "./tile-order";
 import { renderBoardTopToCanvas, type TopRowViewModel } from "./board-image-top";
 import { renderBoardTableauToCanvas, type TableauRowViewModel } from "./board-image-tableau";
 import { canvasToGreyscaleIndexedPngUint8Bytes } from "./png-utils";
-import { getPileView, getMenuLines, getFloatingCards, getInfoPanelText } from "../state/selectors";
+import { getPileView, getFloatingCards, getInfoPanelText } from "../state/selectors";
 import { focusTargetToIndex } from "../state/ui-mode";
 import type { AppState } from "../state/types";
 
@@ -300,8 +300,6 @@ async function renderWinAnimationFrame(
   };
 }
 
-
-
 const EMPTY_PNG = new Uint8Array(0);
 
 /**
@@ -329,8 +327,6 @@ type BoardViewContext = {
   focusIdx: number;
   selectionSource: AppState["ui"]["selection"]["source"];
   floatingCards: ReturnType<typeof getFloatingCards>;
-  blinkVisible: boolean;
-  menuLines: string[];
   /** Win-animation stamps for this tick, routed to whichever row(s) they overlap. */
   stampsTop: FlyingCard[];
   stampsTableau: FlyingCard[];
@@ -367,8 +363,6 @@ function buildBoardViewContext(state: AppState): BoardViewContext {
     focusIdx: focusTargetToIndex(state.ui.focus),
     selectionSource: state.ui.selection.source,
     floatingCards: getFloatingCards(state),
-    blinkVisible: true,
-    menuLines: getMenuLines(state),
     stampsTop: stamps.top,
     stampsTableau: stamps.tableau,
   };
@@ -402,10 +396,8 @@ function topRowViewFromState(state: AppState, boardCtx: BoardViewContext): TopRo
     sourceIndex: sourceTopIdx !== null && sourceTopIdx <= 5 ? sourceTopIdx : null,
     floatingCard: hasFloating ? floatingCards[floatingCards.length - 1]! : null,
     floatingCardAtSlot: focusIdx,
-    blinkVisible: boardCtx.blinkVisible,
     wasteWithoutTop,
     foundationWithoutTop,
-    menuOverlay: undefined,
     tableauFloatingCards,
   };
 }
@@ -437,9 +429,7 @@ function tableauViewFromState(state: AppState, boardCtx: BoardViewContext): Tabl
     sourceIndex: sourceTableauIdx,
     floatingCards: hasFloating ? floatingCards : undefined,
     floatingCardAtSlot: focusIdx,
-    blinkVisible: boardCtx.blinkVisible,
     selectionCount: sourceTableauIdx !== null && hasFloating ? count : undefined,
-    menuOverlay: undefined,
   };
 }
 

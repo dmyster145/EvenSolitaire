@@ -153,22 +153,40 @@ describe("moves", () => {
   });
 
   it("applyMove applies legal ace to foundation", () => {
+    // Hand-built: deal(1) tops no pile with an ace, so the findIndex guard this opened with
+    // returned early on every run and neither assertion was ever reached.
     const state = deal(1);
-    const pileIndex = state.tableau.findIndex((p) => p.visible[0]?.rank === 1);
-    if (pileIndex < 0) return;
-    const legal = isLegalMove(
-      state,
-      { area: "tableau", pileIndex, count: 1 },
-      { area: "foundation", index: 0 }
-    );
-    if (!legal) return;
+    state.tableau[0] = { hidden: [], visible: [card("tas", 1, "S")] };
+
     const next = applyMove(
       state,
-      { area: "tableau", pileIndex, count: 1 },
+      { area: "tableau", pileIndex: 0, count: 1 },
       { area: "foundation", index: 0 }
     );
-    expect(next.foundations[0].cards.length).toBe(1);
-    expect(next.tableau[pileIndex].visible.length).toBe(0);
+
+    expect(next.foundations[0].cards.map((c) => c.id)).toEqual(["tas"]);
+    expect(next.tableau[0].visible).toHaveLength(0);
+    expect(next.moves).toBe(state.moves + 1);
+  });
+
+  it("counts a waste play as a move, same as a tableau play", () => {
+    // The waste branch used to return placeCard's result directly, so playing off the waste
+    // was free while the identical tableau play incremented the counter.
+    const base = deal(1);
+    const state = {
+      ...base,
+      waste: [card("was", 1, "S")],
+      tableau: base.tableau.map((p, i) =>
+        i === 0 ? { hidden: [], visible: [card("tah", 1, "H")] } : p
+      ) as typeof base.tableau,
+    };
+
+    const fromWaste = applyMove(state, { area: "waste" }, { area: "foundation", index: 0 });
+    const fromTableau = applyMove(state, { area: "tableau", pileIndex: 0, count: 1 }, { area: "foundation", index: 1 });
+
+    expect(fromWaste.foundations[0].cards).toHaveLength(1);
+    expect(fromWaste.moves).toBe(state.moves + 1);
+    expect(fromWaste.moves).toBe(fromTableau.moves);
   });
 
   it("applyMove from waste removes waste top and places on dest", () => {

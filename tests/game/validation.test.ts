@@ -35,16 +35,18 @@ function customFoundationBlockingState(): GameState {
 describe("validation", () => {
   beforeEach(() => resetIdCounter());
 
-  it("getLegalDests returns array for tableau source", () => {
+  it("getLegalDests names the pile a tableau card can actually move to", () => {
+    // Asserting Array.isArray here proved nothing -- getLegalDests cannot return anything else,
+    // so the test passed even with the rules deleted. Assert the destinations themselves.
     const state = deal(5);
-    for (let i = 0; i < 7; i++) {
-      const pile = state.tableau[i];
-      if (pile.visible.length > 0) {
-        const dests = getLegalDests(state, { area: "tableau", pileIndex: i, count: 1 });
-        expect(Array.isArray(dests)).toBe(true);
-        break;
-      }
-    }
+    state.tableau[0].visible = [card("t7h", 7, "H")];
+    state.tableau[1].visible = [card("t8s", 8, "S")]; // accepts the red 7
+    state.tableau[2].visible = [card("t8h", 8, "H")]; // same colour, must not accept it
+
+    const dests = getLegalDests(state, { area: "tableau", pileIndex: 0, count: 1 });
+
+    expect(dests).toContainEqual({ area: "tableau", index: 1 });
+    expect(dests).not.toContainEqual({ area: "tableau", index: 2 });
   });
 
   it("isLegalMove returns false for invalid dest", () => {
@@ -57,20 +59,49 @@ describe("validation", () => {
     expect(ok).toBe(false);
   });
 
-  it("getLegalDests for waste returns some dests after a draw", () => {
+  it("getLegalDests finds both homes open to a waste card", () => {
     const state = deal(20);
-    const withWaste = { ...state, waste: [state.stock[state.stock.length - 1]!], stock: state.stock.slice(0, -1) };
+    const withWaste = {
+      ...state,
+      waste: [card("w6d", 6, "D")],
+      foundations: [{ cards: [card("f5d", 5, "D")] }, { cards: [] }, { cards: [] }, { cards: [] }] as typeof state.foundations,
+    };
+    withWaste.tableau[0].visible = [card("t7s", 7, "S")]; // accepts the red 6
+    withWaste.tableau[1].visible = [card("t7h", 7, "H")]; // same colour, must not
+
     const dests = getLegalDests(withWaste, { area: "waste" });
-    expect(Array.isArray(dests)).toBe(true);
+
+    expect(dests).toContainEqual({ area: "foundation", index: 0 });
+    expect(dests).toContainEqual({ area: "tableau", index: 0 });
+    expect(dests).not.toContainEqual({ area: "tableau", index: 1 });
   });
 
   it("empty foundation accepts only ace", () => {
+    // Hand-built rather than fished out of a seeded deal: deal(10) happens to top no pile with
+    // an ace, so the findIndex guard this test used to open with returned early every run and
+    // neither assertion was ever reached.
     const state = deal(10);
-    const acePile = state.tableau.findIndex((p) => p.visible[0]?.rank === 1);
-    const nonAcePile = state.tableau.findIndex((p) => p.visible[0]?.rank !== 1 && p.visible.length > 0);
-    if (acePile < 0 || nonAcePile < 0) return;
-    expect(isLegalMove(state, { area: "tableau", pileIndex: acePile, count: 1 }, { area: "foundation", index: 0 })).toBe(true);
-    expect(isLegalMove(state, { area: "tableau", pileIndex: nonAcePile, count: 1 }, { area: "foundation", index: 0 })).toBe(false);
+    state.tableau[0].visible = [card("tas", 1, "S")];
+    state.tableau[1].visible = [card("t9d", 9, "D")];
+
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 1 }, { area: "foundation", index: 0 })).toBe(true);
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 1, count: 1 }, { area: "foundation", index: 0 })).toBe(false);
+  });
+
+  it("a non-empty foundation accepts only the next rank of its own suit", () => {
+    // Found by mutation: dropping the suit check from canPlaceOnFoundation kept the whole suite
+    // green, so nothing verified that foundations stay single-suit.
+    const state = deal(10);
+    state.foundations[0] = { cards: [card("fas", 1, "S")] };
+    state.tableau[0].visible = [card("t2s", 2, "S")]; // same suit, next rank
+    state.tableau[1].visible = [card("t2h", 2, "H")]; // right rank, wrong suit
+    state.tableau[2].visible = [card("t3s", 3, "S")]; // right suit, skips a rank
+
+    const dest = { area: "foundation", index: 0 } as const;
+
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 1 }, dest)).toBe(true);
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 1, count: 1 }, dest)).toBe(false);
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 2, count: 1 }, dest)).toBe(false);
   });
 
   it("empty tableau pile accepts only king", () => {
@@ -120,11 +151,15 @@ describe("validation", () => {
     // pile 0 = 8C, 3H — 3H does not follow 8C, so the pair must not move as a unit.
     state.tableau[0].visible = [card("t8c", 8, "C"), card("t3h", 3, "H")];
     state.tableau[1].visible = [card("t9d", 9, "D")];
+    state.tableau[2].visible = [card("t4s", 4, "S")];
 
     expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 2 }, { area: "tableau", index: 1 })).toBe(false);
     expect(getLegalDests(state, { area: "tableau", pileIndex: 0, count: 2 })).toEqual([]);
 
-    // The single top card is still free to move on its own.
+    // The run guard must not leak into single-card moves: 3H alone still goes on the black 4.
+    // Asserting this against 9D instead would pass on ordinary rank/colour grounds and prove
+    // nothing about the guard.
+    expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 1 }, { area: "tableau", index: 2 })).toBe(true);
     expect(isLegalMove(state, { area: "tableau", pileIndex: 0, count: 1 }, { area: "tableau", index: 1 })).toBe(false);
   });
 

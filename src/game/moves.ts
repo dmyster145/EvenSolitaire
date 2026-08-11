@@ -84,10 +84,13 @@ export function applyMove(
   if (source.area === "waste") {
     const card = state.waste[state.waste.length - 1];
     if (!card) return state;
-    return placeCard(state, card, dest, () => ({
+    const next = placeCard(state, card, dest, () => ({
       ...state,
       waste: state.waste.slice(0, -1),
     }));
+    // placeCard only swaps in the destination pile, so the counter has to be bumped here the
+    // same way the tableau path does below -- otherwise waste plays are free.
+    return { ...next, moves: state.moves + 1 };
   }
 
   const pile = state.tableau[source.pileIndex];
@@ -141,8 +144,4 @@ function flipTableauTopIfNeeded(
   const tableau = state.tableau.slice() as GameState["tableau"];
   tableau[pileIndex] = newPile;
   return { ...state, tableau };
-}
-
-export function flipTableauTop(state: GameState, pileIndex: number): GameState {
-  return flipTableauTopIfNeeded(state, pileIndex);
 }

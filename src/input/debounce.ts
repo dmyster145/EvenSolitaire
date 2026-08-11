@@ -6,6 +6,11 @@ const DIRECTION_CHANGE_DEBOUNCE_MS = 20;
 let lastScrollTime = 0;
 let lastScrollDirection: "prev" | "next" | null = null;
 
+/**
+ * NOT a pure predicate: returning false CONSUMES the event, advancing the debounce clock to
+ * now. So it must be the last guard a scroll passes -- put any check that can still discard
+ * the event ahead of it, or a discarded event silently starts the window for the next real one.
+ */
 export function isScrollDebounced(direction: "prev" | "next"): boolean {
   const now = Date.now();
   const elapsedMs = now - lastScrollTime;

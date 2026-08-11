@@ -7,9 +7,11 @@ vi.mock("@evenrealities/even_hub_sdk", () => {
       Object.assign(this, props);
     }
   }
-  return { ImageRawDataUpdate: Base, ImageRawDataUpdateResult: Base };
+  // Mirrors the real SDK enum, which is a string enum -- the send memo compares against it.
+  return { ImageRawDataUpdate: Base, ImageRawDataUpdateResult: { success: "success" } };
 });
 
+import { ImageRawDataUpdateResult } from "@evenrealities/even_hub_sdk";
 import { sendFrame, resetSendMemo, type Frame, type SendBridge } from "../../src/render/send";
 import { resetActiveContainers } from "../../src/evenhub/active-containers";
 import {
@@ -33,7 +35,8 @@ function makeHub() {
   const hub: SendBridge = {
     updateImage: async (data: { containerID?: number }) => {
       sent.push(data.containerID as number);
-      return null;
+      // A working link reports success; the send memo only records tiles the glasses took.
+      return ImageRawDataUpdateResult.success;
     },
     updateText: async () => true,
   };

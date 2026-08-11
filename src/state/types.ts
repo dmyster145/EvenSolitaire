@@ -21,15 +21,14 @@ export interface SelectionState {
 
 export type UIMode =
   | "browse"
-  | "select_source"
   | "select_destination"
   | "menu";
 
 /**
  * UI Modes:
- * - browse: Navigating the board, can tap to enter select_source (tableau) or select_destination (waste)
- * - select_source: Tableau card(s) highlighted in-place; scroll adjusts count; tap confirms and lifts
+ * - browse: Navigating the board; tap lifts the focused card into select_destination
  * - select_destination: Card(s) floating with cursor; navigate to destination; tap to place
+ *   (tapping the source pile again cycles how many cards of its run are carried)
  */
 
 export interface UIState {

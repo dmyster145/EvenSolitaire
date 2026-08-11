@@ -134,8 +134,12 @@ export async function sendFrame(
     const png = pngForTile(frame, id);
     if (!png || png.length === 0) continue;
     if (bytesEqual(png, lastSentByTile.get(id))) continue;
-    await hub.updateImage(packImage(tile.id, tile.name, png));
-    lastSentByTile.set(id, png);
+    // Only memoize a tile the glasses actually took. The bridge returns null when the SDK
+    // call threw, and a non-success result when the write failed; recording either would
+    // mark stale pixels as current, and nothing retries until that tile's bytes change --
+    // so a failed last write would leave the wrong board up indefinitely.
+    const result = await hub.updateImage(packImage(tile.id, tile.name, png));
+    if (result === ImageRawDataUpdateResult.success) lastSentByTile.set(id, png);
   }
 }
 

@@ -52,10 +52,6 @@ export function isRed(suit: Suit): boolean {
   return suit === "H" || suit === "D";
 }
 
-export function isBlack(suit: Suit): boolean {
-  return suit === "S" || suit === "C";
-}
-
 export function oppositeColor(a: Suit, b: Suit): boolean {
   return isRed(a) !== isRed(b);
 }

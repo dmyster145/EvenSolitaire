@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { drawCenteredTextWithLetterSpacing, drawTitleWithCenteredDot } from "../../src/render/text-utils";
+import { drawCenteredTextWithLetterSpacing } from "../../src/render/text-utils";
 
 type FillCall = { text: string; x: number; y: number };
 
@@ -28,13 +28,4 @@ describe("render text utils", () => {
     expect(ctx.textAlign).toBe("center");
   });
 
-  it("draws title parts with centered dot offset and restores textAlign", () => {
-    const { ctx, calls } = createMockCtx();
-    drawTitleWithCenteredDot(ctx, "EVEN", "•", "SOL", 120, 30, 2, 3);
-
-    expect(calls.some((c) => c.text === "•" && c.y === 33)).toBe(true);
-    expect(calls.find((c) => c.text === "E")?.y).toBe(30);
-    expect(calls.find((c) => c.text === "S")?.y).toBe(30);
-    expect(ctx.textAlign).toBe("center");
-  });
 });

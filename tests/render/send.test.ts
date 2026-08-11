@@ -7,9 +7,11 @@ vi.mock("@evenrealities/even_hub_sdk", () => {
       Object.assign(this, props);
     }
   }
-  return { ImageRawDataUpdate, ImageRawDataUpdateResult: { success: 0 } };
+  // Mirrors the real SDK enum, which is a string enum -- the send memo compares against it.
+  return { ImageRawDataUpdate, ImageRawDataUpdateResult: { success: "success" } };
 });
 
+import { ImageRawDataUpdateResult } from "@evenrealities/even_hub_sdk";
 import { resetActiveContainers } from "../../src/evenhub/active-containers";
 import { sendFrame, resetSendMemo, type SendBridge } from "../../src/render/send";
 import {
@@ -24,7 +26,7 @@ function makeBridge(): SendBridge & {
   updateText: ReturnType<typeof vi.fn>;
 } {
   return {
-    updateImage: vi.fn(async () => 0 as never),
+    updateImage: vi.fn(async () => ImageRawDataUpdateResult.success),
     updateText: vi.fn(async () => true),
   };
 }
@@ -103,6 +105,35 @@ describe("sendFrame", () => {
     await sendFrame(hub, frame(), { shouldAbortImages: () => imageCalls >= 1 });
     expect(hub.updateText).toHaveBeenCalledTimes(1);
     expect(hub.updateImage).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not memoize a tile whose send failed, so the next frame retries it", async () => {
+    const hub = makeBridge();
+    // The bridge returns null when the SDK call threw, and a non-success result when the
+    // write failed. Either way the glasses never took the pixels.
+    hub.updateImage.mockImplementation(async () => null as never);
+
+    await sendFrame(hub, frame());
+    expect(hub.updateImage).toHaveBeenCalledTimes(3);
+
+    // Identical bytes: if the failure had been recorded as sent, this frame would be skipped
+    // entirely and the glasses would keep showing stale pixels with nothing to correct them.
+    await sendFrame(hub, frame());
+    expect(hub.updateImage).toHaveBeenCalledTimes(6);
+  });
+
+  it("stops retrying a tile once its send succeeds", async () => {
+    const hub = makeBridge();
+    hub.updateImage.mockImplementation(async () => null as never);
+    await sendFrame(hub, frame());
+    expect(hub.updateImage).toHaveBeenCalledTimes(3);
+
+    hub.updateImage.mockImplementation(async () => ImageRawDataUpdateResult.success);
+    await sendFrame(hub, frame());
+    expect(hub.updateImage).toHaveBeenCalledTimes(6);
+
+    await sendFrame(hub, frame());
+    expect(hub.updateImage).toHaveBeenCalledTimes(6);
   });
 
   it("stale-send guard: discards sends for container IDs not in the active set", async () => {

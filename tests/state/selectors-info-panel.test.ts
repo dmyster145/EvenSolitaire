@@ -145,7 +145,7 @@ describe("info panel text", () => {
       ...withGame(customTableauInfoState()),
       ui: {
         ...initialState.ui,
-        mode: "select_source",
+        mode: "select_destination",
         focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
         selection: {
           source: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
@@ -165,7 +165,7 @@ describe("info panel text", () => {
     const game = customMoveAssistCountSelectionState();
     const baseUi = {
       ...initialState.ui,
-      mode: "select_source" as const,
+      mode: "select_destination" as const,
       focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
       moveAssist: true,
     };
@@ -201,7 +201,7 @@ describe("info panel text", () => {
       ...withGame(game),
       ui: {
         ...initialState.ui,
-        mode: "select_source",
+        mode: "select_destination",
         focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
         moveAssist: false,
         selection: {
@@ -236,7 +236,7 @@ describe("info panel text", () => {
       ...withGame(game),
       ui: {
         ...initialState.ui,
-        mode: "select_source",
+        mode: "select_destination",
         focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
         selection: {
           source: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
@@ -272,7 +272,7 @@ describe("info panel text", () => {
       ui: {
         ...initialState.ui,
         moveAssist: true,
-        mode: "select_source",
+        mode: "select_destination",
         focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
         selection: {
           source: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
@@ -493,6 +493,44 @@ describe("info panel text", () => {
       expect(lines).toContain("Tableau Pile:");
       expect(lines).toContain("Selected Pile:");
       expect(lines.indexOf("Selected Pile:")).toBeLessThan(lines.length - 1);
+    });
+
+    it("keeps a transient message inside the budget instead of clipping the pile", () => {
+      // "Invalid move" holds for MESSAGE_DISMISS_MS and unshifts two rows onto a panel whose
+      // lists were already sized to fill it, pushing the pile's top card off the bottom.
+      const game: GameState = {
+        stock: [],
+        waste: [],
+        foundations: [{ cards: [] }, { cards: [] }, { cards: [] }, { cards: [] }],
+        tableau: [
+          {
+            hidden: [],
+            visible: [card("c7s", 7, "S"), card("c6h", 6, "H"), card("c5c", 5, "C"), card("c4d", 4, "D")],
+          },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+        ],
+        moves: 0,
+        won: false,
+      };
+      const state: AppState = {
+        ...withGame(game),
+        ui: {
+          ...initialState.ui,
+          mode: "browse",
+          focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+          message: "Invalid move",
+        },
+      };
+
+      const lines = getInfoPanelText(state).split("\n");
+
+      expect(lines[0]).toBe("Invalid move");
+      expect(lines.length).toBeLessThanOrEqual(PANEL_ROWS);
     });
 
     it("shows no header at all when the selection has no cards to list", () => {

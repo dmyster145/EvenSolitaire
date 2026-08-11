@@ -1,7 +1,14 @@
 /**
  * Page container factories: startup + rebuild.
- * Solitaire's layout is fixed (3 image tiles + 1 info text); rebuildPage is
- * never called during normal play. createStartUpPage runs exactly once at boot.
+ *
+ * Two layouts, not one. Gameplay uses 3 image tiles; composeWinAnimationPage swaps in a 2x2
+ * of 4. Both carry two text containers -- the visible info panel plus the invisible
+ * gesture-capture container that events actually land on.
+ *
+ * rebuildPage is NOT confined to boot: swapToPage fires it on every entry to and exit from the
+ * animation layout, and the exit dialog rebuilds too. The animation is reachable mid-game with
+ * no win via the menu's "Play Animation", so a rebuild can happen at any point in a session --
+ * which is why the live-container set has to be reset around each swap rather than assumed.
  */
 import {
   CreateStartUpPageContainer,

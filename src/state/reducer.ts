@@ -10,7 +10,7 @@ import {
   applyMove,
   checkWin,
 } from "../game/klondike-engine";
-import { getLegalDests, isLegalMove, getSourceCard } from "../game/validation";
+import { getLegalDests, isLegalMove } from "../game/validation";
 import type { Source } from "../game/validation";
 import type { Dest } from "../game/validation";
 import { focusIndexToTarget, focusTargetToIndex, focusTargetToDest } from "./ui-mode";
@@ -164,20 +164,10 @@ function getAutoDestinationFocusTarget(
     return focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION + foundationDest.index);
   }
 
-  // A King fits nowhere but an empty pile and every empty pile takes it equally, so there is
-  // no choice worth leaving the player -- point at the leftmost one. This has to sit ahead of
-  // the rules below, which bail out on two or more legal destinations and so would skip the
-  // exact case of several open piles. No run-cycling is at stake: a King is always the
-  // deepest card a selection can reach, so there is no larger pickup to tap toward.
-  const sourceCard = getSourceCard(game, source);
-  if (sourceCard?.rank === 13) {
-    const emptyPileDest = dests.find(
-      (d) => d.area === "tableau" && game.tableau[d.index].visible.length === 0
-    );
-    if (emptyPileDest) {
-      return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + emptyPileDest.index);
-    }
-  }
+  // Kings need no case of their own: every legal tableau destination for a King is an empty
+  // pile, so the leftmost-legal rule below already lands on the leftmost empty one. (An
+  // explicit King branch used to sit here to get past a since-deleted rule that bailed out on
+  // two or more destinations; tests/state/reducer-runtime.test.ts pins the behaviour.)
 
   // A tableau pile with a deeper run bails out entirely: the player may want a bigger pickup
   // than the top card, and with assist on the swipe cycle only visits legal destinations, so
@@ -298,9 +288,7 @@ function sourceFromTarget(state: AppState, target: AppState["ui"]["focus"]): Sou
   if (target.area === "tableau") {
     const pile = state.game.tableau[target.index];
     const count =
-      state.ui.mode === "select_source" || state.ui.mode === "select_destination"
-        ? state.ui.selection.selectedCardCount ?? 1
-        : 1;
+      state.ui.mode === "select_destination" ? state.ui.selection.selectedCardCount ?? 1 : 1;
     if (!pile.visible.length || count > pile.visible.length) return null;
     return { area: "tableau", pileIndex: target.index, count };
   }
@@ -418,14 +406,6 @@ export function rootReducer(
       };
     }
 
-    case "CONFIRM_SELECTION": {
-      return state;
-    }
-
-    case "ADJUST_SELECTION_COUNT": {
-      return state;
-    }
-
     case "DEST_SELECT_INVALID": {
       if (state.ui.mode !== "select_destination" || !state.ui.selection.source) return state;
       const source = state.ui.selection.source;
@@ -478,7 +458,7 @@ export function rootReducer(
     }
 
     case "CANCEL_SELECTION": {
-      const inSelection = state.ui.mode === "select_source" || state.ui.mode === "select_destination";
+      const inSelection = state.ui.mode === "select_destination";
       if (!inSelection) return state;
       const source = state.ui.selection.source;
       return {
@@ -499,13 +479,6 @@ export function rootReducer(
       return { ...state, game: prev };
     }
 
-    case "EXIT_APP":
-      return { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } };
-
-    case "OPEN_MENU":
-      return { ...state, ui: { ...state.ui, menuOpen: true, pendingResetConfirm: false } };
-    case "CLOSE_MENU":
-      return { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } };
     case "TOGGLE_MENU":
       return { ...state, ui: { ...state.ui, menuOpen: !state.ui.menuOpen, pendingResetConfirm: false } };
 
@@ -612,8 +585,6 @@ export function rootReducer(
       return { ...state, ui: { ...state.ui, winAnimation: undefined } };
     }
 
-    case "SHOW_MESSAGE":
-      return { ...state, ui: { ...state.ui, message: action.message } };
     case "DISMISS_MESSAGE":
       return { ...state, ui: { ...state.ui, message: undefined } };
 

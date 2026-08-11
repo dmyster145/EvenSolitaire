@@ -287,7 +287,7 @@ function getStockPatternBitmap(d: number): HTMLCanvasElement | null {
   return built;
 }
 
-export function pathRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+function pathRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   const rad = Math.min(r, w / 2, h / 2);
   if (rad <= 0) {
     ctx.rect(x, y, w, h);

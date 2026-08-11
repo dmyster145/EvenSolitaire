@@ -14,7 +14,3 @@ export function resetActiveContainers(ids: Iterable<number>): void {
 export function isActive(id: number): boolean {
   return activeIds.has(id);
 }
-
-export function getActiveContainerIds(): ReadonlySet<number> {
-  return activeIds;
-}

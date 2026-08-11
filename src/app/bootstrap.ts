@@ -116,7 +116,10 @@ export async function initApp(): Promise<void> {
   whenCardAssetsReady(onAssetReady);
   whenCardSuitAssetsReady(onAssetReady);
 
-  // Set up the glasses page once. Layout never changes during play.
+  // Set up the glasses page. This is the gameplay layout, not the only one: swapToPage
+  // rebuilds into the win-animation layout (and back), and the exit dialog rebuilds too, so
+  // the live-container set below is a snapshot that later swaps replace -- it is briefly
+  // emptied mid-swap. Read it, never assume it stays ALL_CONTAINER_IDS.
   const setupOk = await hub.setupPage(composeStartupPage());
   if (setupOk || !hub.isReady()) {
     // Populate the live-container set so sendFrame writes through.
@@ -164,10 +167,6 @@ export async function initApp(): Promise<void> {
     if (action.type === "OPEN_EXIT_APP_UI") {
       armExitDialog();
       void hub.showExitUI();
-      return;
-    }
-    if (action.type === "EXIT_APP") {
-      void shutdown();
       return;
     }
     if (!isKeepAliveActive()) activateKeepAlive();

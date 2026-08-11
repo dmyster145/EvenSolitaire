@@ -3,7 +3,6 @@
  */
 import type { GameState, TableauPile } from "./types";
 import { createDeck, shuffle } from "./cards";
-import { SUITS } from "./types";
 
 export function deal(seed?: number): GameState {
   const random = seed !== undefined ? seededRandom(seed) : Math.random;
@@ -37,33 +36,6 @@ export function deal(seed?: number): GameState {
   };
 }
 
-/** Returns a won game state (all 52 cards in foundations, A–K per suit) for demo/testing. */
-export function wonGameState(): GameState {
-  const deck = createDeck(true);
-  const foundations: GameState["foundations"] = [
-    { cards: deck.filter((c) => c.suit === SUITS[0]).sort((a, b) => a.rank - b.rank) },
-    { cards: deck.filter((c) => c.suit === SUITS[1]).sort((a, b) => a.rank - b.rank) },
-    { cards: deck.filter((c) => c.suit === SUITS[2]).sort((a, b) => a.rank - b.rank) },
-    { cards: deck.filter((c) => c.suit === SUITS[3]).sort((a, b) => a.rank - b.rank) },
-  ];
-  const emptyTableau: TableauPile = { hidden: [], visible: [] };
-  return {
-    stock: [],
-    waste: [],
-    foundations,
-    tableau: [
-      emptyTableau,
-      emptyTableau,
-      emptyTableau,
-      emptyTableau,
-      emptyTableau,
-      emptyTableau,
-      emptyTableau,
-    ],
-    moves: 0,
-    won: true,
-  };
-}
 
 function makeTableauPile(
   deck: import("./types").Card[],

@@ -464,16 +464,6 @@ describe("state reducer runtime flows", () => {
     expect(next.ui.moveAssist).toBe(true);
   });
 
-  it("exit app action closes menu and reset confirm state", () => {
-    const state: AppState = {
-      ...withGame(emptyGame()),
-      ui: { ...initialState.ui, menuOpen: true, pendingResetConfirm: true },
-    };
-
-    const next = rootReducer(state, { type: "EXIT_APP" });
-    expect(next.ui.menuOpen).toBe(false);
-    expect(next.ui.pendingResetConfirm).toBe(false);
-  });
 
   it("restore saved state resets transient ui and preserves saved move assist", () => {
     const saved = emptyGame();

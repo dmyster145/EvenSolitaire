@@ -32,10 +32,10 @@ function mapListEvent(event: List_ItemEvent, state: AppState): Action | null {
   const et = event.eventType;
   switch (et) {
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (isScrollDebounced("next") || isScrollSuppressed()) return null;
+      if (isScrollSuppressed() || isScrollDebounced("next")) return null;
       return scrollAction(state, "next");
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
-      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
+      if (isScrollSuppressed() || isScrollDebounced("prev")) return null;
       return scrollAction(state, "prev");
     case OsEventTypeList.CLICK_EVENT:
       if (!tryConsumeTap("tap")) return null;
@@ -56,10 +56,10 @@ function mapTextEvent(event: Text_ItemEvent, state: AppState): Action | null {
   const et = event.eventType;
   switch (et) {
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (isScrollDebounced("next") || isScrollSuppressed()) return null;
+      if (isScrollSuppressed() || isScrollDebounced("next")) return null;
       return scrollAction(state, "next");
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
-      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
+      if (isScrollSuppressed() || isScrollDebounced("prev")) return null;
       return scrollAction(state, "prev");
     case OsEventTypeList.CLICK_EVENT:
       if (!tryConsumeTap("tap")) return null;
@@ -80,10 +80,10 @@ function mapSysEvent(event: Sys_ItemEvent, state: AppState): Action | null {
   const et = event.eventType;
   switch (et) {
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (isScrollDebounced("next") || isScrollSuppressed()) return null;
+      if (isScrollSuppressed() || isScrollDebounced("next")) return null;
       return scrollAction(state, "next");
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
-      if (isScrollDebounced("prev") || isScrollSuppressed()) return null;
+      if (isScrollSuppressed() || isScrollDebounced("prev")) return null;
       return scrollAction(state, "prev");
     case OsEventTypeList.CLICK_EVENT:
       if (!tryConsumeTap("tap")) return null;
@@ -109,9 +109,13 @@ function scrollAction(state: AppState, direction: "next" | "prev"): Action {
 }
 
 function tapAction(state: AppState): Action {
-  // Skip takes priority over everything: the cascade can run on an unfinished
-  // game via the "Play Animation" menu item, so the user needs a way out.
-  if (state.ui.winAnimation?.phase === "playing") return { type: "WIN_ANIMATION_SKIP" };
+  // Skip takes priority over the board: the cascade can run on an unfinished game via the
+  // "Play Animation" menu item, so the user needs a way out. It does NOT take priority over
+  // an open menu -- the panel renders the menu ahead of the animation, so an open menu is
+  // what the user is actually looking at, and stealing its tap makes items need two presses.
+  if (state.ui.winAnimation?.phase === "playing" && !state.ui.menuOpen) {
+    return { type: "WIN_ANIMATION_SKIP" };
+  }
   if (state.ui.menuOpen) {
     if (state.ui.pendingResetConfirm) return { type: "MENU_SELECT" };
     const opt = MENU_OPTIONS[state.ui.menuSelectedIndex];
@@ -139,8 +143,6 @@ function doubleTapAction(state: AppState): Action {
   // Double-tap while the menu is open just closes it.
   if (state.ui.menuOpen) return { type: "TOGGLE_MENU" };
   if (state.game.won) return { type: "TOGGLE_MENU" };
-  const hasSelection =
-    state.ui.mode === "select_source" || state.ui.mode === "select_destination";
-  if (hasSelection) return { type: "CANCEL_SELECTION" };
+  if (state.ui.mode === "select_destination") return { type: "CANCEL_SELECTION" };
   return { type: "TOGGLE_MENU" };
 }

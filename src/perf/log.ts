@@ -361,16 +361,3 @@ export function perfLogLazy(msgFactory: () => string): void {
   perfLog(msgFactory());
 }
 
-export function clearPerfLog(): void {
-  ensureDomInitialized();
-  if (PERF_LOG_DOM_ENABLED) {
-    clearDomOutput();
-  }
-  if (!PERF_LOG_CAPTURE_ENABLED) return;
-  ensureInitialized();
-  if (typeof window === "undefined") return;
-  entries = [];
-  dirty = true;
-  dirtySinceTs = safeNow();
-  flushEntriesForced();
-}

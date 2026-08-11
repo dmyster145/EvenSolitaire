@@ -279,12 +279,27 @@ describe("win animation presentation", () => {
     expect(getMenuLines(state)).toContain("Play Animation");
   });
 
-  it("shows the new-game prompt in the info panel while playing", () => {
+  it("calls the menu-launched cascade a preview, not a win", () => {
+    // playingState() goes through the "Play Animation" menu item on an unfinished game, so
+    // the panel must not claim a win nor promise a new game -- the tap only skips back.
     const text = getInfoPanelText(playingState());
+
+    expect(text).not.toContain("You win!");
+    expect(text).not.toContain("Tap for new game");
+    expect(text).toContain("Preview");
+    expect(text).toContain("Tap to skip");
+    expect(text).not.toContain("Legal Move");
+  });
+
+  it("shows the new-game prompt for a cascade that followed a real win", () => {
+    const won = playingState();
+    const text = getInfoPanelText({
+      ...won,
+      ui: { ...won.ui, winAnimation: { ...won.ui.winAnimation!, fromWin: true } },
+    });
 
     expect(text).toContain("You win!");
     expect(text).toContain("Tap for new game");
-    expect(text).not.toContain("Legal Move");
   });
 
   it("a tap while playing skips rather than acting on the board", () => {
