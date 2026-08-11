@@ -61,7 +61,8 @@ function isOrderedRun(state: GameState, source: Source): boolean {
   return true;
 }
 
-function getSourceCard(state: GameState, source: Source): Card | null {
+/** Deepest card of the selection: the one that actually has to land on the destination. */
+export function getSourceCard(state: GameState, source: Source): Card | null {
   if (source.area === "waste") {
     return state.waste.length > 0 ? state.waste[state.waste.length - 1] : null;
   }

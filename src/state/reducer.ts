@@ -1,6 +1,6 @@
 import type { AppState } from "./types";
 import { FOCUS_COUNT, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU } from "./constants";
-import { MENU_OPTIONS, CONFIRM_RESET_OPTIONS } from "./constants";
+import { MENU_OPTIONS, CONFIRM_RESET_OPTIONS, FINAL_PASS_CYCLE_CARDS } from "./constants";
 import { deal } from "../game/deal";
 import {
   drawFromStock,
@@ -10,7 +10,7 @@ import {
   applyMove,
   checkWin,
 } from "../game/klondike-engine";
-import { getLegalDests, isLegalMove } from "../game/validation";
+import { getLegalDests, isLegalMove, getSourceCard } from "../game/validation";
 import type { Source } from "../game/validation";
 import type { Dest } from "../game/validation";
 import { focusIndexToTarget, focusTargetToIndex, focusTargetToDest } from "./ui-mode";
@@ -26,10 +26,14 @@ function setFocusFromIndex(state: AppState, index: number): AppState {
   return { ...state, ui: { ...state.ui, focus } };
 }
 
-/** True when this focus index has no cards to interact with (browse mode: skip when swiping). Stock is never blank so it's always focusable for draw/recycle. */
+/**
+ * True when this focus index has no cards to interact with (browse mode: skip when swiping).
+ * Stock stays focusable while either pile holds cards -- an empty stock over a non-empty waste
+ * is still the recycle tap. Once both are empty the deck is spent for good and the slot is dead.
+ */
 function isFocusIndexBlank(state: AppState, index: number): boolean {
   const g = state.game;
-  if (index === FOCUS_INDEX_STOCK) return false;
+  if (index === FOCUS_INDEX_STOCK) return g.stock.length === 0 && g.waste.length === 0;
   if (index === FOCUS_INDEX_WASTE) return g.waste.length === 0;
   if (index >= FOCUS_INDEX_FIRST_FOUNDATION && index < FOCUS_INDEX_FIRST_TABLEAU) {
     return g.foundations[index - FOCUS_INDEX_FIRST_FOUNDATION].cards.length === 0;
@@ -67,16 +71,47 @@ function nextFocusWithTopCard(state: AppState, startIndex: number): AppState["ui
   return focusIndexToTarget(startIndex);
 }
 
+/** True when this tableau pile's top card can go straight home. */
+function tableauPileHasFoundationMove(game: AppState["game"], pileIndex: number): boolean {
+  if (game.tableau[pileIndex].visible.length === 0) return false;
+  const source: Source = { area: "tableau", pileIndex, count: 1 };
+  return getCachedLegalDestEntry(game, source).dests.some((d) => d.area === "foundation");
+}
+
+/**
+ * Next tableau pile whose top card can go home, checking the pile just played from first so a
+ * run in one pile keeps the focus rather than bouncing away and back. Null when nothing can go
+ * home, which hands the caller back to the plain any-card scan.
+ */
+function nextFocusWithFoundationMove(state: AppState, startIndex: number): AppState["ui"]["focus"] | null {
+  for (let i = 0; i < FOCUS_COUNT; i += 1) {
+    const next = (startIndex + i) % FOCUS_COUNT;
+    if (next < FOCUS_INDEX_FIRST_TABLEAU) continue;
+    if (tableauPileHasFoundationMove(state.game, next - FOCUS_INDEX_FIRST_TABLEAU)) {
+      return focusIndexToTarget(next);
+    }
+  }
+  return null;
+}
+
 function resolveFocusAfterFoundationMove(state: AppState, sourceFocus: AppState["ui"]["focus"]): AppState["ui"]["focus"] {
   const sourceIndex = focusTargetToIndex(sourceFocus);
+  // Move Assist, endgame only: every remaining card is bound for a foundation, so advance to
+  // the next pile that can actually go home instead of the next pile that merely has a card.
+  // That turns the finish into tap, tap, tap. Swiping still reaches every pile, so a card that
+  // needs parking on another tableau first is unaffected -- and with assist off nothing moves.
+  if (state.ui.moveAssist && isEndgameAutoMoveState(state.game)) {
+    const nextPlayable = nextFocusWithFoundationMove(state, sourceIndex);
+    if (nextPlayable) return nextPlayable;
+  }
   if (hasTopCardAtFocusIndex(state, sourceIndex)) return sourceFocus;
   return nextFocusWithTopCard(state, sourceIndex);
 }
 
 /**
  * True once the deal is fully resolved: stock and waste empty and no face-down tableau cards.
- * From here every remaining card only ever goes to a foundation, so the destination step is
- * pure ceremony and a single tap commits the move.
+ * From here every remaining card is bound for a foundation, which is what lets the focus walk
+ * pile to pile by what can go home. Without assist it also collapses the move to a single tap.
  */
 function isEndgameAutoMoveState(game: AppState["game"]): boolean {
   if (game.stock.length > 0 || game.waste.length > 0) return false;
@@ -121,33 +156,41 @@ function getAutoDestinationFocusTarget(
   source: Source,
   dests: Dest[],
 ): AppState["ui"]["focus"] | null {
-  // Move Assist: prefer foundation first for both waste and tableau selections.
-  // If foundation is not legal, waste falls back to the leftmost legal tableau destination.
-  // Tableau keeps source focus unless there is exactly one legal non-foundation destination
-  // AND the pile has no deeper run to select — otherwise auto-focusing the destination would
-  // steal the follow-up tap that cycles the selected card count, making multi-card runs
-  // unselectable (e.g. 8C+7D can never be picked up if 7D alone has a lone legal home).
+  // Move Assist: a foundation wins for both waste and tableau selections. Failing that, point
+  // at the leftmost legal tableau pile — once two or more are legal something has to be the
+  // default, and leftmost is the one the player can predict without reading the board.
   const foundationDest = dests.find((d) => d.area === "foundation");
   if (foundationDest && foundationDest.area === "foundation") {
     return focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION + foundationDest.index);
   }
 
-  if (source.area === "waste") {
-    const leftmostTableauDest = dests.find((d) => d.area === "tableau");
-    if (leftmostTableauDest && leftmostTableauDest.area === "tableau") {
-      return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + leftmostTableauDest.index);
+  // A King fits nowhere but an empty pile and every empty pile takes it equally, so there is
+  // no choice worth leaving the player -- point at the leftmost one. This has to sit ahead of
+  // the rules below, which bail out on two or more legal destinations and so would skip the
+  // exact case of several open piles. No run-cycling is at stake: a King is always the
+  // deepest card a selection can reach, so there is no larger pickup to tap toward.
+  const sourceCard = getSourceCard(game, source);
+  if (sourceCard?.rank === 13) {
+    const emptyPileDest = dests.find(
+      (d) => d.area === "tableau" && game.tableau[d.index].visible.length === 0
+    );
+    if (emptyPileDest) {
+      return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + emptyPileDest.index);
     }
+  }
+
+  // A tableau pile with a deeper run bails out entirely: the player may want a bigger pickup
+  // than the top card, and with assist on the swipe cycle only visits legal destinations, so
+  // the source pile is unreachable once focus leaves it. Focus has to stay put, where the
+  // follow-up tap cycles the selected card count -- otherwise 8C+7D can never be picked up as
+  // a pair if 7D alone has a legal home of its own.
+  if (source.area === "tableau" && game.tableau[source.pileIndex].visible.length > 1) {
     return null;
   }
 
-  if (source.area === "tableau") {
-    if (dests.length !== 1) return null;
-    if (game.tableau[source.pileIndex].visible.length > 1) return null;
-    const onlyDest = dests[0];
-    if (onlyDest.area === "tableau") {
-      return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + onlyDest.index);
-    }
-    return null;
+  const leftmostTableauDest = dests.find((d) => d.area === "tableau");
+  if (leftmostTableauDest && leftmostTableauDest.area === "tableau") {
+    return focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + leftmostTableauDest.index);
   }
 
   return null;
@@ -273,7 +316,10 @@ export const initialState: AppState = {
     selection: {},
     menuOpen: false,
     menuSelectedIndex: 0,
-    moveAssist: false,
+    // On by default: a first-time player gets destination previews and the tap-through
+    // endgame without having to find the menu toggle. NEW_GAME carries the player's own
+    // choice forward, so this only decides the very first run.
+    moveAssist: true,
   },
 };
 
@@ -308,9 +354,17 @@ export function rootReducer(
       let game = state.game;
       let didRecycle = false;
       if (game.stock.length === 0 && game.waste.length > 0) {
+        // Final pass: the whole cycle fits in one deal, so recycling and dealing on the
+        // same tap lands the identical card back on the waste every time. Give the
+        // recycle its own tap -- the stock refilling face-down is the feedback that the
+        // toast alone can't carry. Next tap deals as usual.
+        const isFinalPass = game.waste.length <= FINAL_PASS_CYCLE_CARDS;
         const menuCardId = state.ui.lastDrawCardFromMenuId;
         game = menuCardId ? recycleWasteToStockMenuCardFirst(game, menuCardId) : recycleWasteToStock(game);
         didRecycle = true;
+        if (isFinalPass) {
+          return { ...state, game, ui: { ...state.ui, message: "Stock reset" } };
+        }
       }
       if (game.stock.length > 0) {
         game = drawThreeFromStock(game);
@@ -336,8 +390,11 @@ export function rootReducer(
       if (!source) return state;
       const dests = getCachedLegalDestEntry(state.game, source).dests;
 
-      // Endgame: one tap sends the top tableau card straight home, no destination step.
-      if (source.area === "tableau" && isEndgameAutoMoveState(state.game)) {
+      // Endgame without assist: one tap sends the top tableau card straight home, no
+      // destination step. With assist on we deliberately keep the destination step -- the
+      // foundation is pre-focused below as a preview, so the second tap releases it there
+      // while a swipe first redirects the card to a tableau pile instead.
+      if (!state.ui.moveAssist && source.area === "tableau" && isEndgameAutoMoveState(state.game)) {
         const foundationDest = dests.find((d) => d.area === "foundation");
         if (foundationDest) {
           return applyLegalMoveAndReturnBrowseState(state, action.target, source, foundationDest);

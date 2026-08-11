@@ -381,6 +381,8 @@ describe("info panel text", () => {
         ...initialState.ui,
         menuOpen: true,
         menuSelectedIndex: 0,
+        // Pinned rather than inherited: this covers HUD formatting, not the default.
+        moveAssist: false,
       },
     };
 
@@ -391,5 +393,117 @@ describe("info panel text", () => {
     expect(text).toContain("  Draw Card");
     expect(text).not.toContain("Tap: select");
     expect(text).not.toContain("Double-tap: close menu");
+  });
+
+  describe("selected-pile section line budget", () => {
+    /** The info text container shows nine rows; anything past that is clipped off the bottom. */
+    const PANEL_ROWS = 9;
+
+    function selectingFrom(
+      build: (game: GameState) => void,
+      sourcePile: number,
+      selectedCardCount = 1
+    ): AppState {
+      const game: GameState = {
+        stock: [],
+        waste: [],
+        foundations: [{ cards: [] }, { cards: [] }, { cards: [] }, { cards: [] }],
+        tableau: [
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+          { hidden: [], visible: [] },
+        ],
+        moves: 0,
+        won: false,
+      };
+      build(game);
+      return {
+        ...withGame(game),
+        ui: {
+          ...initialState.ui,
+          mode: "select_destination",
+          moveAssist: true,
+          focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+          selection: { source: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + sourcePile), selectedCardCount },
+        },
+      };
+    }
+
+    it("keeps the selected card on screen instead of clipping it off the bottom", () => {
+      // The reported case: a three-card focused pile used to push "Selected Pile:" onto the
+      // last visible row with the card it names clipped away on row ten.
+      const state = selectingFrom((game) => {
+        game.tableau[0].visible = [card("tkh", 13, "H"), card("tqc", 12, "C"), card("tjh", 11, "H")];
+        game.tableau[4].visible = [card("ttc", 10, "C")];
+      }, 4);
+
+      const lines = getInfoPanelText(state).split("\n");
+
+      expect(lines.length).toBeLessThanOrEqual(PANEL_ROWS);
+      expect(lines).toContain("Selected Pile:");
+      expect(lines[lines.indexOf("Selected Pile:") + 1]).toBe("10 Clubs <");
+    });
+
+    it("drops the status lines while both lists are on screen", () => {
+      const state = selectingFrom((game) => {
+        game.tableau[0].visible = [card("tkh", 13, "H")];
+        game.tableau[4].visible = [card("ttc", 10, "C")];
+      }, 4);
+
+      const text = getInfoPanelText(state);
+
+      expect(text).not.toContain("Move Assist:");
+      expect(text).not.toContain("Legal Move");
+      expect(text).toContain("Selected Pile:");
+    });
+
+    it("keeps the status lines when no selected list is shown", () => {
+      const state: AppState = {
+        ...withGame(deal(31)),
+        ui: { ...initialState.ui, mode: "browse", focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) },
+      };
+
+      const text = getInfoPanelText(state);
+
+      expect(text).toContain("Move Assist:");
+      expect(text).toContain("Legal Move");
+      expect(text).not.toContain("Selected Pile:");
+    });
+
+    it("fits a long selected run and a long focused pile in the panel together", () => {
+      const state = selectingFrom((game) => {
+        game.tableau[0].visible = [
+          card("p1", 13, "S"), card("p2", 12, "H"), card("p3", 11, "S"),
+          card("p4", 10, "H"), card("p5", 9, "S"), card("p6", 8, "H"),
+        ];
+        game.tableau[4].visible = [
+          card("s1", 13, "D"), card("s2", 12, "C"), card("s3", 11, "D"),
+          card("s4", 10, "C"), card("s5", 9, "D"), card("s6", 8, "C"),
+        ];
+      }, 4, 6);
+
+      const lines = getInfoPanelText(state).split("\n");
+
+      expect(lines.length).toBeLessThanOrEqual(PANEL_ROWS);
+      // Both lists survive the split, neither is starved out entirely.
+      expect(lines).toContain("Tableau Pile:");
+      expect(lines).toContain("Selected Pile:");
+      expect(lines.indexOf("Selected Pile:")).toBeLessThan(lines.length - 1);
+    });
+
+    it("shows no header at all when the selection has no cards to list", () => {
+      const state = selectingFrom((game) => {
+        game.tableau[0].visible = [card("tkh", 13, "H")];
+        // Pile 4 is the selection source but holds nothing, so there is nothing to name.
+      }, 4);
+
+      const text = getInfoPanelText(state);
+
+      expect(text).not.toContain("Selected Pile:");
+    });
   });
 });

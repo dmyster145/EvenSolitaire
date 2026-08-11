@@ -149,9 +149,19 @@ describe("storage/save-game serialization", () => {
     expect(typeof parsed?.savedAt).toBe("number");
   });
 
-  it("defaults moveAssist to false when missing from payload", () => {
+  it("defaults moveAssist to on when missing from payload", () => {
     const payload = {
       game: sampleGame(),
+      savedAt: Date.now(),
+    };
+    const parsed = deserializeSave(JSON.stringify(payload));
+    expect(parsed?.moveAssist).toBe(true);
+  });
+
+  it("keeps an explicit moveAssist:false rather than applying the default", () => {
+    const payload = {
+      game: sampleGame(),
+      moveAssist: false,
       savedAt: Date.now(),
     };
     const parsed = deserializeSave(JSON.stringify(payload));

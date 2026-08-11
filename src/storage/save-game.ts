@@ -26,7 +26,9 @@ export function deserializeSave(raw: string): SavePayload | null {
   try {
     const payload = JSON.parse(raw) as SavePayload;
     if (payload?.game && typeof payload.savedAt === "number") {
-      const moveAssist = typeof payload.moveAssist === "boolean" ? payload.moveAssist : false;
+      // Absent or corrupt field means no recorded preference, so fall back to the same
+      // default a fresh install gets rather than a second, quieter default.
+      const moveAssist = typeof payload.moveAssist === "boolean" ? payload.moveAssist : true;
       return { ...payload, moveAssist };
     }
     return null;

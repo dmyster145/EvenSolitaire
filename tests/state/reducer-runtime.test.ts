@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearUndo } from "../../src/features/undo";
 import { rootReducer, initialState } from "../../src/state/reducer";
-import { focusIndexToTarget, focusTargetToIndex } from "../../src/state/ui-mode";
+import { focusIndexToTarget, focusTargetToIndex, focusTargetToDest } from "../../src/state/ui-mode";
 import {
   FOCUS_INDEX_FIRST_FOUNDATION,
   FOCUS_INDEX_FIRST_TABLEAU,
@@ -47,6 +47,20 @@ describe("state reducer runtime flows", () => {
     clearUndo();
   });
 
+  it("move assist is on for a fresh install and survives a new game", () => {
+    expect(initialState.ui.moveAssist).toBe(true);
+
+    const menu: AppState = {
+      ...initialState,
+      ui: { ...initialState.ui, menuOpen: true, menuSelectedIndex: 0 },
+    };
+    const off = rootReducer(menu, { type: "MENU_SELECT" });
+    expect(off.ui.moveAssist).toBe(false);
+
+    // NEW_GAME carries the player's own choice forward instead of reapplying the default.
+    expect(rootReducer(off, { type: "NEW_GAME" }).ui.moveAssist).toBe(false);
+  });
+
   it("browse focus move skips foundations and blank piles", () => {
     const game = emptyGame();
     game.tableau[2].visible = [card("t9d", 9, "D")];
@@ -58,6 +72,247 @@ describe("state reducer runtime flows", () => {
     const next = rootReducer(state, { type: "FOCUS_MOVE", direction: "next" });
 
     expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU + 2);
+  });
+
+  it("browse focus move skips the stock once stock and waste are both spent", () => {
+    const game = emptyGame();
+    game.tableau[0].visible = [card("t4h", 4, "H")];
+    game.tableau[2].visible = [card("t9d", 9, "D")];
+    const state: AppState = {
+      ...withGame(game),
+      ui: { ...initialState.ui, mode: "browse", focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + 2) },
+    };
+
+    const next = rootReducer(state, { type: "FOCUS_MOVE", direction: "next" });
+
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU);
+  });
+
+  it("browse focus move still reaches an empty stock while the waste holds cards", () => {
+    const game = emptyGame();
+    game.waste = [card("w9d", 9, "D")];
+    game.tableau[2].visible = [card("t4h", 4, "H")];
+    const state: AppState = {
+      ...withGame(game),
+      ui: { ...initialState.ui, mode: "browse", focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + 2) },
+    };
+
+    const next = rootReducer(state, { type: "FOCUS_MOVE", direction: "next" });
+
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_STOCK);
+  });
+
+  function endgameState(moveAssist: boolean, build: (game: GameState) => void): AppState {
+    const game = emptyGame();
+    build(game);
+    return {
+      ...withGame(game),
+      ui: {
+        ...initialState.ui,
+        mode: "browse",
+        moveAssist,
+        focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+      },
+    };
+  }
+
+  const tapFirstTableau = { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) } as const;
+
+  /** One touchpad tap, mirroring tapAction: select a source in browse, release in select_destination. */
+  function tap(s: AppState): AppState {
+    if (s.ui.mode === "select_destination") {
+      const dest = focusTargetToDest(s.ui.focus);
+      return rootReducer(s, dest ? { type: "DEST_SELECT", dest } : { type: "CANCEL_SELECTION" });
+    }
+    return rootReducer(s, { type: "SOURCE_SELECT", target: s.ui.focus });
+  }
+
+  it("endgame assist previews the foundation instead of releasing on the first tap", () => {
+    const state = endgameState(true, (game) => {
+      game.tableau[0].visible = [card("tah", 1, "H")];
+      game.tableau[2].visible = [card("tas", 1, "S")];
+    });
+
+    const previewing = rootReducer(state, tapFirstTableau);
+
+    expect(previewing.ui.mode).toBe("select_destination");
+    expect(previewing.game.foundations[0].cards).toHaveLength(0);
+    expect(focusTargetToIndex(previewing.ui.focus)).toBe(FOCUS_INDEX_FIRST_FOUNDATION);
+  });
+
+  it("endgame assist can redirect the previewed card to a tableau pile", () => {
+    const state = endgameState(true, (game) => {
+      game.tableau[0].visible = [card("tah", 1, "H")];
+      game.tableau[2].visible = [card("t2s", 2, "S")];
+    });
+
+    const previewing = rootReducer(state, tapFirstTableau);
+    const redirected = rootReducer(previewing, {
+      type: "DEST_SELECT",
+      dest: { area: "tableau", index: 2 },
+    });
+
+    expect(redirected.game.foundations[0].cards).toHaveLength(0);
+    expect(redirected.game.tableau[2].visible.map((c) => c.id)).toEqual(["t2s", "tah"]);
+  });
+
+  it("endgame assist focus skips a pile that cannot go home", () => {
+    const state = endgameState(true, (game) => {
+      game.tableau[0].visible = [card("tah", 1, "H")];
+      game.tableau[1].visible = [card("t9d", 9, "D")];
+      game.tableau[2].visible = [card("tas", 1, "S")];
+    });
+
+    const next = tap(tap(state));
+
+    expect(next.game.foundations[0].cards).toHaveLength(1);
+    expect(next.ui.mode).toBe("browse");
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU + 2);
+  });
+
+  it("endgame assist focus stays put when the same pile has another card for home", () => {
+    const state = endgameState(true, (game) => {
+      game.tableau[0].visible = [card("t2h", 2, "H"), card("tah", 1, "H")];
+      game.tableau[2].visible = [card("tas", 1, "S")];
+    });
+
+    const next = tap(tap(state));
+
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU);
+  });
+
+  it("endgame focus falls back to the plain any-card scan when move assist is off", () => {
+    const state = endgameState(false, (game) => {
+      game.tableau[0].visible = [card("tah", 1, "H")];
+      game.tableau[1].visible = [card("t9d", 9, "D")];
+      game.tableau[2].visible = [card("tas", 1, "S")];
+    });
+
+    const next = rootReducer(state, tapFirstTableau);
+
+    expect(next.game.foundations[0].cards).toHaveLength(1);
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU + 1);
+  });
+
+  it("endgame assist clears the board on taps alone, with no focus moves", () => {
+    let s = endgameState(true, (game) => {
+      game.tableau[0].visible = [card("t2h", 2, "H"), card("tah", 1, "H")];
+      game.tableau[1].visible = [card("t2s", 2, "S"), card("tas", 1, "S")];
+    });
+
+    // Select + release for each of the four cards, always on wherever the focus already
+    // sits -- never a FOCUS_MOVE.
+    for (let i = 0; i < 8; i += 1) {
+      s = tap(s);
+    }
+
+    expect(s.game.tableau.every((p) => p.visible.length === 0)).toBe(true);
+    expect(s.game.foundations[0].cards).toHaveLength(2);
+    expect(s.game.foundations[1].cards).toHaveLength(2);
+  });
+
+  it("assist focus advance does not apply before the endgame", () => {
+    const game = emptyGame();
+    game.tableau[0].visible = [card("tah", 1, "H")];
+    game.tableau[1].visible = [card("t9d", 9, "D")];
+    game.tableau[1].hidden = [card("h5c", 5, "C", false)];
+    game.tableau[2].visible = [card("tas", 1, "S")];
+    const state: AppState = {
+      ...withGame(game),
+      ui: {
+        ...initialState.ui,
+        mode: "browse",
+        moveAssist: true,
+        focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+      },
+    };
+
+    const selected = rootReducer(state, tapFirstTableau);
+    expect(selected.ui.mode).toBe("select_destination");
+
+    const next = rootReducer(selected, { type: "DEST_SELECT", dest: { area: "foundation", index: 0 } });
+
+    expect(next.game.foundations[0].cards).toHaveLength(1);
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU + 1);
+  });
+
+  function assistBrowse(build: (game: GameState) => void, focusIndex: number): AppState {
+    const game = emptyGame();
+    build(game);
+    return {
+      ...withGame(game),
+      ui: { ...initialState.ui, mode: "browse", moveAssist: true, focus: focusIndexToTarget(focusIndex) },
+    };
+  }
+
+  it("assist points a tableau king at the leftmost empty pile", () => {
+    // Piles 1 and 4 open: without the king rule two legal dests would mean no auto-focus.
+    const state = assistBrowse((game) => {
+      game.tableau[0].hidden = [card("h3c", 3, "C", false)];
+      game.tableau[0].visible = [card("tks", 13, "S")];
+      game.tableau[2].visible = [card("t9d", 9, "D")];
+      game.tableau[3].visible = [card("t8h", 8, "H")];
+    }, FOCUS_INDEX_FIRST_TABLEAU);
+
+    const next = rootReducer(state, tapFirstTableau);
+
+    expect(next.ui.mode).toBe("select_destination");
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU + 1);
+  });
+
+  it("assist points a waste king at the leftmost empty pile", () => {
+    const state = assistBrowse((game) => {
+      game.waste = [card("wkh", 13, "H")];
+      game.tableau[0].visible = [card("t9d", 9, "D")];
+      game.tableau[1].visible = [card("t8h", 8, "H")];
+    }, FOCUS_INDEX_WASTE);
+
+    const next = rootReducer(state, {
+      type: "SOURCE_SELECT",
+      target: focusIndexToTarget(FOCUS_INDEX_WASTE),
+    });
+
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU + 2);
+  });
+
+  it("a king still prefers a foundation over an empty pile", () => {
+    const state = assistBrowse((game) => {
+      game.tableau[0].visible = [card("tks", 13, "S")];
+      game.foundations[0].cards = [card("fqs", 12, "S")];
+    }, FOCUS_INDEX_FIRST_TABLEAU);
+
+    const next = rootReducer(state, tapFirstTableau);
+
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_FOUNDATION);
+  });
+
+  it("a king with no empty pile gets no auto-focus", () => {
+    const state = assistBrowse((game) => {
+      game.tableau[0].visible = [card("tks", 13, "S")];
+      for (let i = 1; i < 7; i += 1) game.tableau[i].visible = [card(`t9-${i}`, 9, "D")];
+    }, FOCUS_INDEX_FIRST_TABLEAU);
+
+    const next = rootReducer(state, tapFirstTableau);
+
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU);
+  });
+
+  it("the king rule does not fire with move assist off", () => {
+    const game = emptyGame();
+    game.tableau[0].visible = [card("tks", 13, "S")];
+    const state: AppState = {
+      ...withGame(game),
+      ui: {
+        ...initialState.ui,
+        mode: "browse",
+        moveAssist: false,
+        focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+      },
+    };
+
+    const next = rootReducer(state, tapFirstTableau);
+
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU);
   });
 
   it("destination focus move from source jumps to first legal foundation", () => {

@@ -42,7 +42,7 @@ export function getHudLines(state: AppState): string[] {
     return getMenuHudLines(state);
   }
   if (state.ui.winAnimation?.phase === "playing") {
-    return ["You win!", "Tap to skip"];
+    return ["You win!", "Tap for new game"];
   }
   if (state.game.won) {
     return ["You win!", "Tap for new game"];
@@ -166,7 +166,7 @@ export function getInfoPanelText(state: AppState): string {
   } else if (state.ui.winAnimation?.phase === "playing") {
     // Keep the panel quiet during the cascade; pile detail is noise here.
     lines.push("You win!");
-    lines.push("Tap to skip");
+    lines.push("Tap for new game");
   } else if (g.won) {
     lines.push("You win!");
     lines.push("Tap for new game");
@@ -174,29 +174,43 @@ export function getInfoPanelText(state: AppState): string {
     const pileIdx = focusIdx;
     const pileCards = getFocusedPileCards(state, pileIdx);
     const activeTableauCardIndex = getInfoPanelActiveTableauCardIndex(state, pileIdx, pileCards.length);
-    const selectedSection = getInfoPanelSelectedPileSection(state, pileIdx);
+    const selectedCards = getInfoPanelSelectedCards(state, pileIdx);
+    const showsSelected = selectedCards.length > 0;
     const hasSelectedCard = !!state.ui.selection.source;
-    const prePileCardLineCount =
-      1 + // Move Assist line
-      1 + // Legal moves line
-      1 + // spacer line
+
+    // Two lists on a nine-row panel need every row they can get, so the status lines step
+    // aside while both are up: Move Assist is static, and the legal-move count rates the
+    // focused pile as a source, which is not what the player is doing mid-move.
+    const showsStatusLines = !showsSelected;
+
+    const fixedLineCount =
+      (showsStatusLines ? 3 : 0) + // Move Assist, legal moves, spacer
       1 + // pile label
-      (pileIdx === FOCUS_INDEX_STOCK ? 1 : 0); // stock count line
+      (pileIdx === FOCUS_INDEX_STOCK ? 1 : 0) + // stock count line
+      (showsSelected ? 2 : 0); // spacer + "Selected Pile:"
+
+    // Everything below shares one budget, so nothing lands on the last visible row with its
+    // content clipped off the bottom of the container. The selection is what the player is
+    // holding, so it is served first; the focused pile keeps at least one row regardless.
+    const listBudget = INFO_PANEL_MAX_TOTAL_LINES_WITH_SELECTION - fixedLineCount;
+    const maxSelectedCardLines = showsSelected
+      ? Math.max(1, Math.min(selectedCards.length, listBudget - 1))
+      : 0;
     const maxCardLines = hasSelectedCard
-      ? Math.max(
-          1,
-          Math.min(INFO_PANEL_CARD_WINDOW_LINES, INFO_PANEL_MAX_TOTAL_LINES_WITH_SELECTION - prePileCardLineCount)
-        )
+      ? Math.max(1, Math.min(INFO_PANEL_CARD_WINDOW_LINES, listBudget - maxSelectedCardLines))
       : INFO_PANEL_CARD_WINDOW_LINES_NO_SELECTION;
 
-    lines.push(state.ui.moveAssist ? "Move Assist: ON" : "Move Assist: OFF");
+    if (showsStatusLines) {
+      lines.push(state.ui.moveAssist ? "Move Assist: ON" : "Move Assist: OFF");
 
-    // Shown regardless of Move Assist: it is the only feedback that a pile is dead,
-    // now that the "no legal move" message is gone.
-    const legalMoveCount = countLegalMovesForFocus(state, pileIdx);
-    lines.push(`${legalMoveCount} Legal Move${legalMoveCount !== 1 ? "s" : ""}`);
+      // Shown regardless of Move Assist: it is the only feedback that a pile is dead,
+      // now that the "no legal move" message is gone.
+      const legalMoveCount = countLegalMovesForFocus(state, pileIdx);
+      lines.push(`${legalMoveCount} Legal Move${legalMoveCount !== 1 ? "s" : ""}`);
 
-    lines.push("");
+      lines.push("");
+    }
+
     lines.push(infoPanelPileLabelFromIndex(pileIdx));
     if (pileIdx === FOCUS_INDEX_STOCK) {
       lines.push(`Cards Left: ${g.stock.length}`);
@@ -207,9 +221,10 @@ export function getInfoPanelText(state: AppState): string {
       lines.push("(empty)");
     }
 
-    if (selectedSection.length > 0) {
+    if (showsSelected) {
       lines.push("");
-      lines.push(...selectedSection);
+      lines.push("Selected Pile:");
+      lines.push(...formatInfoPanelCardLines(selectedCards, 0, maxSelectedCardLines));
     }
   }
 
@@ -247,24 +262,17 @@ function getInfoPanelActiveTableauCardIndex(
   return idx;
 }
 
-function getInfoPanelSelectedPileSection(state: AppState, focusIdx: number): string[] {
+/**
+ * Cards to list under "Selected Pile:", or [] when the section should not appear at all --
+ * no selection, or the focused pile is the one the selection came from. An empty result also
+ * suppresses the header, so it can never render orphaned above nothing.
+ */
+function getInfoPanelSelectedCards(state: AppState, focusIdx: number): Card[] {
   if (state.ui.mode !== "select_destination") return [];
   const source = state.ui.selection.source;
   if (!source) return [];
-  const sourceIdx = focusTargetToIndex(source);
-  if (sourceIdx === focusIdx) return [];
-
-  const selectedCards = getFloatingCards(state);
-  const lines: string[] = ["Selected Pile:"];
-
-  if (selectedCards.length === 0) {
-    lines.push("(empty)");
-    return lines;
-  }
-
-  lines.push(...formatInfoPanelCardLines(selectedCards, 0, INFO_PANEL_CARD_WINDOW_LINES));
-
-  return lines;
+  if (focusTargetToIndex(source) === focusIdx) return [];
+  return getFloatingCards(state);
 }
 
 function formatInfoPanelCardLines(cards: Card[], activeIndex: number, maxLines: number): string[] {

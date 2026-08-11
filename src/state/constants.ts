@@ -25,5 +25,16 @@ export const WIN_ANIMATION_TICK_MS = 32;
  */
 export const WIN_BOARD_HOLD_MS = 2000;
 
+/**
+ * Cycle size (stock + waste) at or below which the recycle gets a tap of its own.
+ * Regulation draw-3 keeps waste order through a recycle, so once the whole cycle
+ * fits inside a single deal the same card returns to the top on every pass. That is
+ * correct, but on one waste slot it is indistinguishable from a frozen screen -- the
+ * only feedback is a "Stock reset" toast firing on every tap. Splitting the recycle
+ * off lets the stock visibly refill face-down instead. Rules are unchanged; the
+ * assist that actually re-phases the deck stays behind the menu's Draw Card.
+ */
+export const FINAL_PASS_CYCLE_CARDS = 3;
+
 /** Shown when user selects Reset; scroll between these, tap to confirm or cancel. */
 export const CONFIRM_RESET_OPTIONS = ["Yes", "No"] as const;

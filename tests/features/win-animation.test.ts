@@ -279,11 +279,11 @@ describe("win animation presentation", () => {
     expect(getMenuLines(state)).toContain("Play Animation");
   });
 
-  it("shows tap-to-skip in the info panel while playing", () => {
+  it("shows the new-game prompt in the info panel while playing", () => {
     const text = getInfoPanelText(playingState());
 
     expect(text).toContain("You win!");
-    expect(text).toContain("Tap to skip");
+    expect(text).toContain("Tap for new game");
     expect(text).not.toContain("Legal Move");
   });
 

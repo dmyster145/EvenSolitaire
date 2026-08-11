@@ -251,11 +251,36 @@ describe("source select auto-destination focus", () => {
     expect(next.ui.message).toBeUndefined();
   });
 
-  it("does not auto-focus for tableau source when multiple legal tableau destinations exist", () => {
+  it("auto-focuses the leftmost pile when several tableau destinations are legal", () => {
     const game = emptyGame();
+    // 6C is playable on both 7H (pile 1) and 7D (pile 3); pile 1 wins for being leftmost.
     game.tableau[0].visible = [card("t6c", 6, "C")];
     game.tableau[1].visible = [card("t7h", 7, "H")];
     game.tableau[3].visible = [card("t7d", 7, "D")];
+
+    const state: AppState = {
+      ...withGame(game),
+      ui: {
+        ...initialState.ui,
+        mode: "browse",
+        moveAssist: true,
+        focus: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU),
+      },
+    };
+
+    const next = rootReducer(state, { type: "SOURCE_SELECT", target: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU) });
+
+    expect(next.ui.mode).toBe("select_destination");
+    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + 1));
+  });
+
+  it("still keeps focus on a tableau source that has a deeper run to select", () => {
+    const game = emptyGame();
+    // 7D sits on 8C: auto-focusing 7D's home would strand the 8C+7D pickup, because with
+    // assist on the swipe cycle never revisits the source pile to grow the selection.
+    game.tableau[0].visible = [card("t8c", 8, "C"), card("t7d", 7, "D")];
+    game.tableau[1].visible = [card("t8h", 8, "H")];
+    game.tableau[3].visible = [card("t8s", 8, "S")];
 
     const state: AppState = {
       ...withGame(game),
