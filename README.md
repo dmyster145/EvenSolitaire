@@ -8,7 +8,7 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 | Main View | Gameplay | Menu |
 |:---------:|:--------:|:----:|
-| ![Main view on G2 glasses](assets/screenshot-main.png) | ![Gameplay with Move Assist](assets/screenshot-gameplay.png) | ![In-game menu](assets/screenshot-menu.png) |
+| ![Main view on G2 glasses](assets/screenshots/main.png) | ![Gameplay with Move Assist](assets/screenshots/gameplay.png) | ![In-game menu](assets/screenshots/menu.png) |
 
 ## Quick links
 
