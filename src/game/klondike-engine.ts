@@ -7,7 +7,6 @@ import {
   drawThreeFromStock,
   recycleWasteToStock,
   recycleWasteToStockPutFirstAtEnd,
-  recycleWasteToStockMenuCardFirst,
   applyMove,
 } from "./moves";
 import { isWon } from "./win";
@@ -21,7 +20,6 @@ export {
   drawThreeFromStock,
   recycleWasteToStock,
   recycleWasteToStockPutFirstAtEnd,
-  recycleWasteToStockMenuCardFirst,
   applyMove,
   isWon,
 };

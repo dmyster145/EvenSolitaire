@@ -6,7 +6,6 @@ import {
   drawFromStock,
   drawThreeFromStock,
   recycleWasteToStock,
-  recycleWasteToStockMenuCardFirst,
   applyMove,
   checkWin,
 } from "../game/klondike-engine";
@@ -347,8 +346,7 @@ export function rootReducer(
         // recycle its own tap -- the stock refilling face-down is the feedback that the
         // toast alone can't carry. Next tap deals as usual.
         const isFinalPass = game.waste.length <= FINAL_PASS_CYCLE_CARDS;
-        const menuCardId = state.ui.lastDrawCardFromMenuId;
-        game = menuCardId ? recycleWasteToStockMenuCardFirst(game, menuCardId) : recycleWasteToStock(game);
+        game = recycleWasteToStock(game);
         didRecycle = true;
         if (isFinalPass) {
           return { ...state, game, ui: { ...state.ui, message: "Stock reset" } };
@@ -504,25 +502,30 @@ export function rootReducer(
       const opt = MENU_OPTIONS[state.ui.menuSelectedIndex];
       if (opt === "Draw Card") {
         let game = state.game;
-        let lastDrawCardFromMenuId: string | undefined;
+        let message: string | undefined;
         if (!state.game.won) {
           if (game.stock.length === 0 && game.waste.length > 0) {
+            // Final pass for draw-1: with a single waste card, recycling and dealing on
+            // the same action would land the identical card back on the waste. Give the
+            // recycle its own action, like DRAW_STOCK's final-pass tap.
+            const isFinalPass = game.waste.length <= 1;
             pushUndo(game);
-            const menuCardId = state.ui.lastDrawCardFromMenuId;
-            game = menuCardId ? recycleWasteToStockMenuCardFirst(game, menuCardId) : recycleWasteToStock(game);
+            game = recycleWasteToStock(game);
+            message = "Stock reset";
+            if (isFinalPass) {
+              return { ...state, game, ui: { ...state.ui, menuOpen: false, message } };
+            }
           }
           if (game.stock.length > 0) {
             pushUndo(game);
-            const top = game.stock[0];
             game = drawFromStock(game);
-            lastDrawCardFromMenuId = top?.id;
           }
           game = checkWin(game);
         }
         return {
           ...state,
           game,
-          ui: { ...state.ui, menuOpen: false, lastDrawCardFromMenuId: lastDrawCardFromMenuId ?? state.ui.lastDrawCardFromMenuId },
+          ui: { ...state.ui, menuOpen: false, message },
         };
       }
       if (opt === "Move Assist") {

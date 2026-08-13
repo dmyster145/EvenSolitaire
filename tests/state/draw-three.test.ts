@@ -130,4 +130,47 @@ describe("draw-3 behavior (state layer)", () => {
     expect(next.game.waste.length).toBe(1);
     expect(next.game.waste.every((c) => c.faceUp)).toBe(true);
   });
+
+  /** Dispatch MENU_SELECT on the Draw Card option (reopening the menu each time). */
+  function menuDraw(state: AppState): AppState {
+    return rootReducer(
+      { ...state, ui: { ...state.ui, menuOpen: true, menuSelectedIndex: 1 } },
+      { type: "MENU_SELECT" }
+    );
+  }
+
+  it("menu draw after exhausting the stock restarts the pass, not the last card", () => {
+    // Draw the whole stock one card at a time through the real menu path, so any
+    // recycle-order state the reducer tracks is exactly what live play produces.
+    let s: AppState = withGame(deal(19));
+    while (s.game.stock.length > 0) s = menuDraw(s);
+    const firstDrawn = s.game.waste[0]!;
+    const lastDrawn = s.game.waste[s.game.waste.length - 1]!;
+
+    // The next menu draw recycles and deals in one action. It must deal the FIRST
+    // card of the previous pass — the old menu-card-first recycle put the card the
+    // user just saw back on top ("resets the pile but shows the same card").
+    const next = menuDraw(s);
+
+    expect(next.game.waste).toHaveLength(1);
+    expect(next.game.waste[0]!.id).toBe(firstDrawn.id);
+    expect(next.game.waste[0]!.id).not.toBe(lastDrawn.id);
+    expect(next.ui.message).toBe("Stock reset");
+  });
+
+  it("menu draw with a single waste card gives the recycle its own action", () => {
+    // Cycle of one: recycling and dealing together would re-show the same card.
+    const base = deal(21);
+    const waste = [{ ...base.stock[0]!, faceUp: true }];
+    let s: AppState = withGame({ ...base, stock: [], waste });
+
+    s = menuDraw(s);
+    expect(s.game.stock).toHaveLength(1);
+    expect(s.game.stock[0]!.faceUp).toBe(false);
+    expect(s.game.waste).toEqual([]);
+    expect(s.ui.message).toBe("Stock reset");
+
+    const dealt = menuDraw(s);
+    expect(dealt.game.waste.map((c) => c.id)).toEqual(waste.map((c) => c.id));
+  });
 });

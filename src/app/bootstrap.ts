@@ -47,8 +47,13 @@ export async function initApp(): Promise<void> {
 
   // Dev-only visual-test fixtures (?fixture=runs). Must run after hub.init() —
   // touching the bridge before the SDK handshake breaks page creation — and
-  // before loadGame() reads the save.
-  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("fixture")) {
+  // before loadGame() reads the save. The typeof guard keeps node-environment
+  // tests (where vitest sets DEV=true but there is no window) off this branch.
+  if (
+    import.meta.env.DEV &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("fixture")
+  ) {
     const { applyDevFixtureFromUrl } = await import("./dev-fixture");
     await applyDevFixtureFromUrl();
   }

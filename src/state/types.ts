@@ -39,8 +39,6 @@ export interface UIState {
   message?: string;
   menuOpen: boolean;
   menuSelectedIndex: number;
-  /** Id of the card drawn when user selects "Draw Card" from the menu; recycle can prioritize it to preserve menu assist draw order. */
-  lastDrawCardFromMenuId?: string;
   /** When true, focus in select_destination skips illegal stacks/spots. */
   moveAssist: boolean;
   /** When true, menu shows "Reset game?" with Yes/No instead of main options. */

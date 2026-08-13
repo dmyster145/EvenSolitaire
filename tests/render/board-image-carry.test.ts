@@ -112,6 +112,28 @@ describe("carried tableau stack rendering", () => {
       }
     });
 
+    it("matches the source raise preview silhouette card-for-card", () => {
+      // The product requirement behind the fan: the carried stack must look the
+      // same at the destination as it did on the source pile. This ties the two
+      // independent implementations together — change either one alone and this
+      // fails. (Highlights differ by design: destination outlines the front card.)
+      const cards = run(4);
+      const piles = emptyPiles();
+      piles[0] = { hidden: 0, visible: [...cards] };
+      renderBoardTableauToCanvas({
+        piles,
+        focusIndex: 0,
+        sourceIndex: 0,
+        floatingCards: [...cards],
+        floatingCardAtSlot: 6,
+        selectionCount: 4,
+      });
+      const source = drawnCards();
+      drawFaceUpCard.mockClear();
+
+      expect(renderCarry(4)).toEqual(source);
+    });
+
     it("keeps short carries at the source preview's positions too", () => {
       expect(renderCarry(1)).toEqual([{ id: "c0", y: BASE_Y - CARD_ELEVATION_OFFSET_Y }]);
       drawFaceUpCard.mockClear();

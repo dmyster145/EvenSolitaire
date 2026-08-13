@@ -35,7 +35,7 @@ function pile(hidden: Card[], visible: Card[]): TableauPile {
  */
 function runsFixture(): GameState {
   return {
-    stock: [card(2, "S", false), card(5, "D", false), card(9, "S", false)],
+    stock: [card(8, "C", false), card(5, "D", false), card(9, "S", false)],
     waste: [card(3, "H")],
     foundations: [
       { cards: [card(1, "S"), card(2, "S")] },
@@ -45,7 +45,7 @@ function runsFixture(): GameState {
     ],
     tableau: [
       pile(
-        [card(4, "C"), card(6, "S")],
+        [card(4, "S"), card(6, "S")],
         [card(12, "H"), card(11, "C"), card(10, "H"), card(9, "C"), card(8, "D")]
       ),
       pile([], [card(7, "C")]),

@@ -5,7 +5,6 @@ import {
   drawThreeFromStock,
   recycleWasteToStock,
   recycleWasteToStockPutFirstAtEnd,
-  recycleWasteToStockMenuCardFirst,
   applyMove,
 } from "../../src/game/moves";
 import { isLegalMove, getLegalDests } from "../../src/game/validation";
@@ -117,29 +116,6 @@ describe("moves", () => {
     expect(state.stock[state.stock.length - 1]).toEqual(expect.objectContaining({ rank: menuDraw?.rank, suit: menuDraw?.suit }));
     state = drawFromStock(state);
     expect(state.waste[state.waste.length - 1]?.id).not.toBe(menuDraw?.id);
-  });
-
-  it("recycleWasteToStockMenuCardFirst puts menu card at front when in waste", () => {
-    let state = deal(10);
-    state = drawFromStock(state);
-    const menuCard = state.waste[0]!;
-    const menuCardId = menuCard.id;
-    while (state.stock.length > 0) state = drawFromStock(state);
-    state = recycleWasteToStockMenuCardFirst(state, menuCardId);
-    expect(state.waste.length).toBe(0);
-    expect(state.stock[0]).toEqual(expect.objectContaining({ id: menuCardId, rank: menuCard.rank, suit: menuCard.suit }));
-    state = drawFromStock(state);
-    expect(state.waste[state.waste.length - 1]).toEqual(expect.objectContaining({ rank: menuCard.rank, suit: menuCard.suit }));
-  });
-
-  it("recycleWasteToStockMenuCardFirst uses normal order when menu card not in waste", () => {
-    let state = deal(10);
-    state = drawFromStock(state);
-    const firstInWaste = state.waste[0]!;
-    while (state.stock.length > 0) state = drawFromStock(state);
-    state = recycleWasteToStockMenuCardFirst(state, "nonexistent-id");
-    expect(state.waste.length).toBe(0);
-    expect(state.stock[0]).toEqual(expect.objectContaining({ rank: firstInWaste.rank, suit: firstInWaste.suit }));
   });
 
   it("applyMove rejects illegal move", () => {

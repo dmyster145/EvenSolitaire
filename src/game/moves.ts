@@ -54,26 +54,6 @@ export function recycleWasteToStockPutFirstAtEnd(state: GameState): GameState {
   };
 }
 
-/** Recycle waste to stock with the menu-draw card (if still in waste) at the front so draw order persists. */
-export function recycleWasteToStockMenuCardFirst(state: GameState, menuCardId: string): GameState {
-  if (state.waste.length === 0 || state.stock.length > 0) return state;
-  const idx = state.waste.findIndex((c) => c.id === menuCardId);
-  const stock =
-    idx < 0
-      ? state.waste.map((c) => ({ ...c, faceUp: false }))
-      : [
-          { ...state.waste[idx]!, faceUp: false },
-          ...state.waste.slice(0, idx).map((c) => ({ ...c, faceUp: false })),
-          ...state.waste.slice(idx + 1).map((c) => ({ ...c, faceUp: false })),
-        ];
-  return {
-    ...state,
-    stock,
-    waste: [],
-    moves: state.moves + 1,
-  };
-}
-
 export function applyMove(
   state: GameState,
   source: Source,

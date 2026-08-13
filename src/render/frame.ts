@@ -393,7 +393,11 @@ function topRowViewFromState(state: AppState, boardCtx: BoardViewContext): TopRo
     foundations: pv.foundations,
     focusIndex: focusIdx <= 5 ? focusIdx : -1,
     sourceIndex: sourceTopIdx !== null && sourceTopIdx <= 5 ? sourceTopIdx : null,
-    floatingCard: hasFloating ? floatingCards[floatingCards.length - 1]! : null,
+    // Only set while focus is on a top-row slot: that is the only place this row
+    // draws it, and leaving it set during tableau carries made the render key
+    // churn (and the top tile re-encode) on every carry focus move for no
+    // visual change.
+    floatingCard: hasFloating && focusIdx <= 5 ? floatingCards[floatingCards.length - 1]! : null,
     floatingCardAtSlot: focusIdx,
     wasteWithoutTop,
     foundationWithoutTop,
