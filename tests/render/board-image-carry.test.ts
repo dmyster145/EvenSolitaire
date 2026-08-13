@@ -4,6 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * Spy on the card-canvas seam. The board images decide which card lands where and delegate the
  * painting; the defects worth pinning here are decisions (a card skipped, a card at the wrong
  * y), so asserting on these calls is both exact and stable against changes to the painting.
+ *
+ * The carried fan is CLAMPED like the source-side raise preview: front card + up to
+ * MAX_PEEK_ITEMS slivers + the elevated lead card, middle cards hidden. Unclamped, a 5+ card
+ * carry stacked bare slivers up past the row seam into the foundation row (venetian-blind
+ * artifact); clamped, nothing ever crosses the seam and the top tile draws no carry at all.
  */
 const drawFaceUpCard = vi.fn();
 vi.mock("../../src/render/card-canvas", () => ({
@@ -20,15 +25,14 @@ import {
   CARD_TABLEAU_H,
   STACK_OFFSET_Y_PEEK,
   CARD_ELEVATION_OFFSET_Y,
+  MAX_PEEK_ITEMS,
   VIRTUAL_IMAGE_TABLEAU,
-  VIRTUAL_IMAGE_TOP,
-  FULL_SCREEN_CENTER_Y,
 } from "../../src/render/layout";
 import type { Card } from "../../src/game/types";
 
 const TABLEAU_H = VIRTUAL_IMAGE_TABLEAU.height;
-const TOP_H = VIRTUAL_IMAGE_TOP.height;
 const BASE_Y = TABLEAU_H - CARD_TABLEAU_H - 2;
+const CLAMPED_LEAD_Y = BASE_Y - MAX_PEEK_ITEMS * STACK_OFFSET_Y_PEEK - CARD_ELEVATION_OFFSET_Y;
 
 function card(id: string, rank: Card["rank"], suit: Card["suit"]): Card {
   return { id, rank, suit, faceUp: true };
@@ -73,74 +77,64 @@ describe("carried tableau stack rendering", () => {
       return drawnCards();
     }
 
-    it("draws every carried card for a 3-card stack", () => {
-      expect(renderCarry(3).map((d) => d.id)).toEqual(["c0", "c1", "c2"]);
+    it("mirrors the source raise preview: lead in the top peek slot, one sliver, front", () => {
+      // Same shape the source pile shows before the move: the elevated lead card
+      // occupies the topmost peek slot (an 18px band of it visible), the card just
+      // under the front fills the sliver below, front card at the base.
+      expect(renderCarry(3)).toEqual([
+        { id: "c0", y: CLAMPED_LEAD_Y },
+        { id: "c1", y: BASE_Y - STACK_OFFSET_Y_PEEK },
+        { id: "c2", y: BASE_Y },
+      ]);
     });
 
-    it("still draws the lead card when a 4-card stack pushes it off the top edge", () => {
-      // stackOffset (3*8) + elevation (10) exceeds BASE_Y's headroom, so the lead card's y goes
-      // negative. It used to be dropped outright, taking its focus outline with it.
-      const drawn = renderCarry(4);
-
-      expect(drawn.map((d) => d.id)).toEqual(["c0", "c1", "c2", "c3"]);
-      expect(drawn[0]!.y).toBe(BASE_Y - 3 * STACK_OFFSET_Y_PEEK - CARD_ELEVATION_OFFSET_Y);
-      expect(drawn[0]!.y).toBeLessThan(0);
+    it("clamps a tall stack to the same shape, hiding middle cards", () => {
+      // 5 cards: identical silhouette to the 3-card fan — lead, the card just under
+      // the front, front. c1 and c2 are hidden (the info panel lists the selection).
+      expect(renderCarry(5)).toEqual([
+        { id: "c0", y: CLAMPED_LEAD_Y },
+        { id: "c3", y: BASE_Y - STACK_OFFSET_Y_PEEK },
+        { id: "c4", y: BASE_Y },
+      ]);
     });
 
-    it("keeps drawing the lead card as the stack grows further past the edge", () => {
-      for (const n of [5, 6, 8, 13]) {
+    it("never draws above the canvas top, no matter how tall the carry", () => {
+      // The unclamped fan sent the lead card negative at 4+ and stacked slivers to
+      // the seam at 5+ — the venetian-blind artifact over the foundation row.
+      for (const n of [4, 5, 8, 13]) {
         drawFaceUpCard.mockClear();
         const drawn = renderCarry(n);
-        expect(drawn).toHaveLength(n);
-        expect(drawn[0]!.y).toBeLessThan(0);
+        expect(drawn).toHaveLength(Math.min(n, MAX_PEEK_ITEMS + 1));
+        expect(drawn[0]).toEqual({ id: "c0", y: CLAMPED_LEAD_Y });
+        for (const d of drawn) {
+          expect(d.y).toBeGreaterThanOrEqual(0);
+        }
       }
     });
 
-    it("drops a card only once it is entirely off the canvas", () => {
-      // Guard is overlap, not containment: a card whose bottom edge has passed y=0 contributes
-      // no pixels and must not be drawn, or the guard would be doing nothing at all.
-      const drawn = renderCarry(13);
-      for (const d of drawn) {
-        expect(d.y + CARD_TABLEAU_H).toBeGreaterThan(0);
-        expect(d.y).toBeLessThan(TABLEAU_H);
-      }
+    it("keeps short carries at the source preview's positions too", () => {
+      expect(renderCarry(1)).toEqual([{ id: "c0", y: BASE_Y - CARD_ELEVATION_OFFSET_Y }]);
+      drawFaceUpCard.mockClear();
+      expect(renderCarry(2)).toEqual([
+        { id: "c0", y: BASE_Y - STACK_OFFSET_Y_PEEK - CARD_ELEVATION_OFFSET_Y },
+        { id: "c1", y: BASE_Y },
+      ]);
     });
   });
 
-  describe("top tile (across the seam)", () => {
-    function renderTopCarry(n: number) {
-      renderBoardTopToCanvas({
-        stockCount: 0,
-        wasteTop: null,
-        foundations: [null, null, null, null],
-        focusIndex: -1,
-        sourceIndex: null,
-        tableauFloatingCards: run(n),
-        floatingCardAtSlot: 9,
-      });
-      return drawnCards();
-    }
-
-    it("draws nothing in the top tile for a short carry that never reaches the seam", () => {
-      expect(renderTopCarry(3)).toEqual([]);
-    });
-
-    it("draws the lead card in the top tile once the carry rises past the seam", () => {
-      // The tableau tile clips this card at its own top edge; without this the card was cut in
-      // half at the seam. Screen y = FULL_SCREEN_CENTER_Y + BASE_Y - offsets.
-      const drawn = renderTopCarry(13);
-      const expectedY =
-        FULL_SCREEN_CENTER_Y + BASE_Y - 12 * STACK_OFFSET_Y_PEEK - CARD_ELEVATION_OFFSET_Y;
-
-      expect(drawn.map((d) => d.id)).toContain("c0");
-      expect(drawn.find((d) => d.id === "c0")!.y).toBe(expectedY);
-      expect(expectedY).toBeLessThan(TOP_H);
-    });
-
-    it("draws only the cards that actually overlap the top tile", () => {
-      for (const d of renderTopCarry(13)) {
-        expect(d.y).toBeLessThan(TOP_H);
-        expect(d.y + CARD_TABLEAU_H).toBeGreaterThan(0);
+  describe("top tile", () => {
+    it("never draws carried cards — the clamped fan cannot reach the seam", () => {
+      for (const n of [3, 5, 13]) {
+        drawFaceUpCard.mockClear();
+        renderBoardTopToCanvas({
+          stockCount: 0,
+          wasteTop: null,
+          foundations: [null, null, null, null],
+          focusIndex: -1,
+          sourceIndex: null,
+          floatingCardAtSlot: 9,
+        });
+        expect(drawnCards()).toEqual([]);
       }
     });
   });

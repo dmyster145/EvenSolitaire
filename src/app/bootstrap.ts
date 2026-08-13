@@ -45,6 +45,14 @@ export async function initApp(): Promise<void> {
   const hub = new EvenHubBridge();
   await hub.init();
 
+  // Dev-only visual-test fixtures (?fixture=runs). Must run after hub.init() —
+  // touching the bridge before the SDK handshake breaks page creation — and
+  // before loadGame() reads the save.
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("fixture")) {
+    const { applyDevFixtureFromUrl } = await import("./dev-fixture");
+    await applyDevFixtureFromUrl();
+  }
+
   const saved = await loadGame();
   const initial = saved
     ? { ...initialState, game: saved.game, ui: { ...initialState.ui, moveAssist: saved.moveAssist } }

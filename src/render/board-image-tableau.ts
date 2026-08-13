@@ -136,31 +136,31 @@ export function renderBoardTableauToCanvas(
     !focusOnSourceColumn
   ) {
     const fx = slotCenterX(colForFloating);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, W, H);
-    ctx.clip();
-    const stackOffset = (floats.length - 1) * STACK_OFFSET_Y_PEEK;
-    for (let j = 0; j < floats.length; j++) {
-      const isRaisedCard = j === 0;
-      const isFrontCard = j === floats.length - 1;
-      const cy = isRaisedCard
-        ? BASE_Y - stackOffset - CARD_ELEVATION_OFFSET_Y
-        : BASE_Y - (floats.length - 1 - j) * STACK_OFFSET_Y_PEEK;
-      const cardBottom = cy + CARD_TABLEAU_H;
-      // Overlap, not containment: the clip above exists precisely so a card hanging off the
-      // canvas edge still draws its visible part. Demanding the whole card fit dropped the
-      // raised lead card of any 4+ card carry entirely (cy goes negative once the stack
-      // offset exceeds the elevation headroom), taking its focus outline with it.
-      if (cardBottom > 0 && cy < H) {
-        drawFaceUpCard(ctx, fx, cy, CARD_TABLEAU_W, CARD_TABLEAU_H, floats[j]!, {
-          // Keep the active (back) card outlined and also outline the visible front card
-          // so destination focus is obvious when carrying multi-card tableau stacks.
-          highlight: isRaisedCard || isFrontCard ? "focus" : undefined,
-        });
-      }
+    // The carried fan mirrors the source-side raise preview exactly, so the
+    // stack looks the same at the destination as it did before the move: the
+    // lead card OCCUPIES the top peek slot (elevated, showing a taller band),
+    // unraised slivers fill the slots below it, front card at the base. Middle
+    // cards beyond the peek window are hidden (the info panel lists them).
+    // Unclamped, a 5+ card carry stacked bare 8px slivers up past the row seam
+    // into the foundation row — an unreadable venetian-blind pile-up. Worst
+    // case top is now BASE_Y - 2*peek - elevation = 4, so the fan never crosses
+    // the seam and the top tile needs no counterpart drawing at all.
+    const peekSpan = Math.min(floats.length - 1, MAX_PEEK_ITEMS);
+    const raisedY = BASE_Y - peekSpan * STACK_OFFSET_Y_PEEK - CARD_ELEVATION_OFFSET_Y;
+    // Lead (raised) card first: it sits at the bottom of the z-order, under the slivers.
+    drawFaceUpCard(ctx, fx, raisedY, CARD_TABLEAU_W, CARD_TABLEAU_H, floats[0]!, {
+      highlight: "focus",
+    });
+    for (let k = peekSpan - 1; k >= 1; k--) {
+      const card = floats[floats.length - 1 - k]!;
+      drawFaceUpCard(ctx, fx, BASE_Y - k * STACK_OFFSET_Y_PEEK, CARD_TABLEAU_W, CARD_TABLEAU_H, card);
     }
-    ctx.restore();
+    if (floats.length > 1) {
+      // Outline the visible front card too, so destination focus is obvious.
+      drawFaceUpCard(ctx, fx, BASE_Y, CARD_TABLEAU_W, CARD_TABLEAU_H, floats[floats.length - 1]!, {
+        highlight: "focus",
+      });
+    }
   }
 
   return targetCanvas;

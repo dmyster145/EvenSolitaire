@@ -6,7 +6,7 @@ import type { GameState } from "../game/types";
 import { getStored, setStored } from "./local";
 import { error as logError } from "../utils/logger";
 
-const SAVE_KEY = "solitaire_save";
+export const SAVE_KEY = "solitaire_save";
 
 export interface SavePayload {
   game: GameState;

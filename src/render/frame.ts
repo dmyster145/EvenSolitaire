@@ -75,7 +75,7 @@ function skipFloatingSlot(_key: string, val: unknown): unknown {
 }
 
 function topRenderKey(v: TopRowViewModel): string {
-  const hasFloat = v.floatingCard !== null || (v.tableauFloatingCards?.length ?? 0) > 0;
+  const hasFloat = v.floatingCard !== null;
   return hasFloat ? JSON.stringify(v) : JSON.stringify(v, skipFloatingSlot);
 }
 
@@ -387,7 +387,6 @@ function topRowViewFromState(state: AppState, boardCtx: BoardViewContext): TopRo
       f.cards.length >= 2 ? f.cards[f.cards.length - 2]! : null
     );
   }
-  const tableauFloatingCards = hasFloating && focusIdx >= 6 ? floatingCards : undefined;
   return {
     stockCount: pv.stockCount,
     wasteTop: pv.wasteTop,
@@ -398,7 +397,6 @@ function topRowViewFromState(state: AppState, boardCtx: BoardViewContext): TopRo
     floatingCardAtSlot: focusIdx,
     wasteWithoutTop,
     foundationWithoutTop,
-    tableauFloatingCards,
   };
 }
 

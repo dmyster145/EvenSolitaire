@@ -4,14 +4,9 @@
  */
 import {
   VIRTUAL_IMAGE_TOP,
-  VIRTUAL_IMAGE_TABLEAU,
   CARD_TOP_W,
   CARD_TOP_H,
-  CARD_TABLEAU_W,
-  CARD_TABLEAU_H,
   CARD_ELEVATION_OFFSET_Y,
-  STACK_OFFSET_Y_PEEK,
-  FULL_SCREEN_CENTER_Y,
   topRowSlotCenter,
 } from "./layout";
 import { BG_BOARD } from "./palette";
@@ -44,8 +39,6 @@ export interface TopRowViewModel {
   wasteWithoutTop?: Card | null;
   /** When source is foundation and card is floating, show these as foundation tops (card below top or null). */
   foundationWithoutTop?: (Card | null)[];
-  /** Floating cards from tableau that extend into the top canvas (when focus is 6–12). */
-  tableauFloatingCards?: Card[];
 }
 
 export function renderBoardTopToCanvas(
@@ -117,45 +110,6 @@ export function renderBoardTopToCanvas(
     drawFaceUpCard(ctx, fx, fy - CARD_ELEVATION_OFFSET_Y, CARD_TOP_W, CARD_TOP_H, view.floatingCard, {
       highlight: "focus",
     });
-  }
-
-  const tableauFloats = view.tableauFloatingCards ?? [];
-  if (
-    tableauFloats.length > 0 &&
-    slotForFloating >= 6 &&
-    slotForFloating <= 12
-  ) {
-    const TABLEAU_SLOT_STEP = Math.floor(VIRTUAL_IMAGE_TABLEAU.width / 7);
-    const TABLEAU_CARD_X_OFFSET = Math.floor((TABLEAU_SLOT_STEP - CARD_TABLEAU_W) / 2);
-    const TABLEAU_BASE_Y = VIRTUAL_IMAGE_TABLEAU.height - CARD_TABLEAU_H - 2;
-    const col = slotForFloating - 6;
-    const fx = col * TABLEAU_SLOT_STEP + TABLEAU_CARD_X_OFFSET;
-    const baseYScreen = FULL_SCREEN_CENTER_Y + TABLEAU_BASE_Y;
-    const stackOffset = (tableauFloats.length - 1) * STACK_OFFSET_Y_PEEK;
-    const raisedYScreen = baseYScreen - stackOffset - CARD_ELEVATION_OFFSET_Y;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, W, H);
-    ctx.clip();
-    for (let j = 0; j < tableauFloats.length; j++) {
-      const isRaisedCard = j === 0;
-      const isFrontCard = j === tableauFloats.length - 1;
-      const cyScreen = isRaisedCard
-        ? raisedYScreen
-        : baseYScreen - (tableauFloats.length - 1 - j) * STACK_OFFSET_Y_PEEK;
-      const cardBottom = cyScreen + CARD_TABLEAU_H;
-      // Overlap, not containment — the counterpart to the same guard in board-image-tableau.
-      // A carried stack tall enough to rise past the seam is clipped at the tableau tile's top
-      // edge; this draws the remainder in the top tile so the card reads as one piece. Under
-      // containment the minimum cyScreen (100, at a 13-card run) never met the <=96 the guard
-      // demanded, so the block never ran and tall carries were cut off at the seam.
-      if (cardBottom > 0 && cyScreen < H) {
-        drawFaceUpCard(ctx, fx, cyScreen, CARD_TABLEAU_W, CARD_TABLEAU_H, tableauFloats[j]!, {
-          highlight: isRaisedCard || isFrontCard ? "focus" : undefined,
-        });
-      }
-    }
-    ctx.restore();
   }
 
   return targetCanvas;
