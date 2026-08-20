@@ -1,0 +1,595 @@
+2026-08-18T23:10:49.373Z [Perf][Session] start wall=2026-08-18T23:10:49.373Z t=264
+2026-08-18T23:10:49.388Z [Perf][CardAssets] first-suit ms=15.8
+2026-08-18T23:10:49.388Z [Perf][CardAssets] load kind=suit-main name=D ms=15.8 loaded=1/9
+2026-08-18T23:10:49.388Z [Perf][CardAssets] load kind=suit-corner name=S ms=15.8 loaded=2/9
+2026-08-18T23:10:49.389Z [Perf][CardAssets] load kind=suit-main name=S ms=17.1 loaded=3/9
+2026-08-18T23:10:49.389Z [Perf][CardAssets] load kind=suit-main name=C ms=17.1 loaded=4/9
+2026-08-18T23:10:49.389Z [Perf][CardAssets] load kind=suit-main name=H ms=17.2 loaded=5/9
+2026-08-18T23:10:49.389Z [Perf][CardAssets] main-suits-ready ms=17.2
+2026-08-18T23:10:49.392Z [Perf][CardAssets] load kind=suit-corner name=C ms=20.4 loaded=6/9
+2026-08-18T23:10:49.399Z [Perf][CardAssets] load kind=suit-corner name=D ms=27.2 loaded=7/9
+2026-08-18T23:10:49.399Z [Perf][CardAssets] load kind=suit-corner name=H ms=27.3 loaded=8/9
+2026-08-18T23:10:49.399Z [Perf][CardAssets] corner-suits-ready ms=27.4
+2026-08-18T23:10:49.399Z [Perf][CardAssets] suits-ready ms=27.4 main=4/4 corner=4/4 loaded=8/9
+2026-08-18T23:10:49.399Z [Perf][CardAssets] load kind=stock-back name=stock-back ms=27.5 loaded=9/9
+2026-08-18T23:10:49.399Z [Perf][CardAssets] all-ready ms=27.6 main=4/4 corner=4/4 stock=y loaded=9/9
+2026-08-18T23:10:49.465Z [Perf][Frame] render=48.4ms send=0.0ms images=1 tiles=0 failed=0 skipMemo=0 skipInactive=5 skipEmpty=0 remaining=0 aborted=0 text=0 t=308
+2026-08-18T23:10:49.498Z [Perf][Bridge] setupPage=76.2ms ok=1 t=313
+2026-08-18T23:10:49.655Z [Perf][TextSend] container=4 chars=57 ms=122.6 ok=1 t=423
+2026-08-18T23:10:49.802Z [Perf][ImgSend] tile=1 bytes=494 ms=147.4 result=success t=546
+2026-08-18T23:10:50.344Z [Perf][ImgSend] tile=2 bytes=1057 ms=541.6 result=success t=694
+2026-08-18T23:10:50.680Z [Perf][ImgSend] tile=3 bytes=1104 ms=335.1 result=success t=1235
+2026-08-18T23:10:50.680Z [Perf][Frame] render=33.8ms send=1147.5ms images=1 tiles=3 failed=0 skipMemo=0 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 t=389
+2026-08-18T23:10:52.159Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=3050
+2026-08-18T23:10:52.174Z [Perf][KeepAlive][Audio] activated state=running
+2026-08-18T23:10:52.209Z [Perf][KeepAlive][Audio] statechange=running
+2026-08-18T23:10:52.295Z [Perf][TextSend] container=4 chars=57 ms=87.2 ok=1 t=3098
+2026-08-18T23:10:52.295Z [Perf][Frame] render=32.6ms send=87.6ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#1 inputAge=15.4ms t=3066
+2026-08-18T23:10:52.599Z [Perf][ImgSend] tile=1 bytes=420 ms=171.9 result=success t=3318
+2026-08-18T23:10:52.921Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=3812
+2026-08-18T23:10:52.985Z [Perf][ImgSend] tile=2 bytes=1148 ms=385.5 result=success t=3490
+2026-08-18T23:10:52.985Z [Perf][Frame] render=0.2ms send=558.1ms images=1 tiles=2 failed=0 skipMemo=0 skipInactive=2 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#1 inputAge=267.0ms t=3317
+2026-08-18T23:10:53.071Z [Perf][TextSend] container=4 chars=55 ms=61.7 ok=1 t=3900
+2026-08-18T23:10:53.071Z [Perf][Frame] render=24.4ms send=61.9ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#2 inputAge=63.6ms t=3876
+2026-08-18T23:10:53.461Z [Perf][ImgSend] tile=2 bytes=1123 ms=289.5 result=success t=4063
+2026-08-18T23:10:53.462Z [Perf][Frame] render=0.1ms send=289.8ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#2 inputAge=250.5ms t=4063
+2026-08-18T23:10:53.519Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=4410
+2026-08-18T23:10:53.613Z [Perf][TextSend] container=4 chars=55 ms=63.7 ok=1 t=4440
+2026-08-18T23:10:53.613Z [Perf][Frame] render=29.6ms send=63.9ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#3 inputAge=0.1ms t=4410
+2026-08-18T23:10:53.613Z [Perf][Sched] runs=7 avgDelay=9.1ms maxDelay=63.5ms avgRun=339.8ms maxRun=1181.4ms coalesced=0 t=4504
+2026-08-18T23:10:54.000Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=4891
+2026-08-18T23:10:54.063Z [Perf][ImgSend] tile=2 bytes=1119 ms=290.9 result=success t=4663
+2026-08-18T23:10:54.063Z [Perf][BridgeImg] sends=7 avgSend=308.8ms maxSend=541.6ms minSend=147.4ms avgBytes=924 failed=0 t=4954
+2026-08-18T23:10:54.063Z [Perf][BridgeText] sends=4 avgSend=83.8ms maxSend=122.6ms minSend=61.7ms avgBytes=56 failed=0 t=4954
+2026-08-18T23:10:54.063Z [Perf][Frame] render=0.1ms send=291.5ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#3 inputAge=251.9ms t=4662
+2026-08-18T23:10:54.149Z [Perf][TextSend] container=4 chars=52 ms=70.5 ok=1 t=4969
+2026-08-18T23:10:54.149Z [Perf][Frame] render=15.3ms send=70.7ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#4 inputAge=62.2ms t=4954
+2026-08-18T23:10:54.545Z [Perf][ImgSend] tile=2 bytes=1091 ms=293.7 result=success t=5142
+2026-08-18T23:10:54.660Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=5551
+2026-08-18T23:10:54.874Z [Perf][ImgSend] tile=3 bytes=1121 ms=328.8 result=success t=5436
+2026-08-18T23:10:54.874Z [Perf][Frame] render=0.2ms send=623.3ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#4 inputAge=250.2ms t=5142
+2026-08-18T23:10:54.925Z [Perf][PngEncode] label=crop:tile-3-bottom-left size=200x100 qwait=0.2ms toBlob=40.9ms read=8.3ms encode=49.2ms total=49.4ms bytes=1057 pend=1->2
+2026-08-18T23:10:54.935Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=49.3ms toBlob=2.9ms read=7.2ms encode=10.1ms total=59.4ms bytes=1161 pend=2->1
+2026-08-18T23:10:54.991Z [Perf][Frame] render=61.1ms send=55.1ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#5 inputAge=214.0ms t=5765
+2026-08-18T23:10:55.262Z [Perf][ImgSend] tile=2 bytes=1057 ms=270.5 result=success t=5882
+2026-08-18T23:10:55.562Z [Perf][ImgSend] tile=3 bytes=1161 ms=300.4 result=success t=6153
+2026-08-18T23:10:55.562Z [Perf][Frame] render=0.2ms send=571.5ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#5 inputAge=330.4ms t=5882
+2026-08-18T23:10:55.745Z [Perf][Event] kind=sys type=none t=6636
+2026-08-18T23:10:55.783Z [Perf][PngEncodeSummary] n=20 avgBytes=980 avgQwait=6.5ms avgBlob=7.0ms avgRead=6.1ms avgEncode=13.1ms avgTotal=19.6ms maxQwait=49.3ms maxBlob=40.9ms maxRead=13.5ms maxEncode=49.2ms maxTotal=59.4ms slow=2 maxPend=2 labels=crop:tile-3-bottom-left:8,crop:tile-3-bottom-right:8,crop:tile-3-top:4
+2026-08-18T23:10:55.830Z [Perf][Frame] render=35.1ms send=46.5ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#6 inputAge=2.9ms t=6639
+2026-08-18T23:10:56.147Z [Perf][ImgSend] tile=1 bytes=574 ms=145.5 result=success t=6892
+2026-08-18T23:10:56.463Z [Perf][ImgSend] tile=2 bytes=1145 ms=315.8 result=success t=7038
+2026-08-18T23:10:56.704Z [Perf][ImgSend] tile=3 bytes=1022 ms=240.8 result=success t=7354
+2026-08-18T23:10:56.704Z [Perf][Frame] render=0.1ms send=702.8ms images=1 tiles=3 failed=0 skipMemo=0 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#6 inputAge=255.7ms t=6892
+2026-08-18T23:10:57.530Z [Perf][Event] kind=sys type=none t=8420
+2026-08-18T23:10:57.871Z [Perf][ImgSend] tile=1 bytes=556 ms=242.1 result=success t=8520
+2026-08-18T23:10:58.203Z [Perf][ImgSend] tile=2 bytes=1102 ms=331.8 result=success t=8762
+2026-08-18T23:10:58.203Z [Perf][BridgeImg] sends=9 avgSend=274.4ms maxSend=331.8ms minSend=145.5ms avgBytes=981 failed=0 t=9094
+2026-08-18T23:10:58.203Z [Perf][BridgeText] sends=4 avgSend=56.1ms maxSend=70.5ms minSend=46.5ms avgBytes=53 failed=0 t=9094
+2026-08-18T23:10:58.533Z [Perf][ImgSend] tile=3 bytes=1137 ms=329.2 result=success t=9094
+2026-08-18T23:10:58.533Z [Perf][Frame] render=44.3ms send=956.3ms images=1 tiles=3 failed=0 skipMemo=0 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DEST_SELECT#7 inputAge=2.4ms t=8423
+2026-08-18T23:10:58.533Z [Perf][Sched] runs=8 avgDelay=41.1ms maxDelay=214.0ms avgRun=434.5ms maxRun=1002.2ms coalesced=0 t=9424
+2026-08-18T23:11:01.967Z [Perf][Event] kind=sys type=none t=12858
+2026-08-18T23:11:02.071Z [Perf][TextSend] container=4 chars=50 ms=70.1 ok=1 t=12892
+2026-08-18T23:11:02.071Z [Perf][Frame] render=33.1ms send=70.3ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#8 inputAge=0.2ms t=12859
+2026-08-18T23:11:02.553Z [Perf][ImgSend] tile=2 bytes=1192 ms=331.6 result=success t=13112
+2026-08-18T23:11:02.553Z [Perf][BridgeImg] sends=2 avgSend=330.4ms maxSend=331.6ms minSend=329.2ms avgBytes=1165 failed=0 t=13444
+2026-08-18T23:11:02.553Z [Perf][BridgeText] sends=1 avgSend=70.1ms maxSend=70.1ms minSend=70.1ms avgBytes=50 failed=0 t=13444
+2026-08-18T23:11:02.825Z [Perf][ImgSend] tile=3 bytes=1022 ms=271.1 result=success t=13444
+2026-08-18T23:11:02.825Z [Perf][Frame] render=0.2ms send=603.4ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#8 inputAge=253.9ms t=13112
+2026-08-18T23:11:02.825Z [Perf][Sched] runs=2 avgDelay=0.0ms maxDelay=0.0ms avgRun=353.5ms maxRun=603.6ms coalesced=0 t=13716
+2026-08-18T23:11:03.031Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=13922
+2026-08-18T23:11:03.032Z [Perf][Frame] render=0.2ms send=0.0ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#9 inputAge=0.1ms t=13922
+2026-08-18T23:11:03.283Z [Perf][Frame] render=0.3ms send=0.1ms images=1 tiles=0 failed=0 skipMemo=3 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#9 inputAge=251.1ms t=14173
+2026-08-18T23:11:06.164Z [Perf][Event] kind=sys type=none t=17055
+2026-08-18T23:11:06.274Z [Perf][TextSend] container=4 chars=63 ms=80.5 ok=1 t=17084
+2026-08-18T23:11:06.542Z [Perf][ImgSend] tile=2 bytes=1187 ms=268.6 result=success t=17165
+2026-08-18T23:11:06.781Z [Perf][ImgSend] tile=3 bytes=1046 ms=238.7 result=success t=17434
+2026-08-18T23:11:06.781Z [Perf][BridgeImg] sends=3 avgSend=259.5ms maxSend=271.1ms minSend=238.7ms avgBytes=1085 failed=0 t=17672
+2026-08-18T23:11:06.781Z [Perf][BridgeText] sends=1 avgSend=80.5ms maxSend=80.5ms minSend=80.5ms avgBytes=63 failed=0 t=17672
+2026-08-18T23:11:06.782Z [Perf][Frame] render=28.2ms send=588.7ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DEST_SELECT#10 inputAge=0.6ms t=17056
+2026-08-18T23:11:07.699Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=18589
+2026-08-18T23:11:07.799Z [Perf][TextSend] container=4 chars=55 ms=69.6 ok=1 t=18621
+2026-08-18T23:11:07.799Z [Perf][Frame] render=30.8ms send=69.7ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#11 inputAge=0.1ms t=18590
+2026-08-18T23:11:07.799Z [Perf][Sched] runs=4 avgDelay=0.0ms maxDelay=0.0ms avgRun=179.8ms maxRun=617.0ms coalesced=0 t=18690
+2026-08-18T23:11:08.224Z [Perf][ImgSend] tile=2 bytes=1175 ms=272.6 result=success t=18842
+2026-08-18T23:11:08.224Z [Perf][Frame] render=0.2ms send=272.8ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#11 inputAge=252.0ms t=18842
+2026-08-18T23:11:09.348Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=20239
+2026-08-18T23:11:09.454Z [Perf][TextSend] container=4 chars=53 ms=76.0 ok=1 t=20269
+2026-08-18T23:11:09.454Z [Perf][Frame] render=29.7ms send=76.2ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#12 inputAge=0.0ms t=20239
+2026-08-18T23:11:09.932Z [Perf][ImgSend] tile=2 bytes=1138 ms=330.9 result=success t=20492
+2026-08-18T23:11:10.203Z [Perf][ImgSend] tile=3 bytes=1088 ms=271.3 result=success t=20823
+2026-08-18T23:11:10.203Z [Perf][Frame] render=0.2ms send=603.0ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#12 inputAge=251.9ms t=20491
+2026-08-18T23:11:11.102Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=21993
+2026-08-18T23:11:11.222Z [Perf][TextSend] container=4 chars=57 ms=98.5 ok=1 t=22014
+2026-08-18T23:11:11.222Z [Perf][BridgeImg] sends=3 avgSend=291.6ms maxSend=330.9ms minSend=271.3ms avgBytes=1134 failed=0 t=22113
+2026-08-18T23:11:11.222Z [Perf][BridgeText] sends=3 avgSend=81.4ms maxSend=98.5ms minSend=69.6ms avgBytes=55 failed=0 t=22113
+2026-08-18T23:11:11.222Z [Perf][Frame] render=20.4ms send=98.8ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#13 inputAge=0.1ms t=21993
+2026-08-18T23:11:11.614Z [Perf][ImgSend] tile=2 bytes=1107 ms=260.1 result=success t=22245
+2026-08-18T23:11:11.820Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=22711
+2026-08-18T23:11:11.887Z [Perf][ImgSend] tile=3 bytes=1137 ms=272.6 result=success t=22505
+2026-08-18T23:11:11.887Z [Perf][Frame] render=0.2ms send=533.4ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#13 inputAge=251.3ms t=22245
+2026-08-18T23:11:11.887Z [Perf][Sched] runs=5 avgDelay=0.0ms maxDelay=0.0ms avgRun=327.0ms maxRun=603.3ms coalesced=0 t=22778
+2026-08-18T23:11:11.971Z [Perf][TextSend] container=4 chars=59 ms=62.3 ok=1 t=22799
+2026-08-18T23:11:11.971Z [Perf][Frame] render=21.0ms send=62.5ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#14 inputAge=66.9ms t=22778
+2026-08-18T23:11:12.303Z [Perf][ImgSend] tile=3 bytes=1126 ms=232.2 result=success t=22962
+2026-08-18T23:11:12.303Z [Perf][Frame] render=0.2ms send=232.4ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#14 inputAge=250.3ms t=22962
+2026-08-18T23:11:12.739Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=23630
+2026-08-18T23:11:12.841Z [Perf][TextSend] container=4 chars=53 ms=73.9 ok=1 t=23658
+2026-08-18T23:11:12.841Z [Perf][Frame] render=27.3ms send=74.2ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#15 inputAge=0.0ms t=23630
+2026-08-18T23:11:13.293Z [Perf][ImgSend] tile=3 bytes=1120 ms=301.9 result=success t=23882
+2026-08-18T23:11:13.293Z [Perf][Frame] render=0.1ms send=302.2ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#15 inputAge=251.7ms t=23882
+2026-08-18T23:11:13.967Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=24858
+2026-08-18T23:11:14.007Z [Perf][PngEncodeSummary] n=20 avgBytes=1059 avgQwait=7.4ms avgBlob=7.5ms avgRead=5.0ms avgEncode=12.5ms avgTotal=19.9ms maxQwait=22.0ms maxBlob=17.6ms maxRead=6.6ms maxEncode=21.8ms maxTotal=29.7ms slow=0 maxPend=2 labels=crop:tile-3-bottom-left:9,crop:tile-3-bottom-right:9,crop:tile-3-top:2
+2026-08-18T23:11:14.073Z [Perf][TextSend] container=4 chars=57 ms=65.9 ok=1 t=24898
+2026-08-18T23:11:14.073Z [Perf][Frame] render=39.3ms send=66.2ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#16 inputAge=0.1ms t=24858
+2026-08-18T23:11:14.379Z [Perf][ImgSend] tile=1 bytes=632 ms=159.4 result=success t=25111
+2026-08-18T23:11:14.670Z [Perf][ImgSend] tile=3 bytes=1046 ms=290.9 result=success t=25270
+2026-08-18T23:11:14.670Z [Perf][Frame] render=0.2ms send=450.6ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#16 inputAge=252.1ms t=25110
+2026-08-18T23:11:17.028Z [Perf][Event] kind=sys type=none t=27918
+2026-08-18T23:11:17.105Z [Perf][BridgeImg] sends=6 avgSend=252.8ms maxSend=301.9ms minSend=159.4ms avgBytes=1028 failed=0 t=27996
+2026-08-18T23:11:17.105Z [Perf][BridgeText] sends=4 avgSend=63.6ms maxSend=73.9ms minSend=52.4ms avgBytes=57 failed=0 t=27996
+2026-08-18T23:11:17.281Z [Perf][ImgSend] tile=1 bytes=783 ms=176.1 result=success t=27996
+2026-08-18T23:11:17.281Z [Perf][Frame] render=24.2ms send=228.8ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DRAW_STOCK#17 inputAge=0.3ms t=27919
+2026-08-18T23:11:17.281Z [Perf][Sched] runs=7 avgDelay=9.6ms maxDelay=66.9ms avgRun=218.5ms maxRun=450.9ms coalesced=0 t=28172
+2026-08-18T23:11:19.927Z [Perf][Event] kind=sys type=none t=30818
+2026-08-18T23:11:20.011Z [Perf][TextSend] container=4 chars=57 ms=62.0 ok=1 t=30840
+2026-08-18T23:11:20.253Z [Perf][ImgSend] tile=1 bytes=780 ms=241.6 result=success t=30902
+2026-08-18T23:11:20.253Z [Perf][Frame] render=21.2ms send=304.1ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DRAW_STOCK#18 inputAge=0.7ms t=30819
+2026-08-18T23:11:22.534Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=33425
+2026-08-18T23:11:22.652Z [Perf][TextSend] container=4 chars=55 ms=93.9 ok=1 t=33449
+2026-08-18T23:11:22.652Z [Perf][BridgeImg] sends=2 avgSend=208.8ms maxSend=241.6ms minSend=176.1ms avgBytes=782 failed=0 t=33543
+2026-08-18T23:11:22.652Z [Perf][BridgeText] sends=2 avgSend=78.0ms maxSend=93.9ms minSend=62.0ms avgBytes=56 failed=0 t=33543
+2026-08-18T23:11:22.652Z [Perf][Frame] render=23.9ms send=94.2ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#19 inputAge=0.0ms t=33425
+2026-08-18T23:11:22.652Z [Perf][Sched] runs=2 avgDelay=0.0ms maxDelay=0.0ms avgRun=221.8ms maxRun=325.4ms coalesced=0 t=33543
+2026-08-18T23:11:22.979Z [Perf][ImgSend] tile=1 bytes=784 ms=192.9 result=success t=33677
+2026-08-18T23:11:22.979Z [Perf][Frame] render=0.2ms send=193.1ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#19 inputAge=251.3ms t=33676
+2026-08-18T23:11:23.779Z [Perf][Event] kind=sys type=none t=34670
+2026-08-18T23:11:23.881Z [Perf][Frame] render=44.4ms send=56.9ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#20 inputAge=0.1ms t=34670
+2026-08-18T23:11:24.245Z [Perf][ImgSend] tile=1 bytes=782 ms=213.4 result=success t=34923
+2026-08-18T23:11:24.481Z [Perf][ImgSend] tile=3 bytes=1154 ms=235.7 result=success t=35136
+2026-08-18T23:11:24.481Z [Perf][Frame] render=0.1ms send=449.6ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#20 inputAge=252.4ms t=34923
+2026-08-18T23:11:25.953Z [Perf][Event] kind=sys type=none t=36844
+2026-08-18T23:11:26.071Z [Perf][TextSend] container=4 chars=71 ms=68.9 ok=1 t=36893
+2026-08-18T23:11:26.251Z [Perf][ImgSend] tile=1 bytes=724 ms=180.1 result=success t=36962
+2026-08-18T23:11:26.493Z [Perf][ImgSend] tile=3 bytes=1115 ms=242.1 result=success t=37142
+2026-08-18T23:11:26.493Z [Perf][Frame] render=47.4ms send=491.8ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DEST_SELECT#21 inputAge=0.6ms t=36845
+2026-08-18T23:11:35.115Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=46006
+2026-08-18T23:11:35.190Z [Perf][BridgeImg] sends=5 avgSend=212.8ms maxSend=242.1ms minSend=180.1ms avgBytes=912 failed=0 t=46081
+2026-08-18T23:11:35.190Z [Perf][BridgeText] sends=3 avgSend=57.4ms maxSend=68.9ms minSend=46.4ms avgBytes=61 failed=0 t=46081
+2026-08-18T23:11:35.190Z [Perf][Frame] render=28.8ms send=46.6ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#22 inputAge=0.1ms t=46006
+2026-08-18T23:11:35.191Z [Perf][Sched] runs=5 avgDelay=0.0ms maxDelay=0.0ms avgRun=271.9ms maxRun=539.3ms coalesced=0 t=46082
+2026-08-18T23:11:35.672Z [Perf][ImgSend] tile=2 bytes=1138 ms=304.8 result=success t=46258
+2026-08-18T23:11:35.942Z [Perf][ImgSend] tile=3 bytes=1085 ms=269.6 result=success t=46563
+2026-08-18T23:11:35.942Z [Perf][Frame] render=0.2ms send=574.8ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#22 inputAge=251.8ms t=46258
+2026-08-18T23:11:37.473Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=48364
+2026-08-18T23:11:37.511Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=24.9ms toBlob=2.5ms read=7.9ms encode=10.5ms total=35.4ms bytes=1068 pend=2->1
+2026-08-18T23:11:37.618Z [Perf][TextSend] container=4 chars=55 ms=107.4 ok=1 t=48402
+2026-08-18T23:11:37.619Z [Perf][Frame] render=37.6ms send=107.5ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#23 inputAge=0.0ms t=48365
+2026-08-18T23:11:37.888Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=48779
+2026-08-18T23:11:38.015Z [Perf][ImgSend] tile=2 bytes=1175 ms=288.5 result=success t=48617
+2026-08-18T23:11:38.015Z [Perf][Frame] render=0.2ms send=288.7ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#23 inputAge=252.3ms t=48617
+2026-08-18T23:11:38.100Z [Perf][Frame] render=28.6ms send=56.7ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#24 inputAge=126.3ms t=48906
+2026-08-18T23:11:38.401Z [Perf][ImgSend] tile=2 bytes=1187 ms=262.0 result=success t=49030
+2026-08-18T23:11:38.671Z [Perf][ImgSend] tile=3 bytes=1068 ms=269.1 result=success t=49292
+2026-08-18T23:11:38.671Z [Perf][Frame] render=0.1ms send=531.6ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#24 inputAge=250.3ms t=49030
+2026-08-18T23:11:50.550Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=61441
+2026-08-18T23:11:50.710Z [Perf][TextSend] container=4 chars=57 ms=141.0 ok=1 t=61460
+2026-08-18T23:11:50.710Z [Perf][BridgeImg] sends=5 avgSend=278.8ms maxSend=304.8ms minSend=262.0ms avgBytes=1131 failed=0 t=61601
+2026-08-18T23:11:50.710Z [Perf][BridgeText] sends=3 avgSend=101.7ms maxSend=141.0ms minSend=56.6ms avgBytes=58 failed=0 t=61601
+2026-08-18T23:11:50.710Z [Perf][Frame] render=18.5ms send=141.3ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#25 inputAge=0.0ms t=61441
+2026-08-18T23:11:50.710Z [Perf][Sched] runs=6 avgDelay=21.0ms maxDelay=126.1ms avgRun=297.7ms maxRun=575.0ms coalesced=0 t=61601
+2026-08-18T23:11:51.090Z [Perf][ImgSend] tile=2 bytes=1189 ms=288.6 result=success t=61692
+2026-08-18T23:11:51.090Z [Perf][Frame] render=0.2ms send=288.8ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#25 inputAge=251.1ms t=61692
+2026-08-18T23:11:52.037Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=62928
+2026-08-18T23:11:52.077Z [Perf][PngEncodeSummary] n=20 avgBytes=1014 avgQwait=5.3ms avgBlob=8.5ms avgRead=6.3ms avgEncode=14.7ms avgTotal=20.0ms maxQwait=24.9ms maxBlob=18.4ms maxRead=9.6ms maxEncode=26.4ms maxTotal=35.4ms slow=1 maxPend=2 labels=crop:tile-3-bottom-left:7,crop:tile-3-bottom-right:7,crop:tile-3-top:6
+2026-08-18T23:11:52.141Z [Perf][TextSend] container=4 chars=54 ms=64.1 ok=1 t=62968
+2026-08-18T23:11:52.141Z [Perf][Frame] render=40.0ms send=64.2ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#26 inputAge=0.0ms t=62928
+2026-08-18T23:11:52.471Z [Perf][ImgSend] tile=1 bytes=782 ms=180.0 result=success t=63182
+2026-08-18T23:11:52.773Z [Perf][ImgSend] tile=2 bytes=1107 ms=302.1 result=success t=63362
+2026-08-18T23:11:52.773Z [Perf][Frame] render=0.1ms send=482.6ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#26 inputAge=253.5ms t=63181
+2026-08-18T23:11:55.011Z [Perf][Event] kind=sys type=none t=65902
+2026-08-18T23:11:55.057Z [Perf][Frame] render=46.4ms send=0.1ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#27 inputAge=0.0ms t=65902
+2026-08-18T23:11:55.057Z [Perf][Sched] runs=4 avgDelay=0.0ms maxDelay=0.0ms avgRun=230.7ms maxRun=482.8ms coalesced=0 t=65948
+2026-08-18T23:11:55.438Z [Perf][ImgSend] tile=1 bytes=821 ms=175.1 result=success t=66154
+2026-08-18T23:11:55.438Z [Perf][BridgeImg] sends=4 avgSend=236.5ms maxSend=302.1ms minSend=175.1ms avgBytes=975 failed=0 t=66330
+2026-08-18T23:11:55.438Z [Perf][BridgeText] sends=1 avgSend=64.1ms maxSend=64.1ms minSend=64.1ms avgBytes=54 failed=0 t=66330
+2026-08-18T23:11:55.439Z [Perf][Frame] render=0.0ms send=175.4ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#27 inputAge=252.4ms t=66154
+2026-08-18T23:11:56.685Z [Perf][Event] kind=sys type=DOUBLE_CLICK_EVENT t=67576
+2026-08-18T23:11:56.716Z [Perf][Frame] render=30.5ms send=0.0ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=0 input=CANCEL_SELECTION#28 inputAge=0.0ms t=67576
+2026-08-18T23:11:57.094Z [Perf][ImgSend] tile=1 bytes=782 ms=157.9 result=success t=67827
+2026-08-18T23:11:57.094Z [Perf][Frame] render=0.1ms send=158.0ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=CANCEL_SELECTION#28 inputAge=251.3ms t=67827
+2026-08-18T23:11:57.241Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=68132
+2026-08-18T23:11:57.298Z [Perf][Frame] render=13.3ms send=43.2ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#29 inputAge=0.1ms t=68132
+2026-08-18T23:11:57.658Z [Perf][ImgSend] tile=1 bytes=779 ms=166.2 result=success t=68383
+2026-08-18T23:11:57.658Z [Perf][Frame] render=0.1ms send=166.3ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#29 inputAge=250.8ms t=68383
+2026-08-18T23:11:58.994Z [Perf][Event] kind=sys type=none t=69885
+2026-08-18T23:11:59.279Z [Perf][ImgSend] tile=1 bytes=803 ms=209.7 result=success t=69960
+2026-08-18T23:11:59.279Z [Perf][Frame] render=15.5ms send=269.2ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DRAW_STOCK#30 inputAge=0.2ms t=69885
+2026-08-18T23:11:59.279Z [Perf][Sched] runs=6 avgDelay=0.0ms maxDelay=0.1ms avgRun=145.4ms maxRun=284.8ms coalesced=0 t=70170
+2026-08-18T23:12:01.336Z [Perf][Event] kind=sys type=none t=72227
+2026-08-18T23:12:01.411Z [Perf][BridgeImg] sends=3 avgSend=177.9ms maxSend=209.7ms minSend=157.9ms avgBytes=788 failed=0 t=72302
+2026-08-18T23:12:01.411Z [Perf][BridgeText] sends=3 avgSend=52.0ms maxSend=59.1ms minSend=43.2ms avgBytes=57 failed=0 t=72302
+2026-08-18T23:12:01.591Z [Perf][ImgSend] tile=1 bytes=789 ms=179.7 result=success t=72302
+2026-08-18T23:12:01.591Z [Perf][Frame] render=20.5ms send=234.2ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DRAW_STOCK#31 inputAge=0.2ms t=72228
+2026-08-18T23:12:04.128Z [Perf][Event] kind=sys type=none t=75019
+2026-08-18T23:12:04.232Z [Perf][TextSend] container=4 chars=56 ms=78.9 ok=1 t=75044
+2026-08-18T23:12:04.412Z [Perf][ImgSend] tile=1 bytes=786 ms=180.1 result=success t=75123
+2026-08-18T23:12:04.412Z [Perf][Frame] render=24.1ms send=259.4ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DRAW_STOCK#32 inputAge=0.3ms t=75020
+2026-08-18T23:12:04.412Z [Perf][Sched] runs=2 avgDelay=0.0ms maxDelay=0.0ms avgRun=269.2ms maxRun=283.6ms coalesced=0 t=75303
+2026-08-18T23:12:05.956Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=76847
+2026-08-18T23:12:06.030Z [Perf][BridgeImg] sends=2 avgSend=179.9ms maxSend=180.1ms minSend=179.7ms avgBytes=788 failed=0 t=76921
+2026-08-18T23:12:06.030Z [Perf][BridgeText] sends=2 avgSend=69.3ms maxSend=78.9ms minSend=59.6ms avgBytes=54 failed=0 t=76921
+2026-08-18T23:12:06.030Z [Perf][Frame] render=14.5ms send=60.0ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#33 inputAge=0.1ms t=76847
+2026-08-18T23:12:06.391Z [Perf][ImgSend] tile=1 bytes=781 ms=184.3 result=success t=77098
+2026-08-18T23:12:06.391Z [Perf][Frame] render=0.1ms send=184.8ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#33 inputAge=251.0ms t=77098
+2026-08-18T23:12:07.039Z [Perf][Event] kind=sys type=none t=77930
+2026-08-18T23:12:07.142Z [Perf][Frame] render=42.8ms send=59.8ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#34 inputAge=0.1ms t=77930
+2026-08-18T23:12:07.474Z [Perf][ImgSend] tile=1 bytes=800 ms=182.5 result=success t=78183
+2026-08-18T23:12:07.743Z [Perf][ImgSend] tile=3 bytes=1175 ms=268.7 result=success t=78365
+2026-08-18T23:12:07.743Z [Perf][Frame] render=0.2ms send=451.7ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#34 inputAge=252.5ms t=78182
+2026-08-18T23:12:08.478Z [Perf][Event] kind=sys type=DOUBLE_CLICK_EVENT t=79368
+2026-08-18T23:12:08.581Z [Perf][TextSend] container=4 chars=51 ms=60.8 ok=1 t=79411
+2026-08-18T23:12:08.581Z [Perf][Frame] render=42.6ms send=61.0ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=CANCEL_SELECTION#35 inputAge=0.0ms t=79369
+2026-08-18T23:12:08.581Z [Perf][Sched] runs=5 avgDelay=0.0ms maxDelay=0.0ms avgRun=183.5ms maxRun=451.9ms coalesced=0 t=79472
+2026-08-18T23:12:08.911Z [Perf][ImgSend] tile=1 bytes=781 ms=181.4 result=success t=79621
+2026-08-18T23:12:08.941Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=79832
+2026-08-18T23:12:09.215Z [Perf][ImgSend] tile=3 bytes=1068 ms=303.4 result=success t=79803
+2026-08-18T23:12:09.215Z [Perf][Frame] render=0.1ms send=485.4ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=CANCEL_SELECTION#35 inputAge=252.0ms t=79621
+2026-08-18T23:12:09.300Z [Perf][TextSend] container=4 chars=56 ms=66.7 ok=1 t=80124
+2026-08-18T23:12:09.329Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=80220
+2026-08-18T23:12:09.545Z [Perf][ImgSend] tile=1 bytes=786 ms=244.8 result=success t=80191
+2026-08-18T23:12:09.545Z [Perf][Frame] render=18.0ms send=312.1ms images=1 tiles=1 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=1 text=1 input=FOCUS_MOVE#36 inputAge=273.7ms t=80106
+2026-08-18T23:12:09.577Z [Perf][PngEncodeSummary] n=20 avgBytes=926 avgQwait=2.3ms avgBlob=8.6ms avgRead=5.4ms avgEncode=14.0ms avgTotal=16.3ms maxQwait=14.9ms maxBlob=15.1ms maxRead=6.9ms maxEncode=20.7ms maxTotal=22.9ms slow=0 maxPend=2 labels=crop:tile-3-top:11,crop:tile-3-bottom-left:5,crop:tile-3-bottom-right:4
+2026-08-18T23:12:09.662Z [Perf][TextSend] container=4 chars=53 ms=76.7 ok=1 t=80476
+2026-08-18T23:12:09.662Z [Perf][Frame] render=40.0ms send=76.8ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#37 inputAge=216.1ms t=80436
+2026-08-18T23:12:09.692Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=80583
+2026-08-18T23:12:09.877Z [Perf][ImgSend] tile=1 bytes=694 ms=214.5 result=success t=80553
+2026-08-18T23:12:09.877Z [Perf][Frame] render=0.1ms send=214.7ms images=1 tiles=1 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#37 inputAge=333.0ms t=80553
+2026-08-18T23:12:09.960Z [Perf][Frame] render=31.3ms send=51.6ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#38 inputAge=185.2ms t=80768
+2026-08-18T23:12:10.265Z [Perf][ImgSend] tile=3 bytes=1113 ms=303.8 result=success t=80852
+2026-08-18T23:12:10.265Z [Perf][BridgeImg] sends=8 avgSend=235.4ms maxSend=303.8ms minSend=181.4ms avgBytes=900 failed=0 t=81156
+2026-08-18T23:12:10.265Z [Perf][BridgeText] sends=5 avgSend=63.1ms maxSend=76.7ms minSend=51.6ms avgBytes=57 failed=0 t=81156
+2026-08-18T23:12:10.265Z [Perf][Frame] render=0.1ms send=304.2ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#38 inputAge=268.5ms t=80851
+2026-08-18T23:12:12.109Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=82999
+2026-08-18T23:12:12.212Z [Perf][TextSend] container=4 chars=71 ms=76.8 ok=1 t=83026
+2026-08-18T23:12:12.212Z [Perf][Frame] render=26.3ms send=77.0ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#39 inputAge=0.0ms t=83000
+2026-08-18T23:12:12.664Z [Perf][ImgSend] tile=3 bytes=1115 ms=303.1 result=success t=83252
+2026-08-18T23:12:12.664Z [Perf][Frame] render=0.1ms send=303.4ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#39 inputAge=252.2ms t=83252
+2026-08-18T23:12:12.664Z [Perf][Sched] runs=8 avgDelay=95.3ms maxDelay=273.7ms avgRun=242.8ms maxRun=485.6ms coalesced=1 t=83555
+2026-08-18T23:12:16.337Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=87228
+2026-08-18T23:12:16.440Z [Perf][TextSend] container=4 chars=59 ms=70.4 ok=1 t=87261
+2026-08-18T23:12:16.440Z [Perf][BridgeImg] sends=1 avgSend=303.1ms maxSend=303.1ms minSend=303.1ms avgBytes=1115 failed=0 t=87331
+2026-08-18T23:12:16.440Z [Perf][BridgeText] sends=2 avgSend=73.6ms maxSend=76.8ms minSend=70.4ms avgBytes=65 failed=0 t=87331
+2026-08-18T23:12:16.440Z [Perf][Frame] render=32.2ms send=70.6ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#40 inputAge=0.0ms t=87228
+2026-08-18T23:12:16.893Z [Perf][ImgSend] tile=3 bytes=1113 ms=303.0 result=success t=87480
+2026-08-18T23:12:16.893Z [Perf][Frame] render=0.1ms send=303.3ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#40 inputAge=251.9ms t=87480
+2026-08-18T23:12:16.893Z [Perf][Sched] runs=2 avgDelay=0.0ms maxDelay=0.0ms avgRun=203.2ms maxRun=303.4ms coalesced=0 t=87784
+2026-08-18T23:12:16.979Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=87870
+2026-08-18T23:12:17.101Z [Perf][TextSend] container=4 chars=53 ms=93.8 ok=1 t=87899
+2026-08-18T23:12:17.101Z [Perf][Frame] render=28.4ms send=93.9ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#41 inputAge=0.1ms t=87870
+2026-08-18T23:12:17.555Z [Perf][ImgSend] tile=3 bytes=1121 ms=324.2 result=success t=88122
+2026-08-18T23:12:17.555Z [Perf][Frame] render=0.1ms send=324.7ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#41 inputAge=251.7ms t=88122
+2026-08-18T23:12:18.438Z [Perf][Event] kind=sys type=none t=89329
+2026-08-18T23:12:18.541Z [Perf][TextSend] container=4 chars=55 ms=72.0 ok=1 t=89360
+2026-08-18T23:12:18.541Z [Perf][Frame] render=30.6ms send=72.2ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#42 inputAge=0.0ms t=89330
+2026-08-18T23:12:19.116Z [Perf][ImgSend] tile=3 bytes=1151 ms=425.2 result=success t=89581
+2026-08-18T23:12:19.116Z [Perf][Frame] render=0.1ms send=425.6ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#42 inputAge=251.7ms t=89581
+2026-08-18T23:12:20.028Z [Perf][Event] kind=sys type=DOUBLE_CLICK_EVENT t=90919
+2026-08-18T23:12:20.191Z [Perf][TextSend] container=4 chars=53 ms=133.6 ok=1 t=90948
+2026-08-18T23:12:20.191Z [Perf][Frame] render=28.9ms send=133.8ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=CANCEL_SELECTION#43 inputAge=0.0ms t=90919
+2026-08-18T23:12:20.615Z [Perf][ImgSend] tile=3 bytes=1121 ms=335.2 result=success t=91171
+2026-08-18T23:12:20.616Z [Perf][BridgeImg] sends=4 avgSend=346.9ms maxSend=425.2ms minSend=303.0ms avgBytes=1127 failed=0 t=91507
+2026-08-18T23:12:20.616Z [Perf][BridgeText] sends=3 avgSend=99.8ms maxSend=133.6ms minSend=72.0ms avgBytes=54 failed=0 t=91507
+2026-08-18T23:12:20.616Z [Perf][Frame] render=0.1ms send=335.5ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=CANCEL_SELECTION#43 inputAge=251.7ms t=91171
+2026-08-18T23:12:20.702Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=91593
+2026-08-18T23:12:20.852Z [Perf][TextSend] container=4 chars=56 ms=106.8 ok=1 t=91636
+2026-08-18T23:12:20.852Z [Perf][Frame] render=42.8ms send=107.0ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#44 inputAge=0.0ms t=91593
+2026-08-18T23:12:21.149Z [Perf][ImgSend] tile=1 bytes=786 ms=194.9 result=success t=91845
+2026-08-18T23:12:21.485Z [Perf][ImgSend] tile=3 bytes=1068 ms=335.3 result=success t=92040
+2026-08-18T23:12:21.485Z [Perf][Frame] render=0.1ms send=530.7ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#44 inputAge=251.9ms t=91845
+2026-08-18T23:12:21.485Z [Perf][Sched] runs=8 avgDelay=0.0ms maxDelay=0.1ms avgRun=269.4ms maxRun=530.8ms coalesced=0 t=92376
+2026-08-18T23:12:21.919Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=92810
+2026-08-18T23:12:21.991Z [Perf][Frame] render=20.9ms send=51.0ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#45 inputAge=0.0ms t=92810
+2026-08-18T23:12:22.386Z [Perf][ImgSend] tile=1 bytes=781 ms=215.2 result=success t=93061
+2026-08-18T23:12:22.386Z [Perf][Frame] render=0.1ms send=215.4ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#45 inputAge=251.4ms t=93061
+2026-08-18T23:12:23.446Z [Perf][Event] kind=sys type=none t=94337
+2026-08-18T23:12:23.485Z [Perf][PngEncodeSummary] n=20 avgBytes=1066 avgQwait=7.6ms avgBlob=7.4ms avgRead=6.2ms avgEncode=13.7ms avgTotal=21.3ms maxQwait=23.1ms maxBlob=16.7ms maxRead=7.3ms maxEncode=22.4ms maxTotal=30.4ms slow=0 maxPend=2 labels=crop:tile-3-bottom-right:9,crop:tile-3-bottom-left:8,crop:tile-3-top:3
+2026-08-18T23:12:23.552Z [Perf][TextSend] container=4 chars=68 ms=66.7 ok=1 t=94376
+2026-08-18T23:12:23.552Z [Perf][Frame] render=39.2ms send=66.9ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#46 inputAge=0.0ms t=94337
+2026-08-18T23:12:23.916Z [Perf][ImgSend] tile=1 bytes=800 ms=218.2 result=success t=94589
+2026-08-18T23:12:24.337Z [Perf][ImgSend] tile=3 bytes=1175 ms=420.8 result=success t=94807
+2026-08-18T23:12:24.337Z [Perf][Frame] render=0.3ms send=639.4ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#46 inputAge=251.8ms t=94589
+2026-08-18T23:12:25.307Z [Perf][Event] kind=sys type=none t=96198
+2026-08-18T23:12:25.410Z [Perf][TextSend] container=4 chars=81 ms=60.3 ok=1 t=96241
+2026-08-18T23:12:25.410Z [Perf][BridgeImg] sends=5 avgSend=276.9ms maxSend=420.8ms minSend=194.9ms avgBytes=922 failed=0 t=96301
+2026-08-18T23:12:25.411Z [Perf][BridgeText] sends=4 avgSend=71.2ms maxSend=106.8ms minSend=51.0ms avgBytes=64 failed=0 t=96301
+2026-08-18T23:12:25.568Z [Perf][ImgSend] tile=1 bytes=713 ms=157.2 result=success t=96302
+2026-08-18T23:12:25.925Z [Perf][ImgSend] tile=3 bytes=1152 ms=356.5 result=success t=96459
+2026-08-18T23:12:25.925Z [Perf][Frame] render=42.6ms send=574.7ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DEST_SELECT#47 inputAge=0.1ms t=96198
+2026-08-18T23:12:25.925Z [Perf][Sched] runs=5 avgDelay=0.0ms maxDelay=0.0ms avgRun=330.2ms maxRun=639.7ms coalesced=0 t=96816
+2026-08-18T23:12:26.285Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=97176
+2026-08-18T23:12:26.430Z [Perf][TextSend] container=4 chars=53 ms=108.8 ok=1 t=97212
+2026-08-18T23:12:26.430Z [Perf][Frame] render=35.7ms send=109.0ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#48 inputAge=0.0ms t=97176
+2026-08-18T23:12:26.793Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=97684
+2026-08-18T23:12:26.855Z [Perf][ImgSend] tile=2 bytes=1139 ms=317.6 result=success t=97428
+2026-08-18T23:12:26.855Z [Perf][Frame] render=0.2ms send=317.9ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#48 inputAge=251.5ms t=97428
+2026-08-18T23:12:27.063Z [Perf][TextSend] container=4 chars=54 ms=179.0 ok=1 t=97775
+2026-08-18T23:12:27.063Z [Perf][Frame] render=29.1ms send=179.2ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#49 inputAge=61.8ms t=97746
+2026-08-18T23:12:27.335Z [Perf][ImgSend] tile=2 bytes=1176 ms=271.6 result=success t=97954
+2026-08-18T23:12:27.347Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=98238
+2026-08-18T23:12:27.813Z [Perf][ImgSend] tile=3 bytes=1069 ms=477.7 result=success t=98226
+2026-08-18T23:12:27.813Z [Perf][Frame] render=0.1ms send=749.8ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#49 inputAge=270.2ms t=97954
+2026-08-18T23:12:27.932Z [Perf][TextSend] container=4 chars=63 ms=87.7 ok=1 t=98735
+2026-08-18T23:12:28.235Z [Perf][ImgSend] tile=2 bytes=1188 ms=303.3 result=success t=98823
+2026-08-18T23:12:28.236Z [Perf][Frame] render=31.1ms send=391.5ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#50 inputAge=465.6ms t=98704
+2026-08-18T23:12:29.448Z [Perf][Event] kind=sys type=none t=100339
+2026-08-18T23:12:29.557Z [Perf][TextSend] container=4 chars=65 ms=79.4 ok=1 t=100369
+2026-08-18T23:12:29.558Z [Perf][BridgeImg] sends=6 avgSend=314.0ms maxSend=477.7ms minSend=157.2ms avgBytes=1073 failed=0 t=100449
+2026-08-18T23:12:29.558Z [Perf][BridgeText] sends=4 avgSend=113.7ms maxSend=179.0ms minSend=79.4ms avgBytes=59 failed=0 t=100449
+2026-08-18T23:12:29.558Z [Perf][Frame] render=29.6ms send=79.7ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#51 inputAge=0.0ms t=100339
+2026-08-18T23:12:30.007Z [Perf][ImgSend] tile=2 bytes=1198 ms=306.6 result=success t=100591
+2026-08-18T23:12:30.007Z [Perf][Frame] render=0.1ms send=307.0ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#51 inputAge=251.6ms t=100591
+2026-08-18T23:12:30.007Z [Perf][Sched] runs=7 avgDelay=78.2ms maxDelay=465.5ms avgRun=322.9ms maxRun=749.9ms coalesced=1 t=100898
+2026-08-18T23:12:30.524Z [Perf][Event] kind=sys type=DOUBLE_CLICK_EVENT t=101415
+2026-08-18T23:12:30.600Z [Perf][Frame] render=19.4ms send=55.7ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=CANCEL_SELECTION#52 inputAge=0.0ms t=101415
+2026-08-18T23:12:31.051Z [Perf][ImgSend] tile=2 bytes=1188 ms=274.7 result=success t=101667
+2026-08-18T23:12:31.051Z [Perf][Frame] render=0.1ms send=274.9ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=CANCEL_SELECTION#52 inputAge=251.5ms t=101667
+2026-08-18T23:12:31.266Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=102157
+2026-08-18T23:12:31.351Z [Perf][Frame] render=29.4ms send=55.8ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#53 inputAge=0.1ms t=102157
+2026-08-18T23:12:31.832Z [Perf][ImgSend] tile=2 bytes=1176 ms=314.6 result=success t=102409
+2026-08-18T23:12:31.832Z [Perf][Frame] render=0.2ms send=314.9ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#53 inputAge=251.6ms t=102408
+2026-08-18T23:12:32.897Z [Perf][Event] kind=sys type=none t=103788
+2026-08-18T23:12:33.003Z [Perf][TextSend] container=4 chars=79 ms=75.3 ok=1 t=103818
+2026-08-18T23:12:33.003Z [Perf][Frame] render=30.4ms send=75.6ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#54 inputAge=0.0ms t=103788
+2026-08-18T23:12:33.452Z [Perf][ImgSend] tile=2 bytes=1040 ms=303.6 result=success t=104040
+2026-08-18T23:12:33.812Z [Perf][ImgSend] tile=3 bytes=1181 ms=360.0 result=success t=104343
+2026-08-18T23:12:33.813Z [Perf][BridgeImg] sends=5 avgSend=311.9ms maxSend=360.0ms minSend=274.7ms avgBytes=1157 failed=0 t=104704
+2026-08-18T23:12:33.813Z [Perf][BridgeText] sends=3 avgSend=62.2ms maxSend=75.3ms minSend=55.7ms avgBytes=65 failed=0 t=104704
+2026-08-18T23:12:33.813Z [Perf][Frame] render=0.1ms send=664.1ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#54 inputAge=251.7ms t=104039
+2026-08-18T23:12:34.896Z [Perf][Event] kind=sys type=none t=105787
+2026-08-18T23:12:35.251Z [Perf][ImgSend] tile=2 bytes=1091 ms=272.7 result=success t=105869
+2026-08-18T23:12:35.556Z [Perf][ImgSend] tile=3 bytes=1143 ms=304.3 result=success t=106142
+2026-08-18T23:12:35.556Z [Perf][Frame] render=29.3ms send=630.1ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DEST_SELECT#55 inputAge=0.3ms t=105787
+2026-08-18T23:12:35.556Z [Perf][Sched] runs=7 avgDelay=0.0ms maxDelay=0.1ms avgRun=311.5ms maxRun=664.3ms coalesced=0 t=106447
+2026-08-18T23:12:36.270Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=107161
+2026-08-18T23:12:36.292Z [Perf][PngEncodeSummary] n=20 avgBytes=1103 avgQwait=8.3ms avgBlob=8.0ms avgRead=6.1ms avgEncode=14.1ms avgTotal=22.4ms maxQwait=22.6ms maxBlob=15.7ms maxRead=7.7ms maxEncode=22.5ms maxTotal=34.4ms slow=0 maxPend=2 labels=crop:tile-3-bottom-left:10,crop:tile-3-bottom-right:9,crop:tile-3-top:1
+2026-08-18T23:12:36.481Z [Perf][TextSend] container=4 chars=53 ms=179.2 ok=1 t=107193
+2026-08-18T23:12:36.481Z [Perf][Frame] render=31.9ms send=179.4ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#56 inputAge=0.0ms t=107161
+2026-08-18T23:12:36.869Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=107760
+2026-08-18T23:12:36.995Z [Perf][ImgSend] tile=2 bytes=1129 ms=473.6 result=success t=107413
+2026-08-18T23:12:36.995Z [Perf][Frame] render=0.2ms send=473.7ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#56 inputAge=251.4ms t=107413
+2026-08-18T23:12:37.171Z [Perf][TextSend] container=4 chars=52 ms=148.3 ok=1 t=107914
+2026-08-18T23:12:37.172Z [Perf][Frame] render=27.4ms send=148.7ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#57 inputAge=126.8ms t=107887
+2026-08-18T23:12:37.535Z [Perf][ImgSend] tile=2 bytes=1167 ms=362.8 result=success t=108063
+2026-08-18T23:12:37.549Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=108440
+2026-08-18T23:12:37.894Z [Perf][ImgSend] tile=3 bytes=1081 ms=359.3 result=success t=108426
+2026-08-18T23:12:37.894Z [Perf][BridgeImg] sends=5 avgSend=354.5ms maxSend=473.6ms minSend=272.7ms avgBytes=1122 failed=0 t=108785
+2026-08-18T23:12:37.894Z [Perf][BridgeText] sends=3 avgSend=126.7ms maxSend=179.2ms minSend=52.5ms avgBytes=66 failed=0 t=108785
+2026-08-18T23:12:37.894Z [Perf][Frame] render=0.2ms send=722.6ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#57 inputAge=302.9ms t=108063
+2026-08-18T23:12:37.981Z [Perf][TextSend] container=4 chars=63 ms=60.9 ok=1 t=108811
+2026-08-18T23:12:38.252Z [Perf][ImgSend] tile=2 bytes=1164 ms=271.6 result=success t=108872
+2026-08-18T23:12:38.253Z [Perf][Frame] render=25.1ms send=332.9ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#58 inputAge=345.9ms t=108786
+2026-08-18T23:12:44.761Z [Perf][Event] kind=sys type=none t=115652
+2026-08-18T23:12:44.800Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=26.9ms toBlob=3.2ms read=6.5ms encode=9.7ms total=36.6ms bytes=1081 pend=2->1
+2026-08-18T23:12:44.881Z [Perf][TextSend] container=4 chars=65 ms=80.6 ok=1 t=115691
+2026-08-18T23:12:44.881Z [Perf][BridgeImg] sends=1 avgSend=271.6ms maxSend=271.6ms minSend=271.6ms avgBytes=1164 failed=0 t=115772
+2026-08-18T23:12:44.881Z [Perf][BridgeText] sends=2 avgSend=70.7ms maxSend=80.6ms minSend=60.9ms avgBytes=64 failed=0 t=115772
+2026-08-18T23:12:44.881Z [Perf][Frame] render=38.5ms send=80.9ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#59 inputAge=0.1ms t=115653
+2026-08-18T23:12:44.881Z [Perf][Sched] runs=6 avgDelay=87.5ms maxDelay=345.9ms avgRun=343.7ms maxRun=722.9ms coalesced=1 t=115772
+2026-08-18T23:12:45.395Z [Perf][ImgSend] tile=2 bytes=1180 ms=381.3 result=success t=115905
+2026-08-18T23:12:45.396Z [Perf][Frame] render=0.1ms send=381.6ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#59 inputAge=252.3ms t=115905
+2026-08-18T23:12:46.908Z [Perf][Event] kind=sys type=none t=117799
+2026-08-18T23:12:46.980Z [Perf][Frame] render=27.0ms send=44.7ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=DEST_SELECT#60 inputAge=0.1ms t=117799
+2026-08-18T23:12:47.495Z [Perf][ImgSend] tile=2 bytes=1145 ms=334.9 result=success t=118051
+2026-08-18T23:12:47.495Z [Perf][Frame] render=0.2ms send=335.1ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=DEST_SELECT#60 inputAge=251.7ms t=118051
+2026-08-18T23:12:48.289Z [Perf][Event] kind=sys type=DOUBLE_CLICK_EVENT t=119180
+2026-08-18T23:12:48.393Z [Perf][TextSend] container=4 chars=63 ms=72.6 ok=1 t=119211
+2026-08-18T23:12:48.393Z [Perf][Frame] render=30.6ms send=72.7ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=CANCEL_SELECTION#61 inputAge=0.0ms t=119180
+2026-08-18T23:12:48.843Z [Perf][ImgSend] tile=2 bytes=1164 ms=302.1 result=success t=119432
+2026-08-18T23:12:48.844Z [Perf][Frame] render=0.2ms send=302.4ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=CANCEL_SELECTION#61 inputAge=251.6ms t=119432
+2026-08-18T23:12:48.963Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=119854
+2026-08-18T23:12:49.010Z [Perf][PngEncode] label=crop:tile-3-bottom-left size=200x100 qwait=0.1ms toBlob=38.4ms read=6.4ms encode=44.8ms total=44.9ms bytes=1167 pend=1->2
+2026-08-18T23:12:49.018Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=45.1ms toBlob=2.2ms read=6.3ms encode=8.5ms total=53.6ms bytes=1081 pend=2->1
+2026-08-18T23:12:49.080Z [Perf][TextSend] container=4 chars=52 ms=61.9 ok=1 t=119909
+2026-08-18T23:12:49.080Z [Perf][BridgeImg] sends=3 avgSend=339.4ms maxSend=381.3ms minSend=302.1ms avgBytes=1163 failed=0 t=119971
+2026-08-18T23:12:49.080Z [Perf][BridgeText] sends=3 avgSend=59.7ms maxSend=72.6ms minSend=44.7ms avgBytes=60 failed=0 t=119971
+2026-08-18T23:12:49.080Z [Perf][Frame] render=54.7ms send=62.2ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#62 inputAge=0.1ms t=119855
+2026-08-18T23:12:49.080Z [Perf][Sched] runs=6 avgDelay=0.0ms maxDelay=0.1ms avgRun=218.7ms maxRun=381.7ms coalesced=0 t=119971
+2026-08-18T23:12:49.479Z [Perf][ImgSend] tile=2 bytes=1167 ms=263.9 result=success t=120106
+2026-08-18T23:12:49.479Z [Perf][Frame] render=0.1ms send=264.1ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#62 inputAge=251.6ms t=120106
+2026-08-18T23:12:50.660Z [Perf][Event] kind=sys type=none t=121551
+2026-08-18T23:12:50.760Z [Perf][TextSend] container=4 chars=49 ms=68.6 ok=1 t=121583
+2026-08-18T23:12:50.760Z [Perf][Frame] render=31.4ms send=68.8ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#63 inputAge=0.1ms t=121551
+2026-08-18T23:12:51.247Z [Perf][ImgSend] tile=2 bytes=1039 ms=334.9 result=success t=121803
+2026-08-18T23:12:51.663Z [Perf][ImgSend] tile=3 bytes=1230 ms=415.9 result=success t=122138
+2026-08-18T23:12:51.663Z [Perf][Frame] render=0.2ms send=751.4ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#63 inputAge=251.7ms t=121803
+2026-08-18T23:12:52.851Z [Perf][Event] kind=sys type=none t=123742
+2026-08-18T23:12:52.951Z [Perf][TextSend] container=4 chars=62 ms=68.4 ok=1 t=123773
+2026-08-18T23:12:53.195Z [Perf][ImgSend] tile=2 bytes=1081 ms=244.6 result=success t=123842
+2026-08-18T23:12:53.196Z [Perf][BridgeImg] sends=4 avgSend=314.8ms maxSend=415.9ms minSend=244.6ms avgBytes=1129 failed=0 t=124087
+2026-08-18T23:12:53.196Z [Perf][BridgeText] sends=2 avgSend=68.5ms maxSend=68.6ms minSend=68.4ms avgBytes=56 failed=0 t=124087
+2026-08-18T23:12:53.493Z [Perf][ImgSend] tile=3 bytes=1203 ms=296.8 result=success t=124087
+2026-08-18T23:12:53.493Z [Perf][Frame] render=30.8ms send=610.4ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DEST_SELECT#64 inputAge=0.2ms t=123742
+2026-08-18T23:12:53.493Z [Perf][Sched] runs=4 avgDelay=0.0ms maxDelay=0.0ms avgRun=439.4ms maxRun=751.6ms coalesced=0 t=124384
+2026-08-18T23:12:55.773Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=126664
+2026-08-18T23:12:55.860Z [Perf][Frame] render=37.4ms send=49.0ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#65 inputAge=0.0ms t=126664
+2026-08-18T23:12:56.282Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=127173
+2026-08-18T23:12:56.443Z [Perf][ImgSend] tile=3 bytes=1221 ms=415.6 result=success t=126918
+2026-08-18T23:12:56.443Z [Perf][Frame] render=0.3ms send=415.9ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#65 inputAge=254.1ms t=126918
+2026-08-18T23:12:56.475Z [Perf][PngEncodeSummary] n=20 avgBytes=1126 avgQwait=11.7ms avgBlob=9.5ms avgRead=6.7ms avgEncode=16.2ms avgTotal=27.9ms maxQwait=45.1ms maxBlob=38.4ms maxRead=13.0ms maxEncode=44.8ms maxTotal=53.6ms slow=3 maxPend=2 labels=crop:tile-3-bottom-right:10,crop:tile-3-bottom-left:10
+2026-08-18T23:12:56.491Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=30.1ms toBlob=4.5ms read=11.0ms encode=15.5ms total=45.6ms bytes=1212 pend=2->1
+2026-08-18T23:12:56.554Z [Perf][TextSend] container=4 chars=92 ms=62.5 ok=1 t=127382
+2026-08-18T23:12:56.554Z [Perf][Frame] render=47.6ms send=62.8ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#66 inputAge=161.3ms t=127334
+2026-08-18T23:12:56.856Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=127747
+2026-08-18T23:12:56.912Z [Perf][ImgSend] tile=3 bytes=1212 ms=357.2 result=success t=127445
+2026-08-18T23:12:56.912Z [Perf][Frame] render=0.3ms send=357.3ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#66 inputAge=271.9ms t=127445
+2026-08-18T23:12:57.035Z [Perf][TextSend] container=4 chars=53 ms=89.6 ok=1 t=127837
+2026-08-18T23:12:57.035Z [Perf][Frame] render=33.9ms send=89.8ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#67 inputAge=55.1ms t=127803
+2026-08-18T23:12:57.460Z [Perf][ImgSend] tile=2 bytes=1108 ms=352.3 result=success t=127998
+2026-08-18T23:12:57.460Z [Perf][BridgeImg] sends=4 avgSend=355.5ms maxSend=415.6ms minSend=296.8ms avgBytes=1186 failed=0 t=128351
+2026-08-18T23:12:57.460Z [Perf][BridgeText] sends=3 avgSend=67.0ms maxSend=89.6ms minSend=48.9ms avgBytes=68 failed=0 t=128351
+2026-08-18T23:12:57.819Z [Perf][ImgSend] tile=3 bytes=1168 ms=359.2 result=success t=128351
+2026-08-18T23:12:57.819Z [Perf][Frame] render=0.2ms send=712.1ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#67 inputAge=250.3ms t=127998
+2026-08-18T23:12:57.819Z [Perf][Sched] runs=6 avgDelay=39.7ms maxDelay=161.3ms avgRun=301.2ms maxRun=712.4ms coalesced=0 t=128710
+2026-08-18T23:12:58.134Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=129024
+2026-08-18T23:12:58.172Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=28.1ms toBlob=2.0ms read=5.5ms encode=7.6ms total=35.7ms bytes=1145 pend=2->1
+2026-08-18T23:12:58.291Z [Perf][TextSend] container=4 chars=55 ms=118.7 ok=1 t=129063
+2026-08-18T23:12:58.291Z [Perf][Frame] render=38.2ms send=118.9ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#68 inputAge=0.1ms t=129025
+2026-08-18T23:12:58.842Z [Perf][ImgSend] tile=2 bytes=1150 ms=454.7 result=success t=129278
+2026-08-18T23:12:58.959Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=129848
+2026-08-18T23:12:59.140Z [Perf][ImgSend] tile=3 bytes=1145 ms=297.6 result=success t=129733
+2026-08-18T23:12:59.140Z [Perf][Frame] render=0.3ms send=753.2ms images=1 tiles=2 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#68 inputAge=252.9ms t=129278
+2026-08-18T23:12:59.180Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=29.9ms toBlob=2.3ms read=5.5ms encode=7.8ms total=37.7ms bytes=1145 pend=2->1
+2026-08-18T23:12:59.260Z [Perf][TextSend] container=4 chars=63 ms=79.5 ok=1 t=130071
+2026-08-18T23:12:59.260Z [Perf][Frame] render=39.8ms send=79.9ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#69 inputAge=180.5ms t=130031
+2026-08-18T23:12:59.566Z [Perf][ImgSend] tile=2 bytes=1156 ms=305.3 result=success t=130151
+2026-08-18T23:12:59.566Z [Perf][Frame] render=0.3ms send=305.6ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#69 inputAge=300.3ms t=130151
+2026-08-18T23:12:59.706Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=130597
+2026-08-18T23:12:59.799Z [Perf][TextSend] container=4 chars=57 ms=63.2 ok=1 t=130626
+2026-08-18T23:12:59.799Z [Perf][Frame] render=28.7ms send=63.4ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#70 inputAge=0.1ms t=130598
+2026-08-18T23:13:00.283Z [Perf][ImgSend] tile=2 bytes=1165 ms=322.8 result=success t=130851
+2026-08-18T23:13:00.283Z [Perf][Frame] render=0.3ms send=323.2ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#70 inputAge=252.9ms t=130850
+2026-08-18T23:13:00.470Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=131361
+2026-08-18T23:13:00.607Z [Perf][TextSend] container=4 chars=53 ms=90.2 ok=1 t=131407
+2026-08-18T23:13:00.607Z [Perf][Frame] render=46.5ms send=90.3ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#71 inputAge=0.1ms t=131361
+2026-08-18T23:13:01.073Z [Perf][ImgSend] tile=1 bytes=801 ms=350.2 result=success t=131614
+2026-08-18T23:13:01.636Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=132527
+2026-08-18T23:13:03.284Z [Perf][Congest] state=on ewma=1273.5ms t=134174
+2026-08-18T23:13:03.284Z [Perf][ImgSend] tile=2 bytes=1081 ms=2209.1 result=success t=131964
+2026-08-18T23:13:03.284Z [Perf][BridgeImg] sends=7 avgSend=614.1ms maxSend=2209.1ms minSend=297.6ms avgBytes=1095 failed=0 t=134175
+2026-08-18T23:13:03.284Z [Perf][BridgeText] sends=4 avgSend=87.9ms maxSend=118.7ms minSend=63.2ms avgBytes=57 failed=0 t=134175
+2026-08-18T23:13:03.284Z [Perf][Frame] render=0.2ms send=2561.4ms images=1 tiles=2 failed=0 skipMemo=0 skipInactive=2 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#71 inputAge=253.0ms t=131614
+2026-08-18T23:13:03.284Z [Perf][Sched] runs=8 avgDelay=28.8ms maxDelay=180.5ms avgRun=556.3ms maxRun=2561.6ms coalesced=1 t=134175
+2026-08-18T23:13:03.606Z [Perf][TextSend] container=4 chars=56 ms=294.4 ok=1 t=134203
+2026-08-18T23:13:03.684Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=134575
+2026-08-18T23:13:05.769Z [Perf][ImgSend] tile=1 bytes=801 ms=2162.5 result=success t=134497
+2026-08-18T23:13:05.769Z [Perf][Frame] render=27.0ms send=2457.7ms images=1 tiles=1 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=1 text=1 input=FOCUS_MOVE#72 inputAge=1648.0ms t=134175
+2026-08-18T23:13:06.302Z [Perf][TextSend] container=4 chars=62 ms=497.9 ok=1 t=136695
+2026-08-18T23:13:07.925Z [Perf][ImgSend] tile=1 bytes=713 ms=1622.3 result=success t=137194
+2026-08-18T23:13:07.925Z [Perf][BridgeImg] sends=2 avgSend=1892.4ms maxSend=2162.5ms minSend=1622.3ms avgBytes=757 failed=0 t=138816
+2026-08-18T23:13:07.925Z [Perf][BridgeText] sends=2 avgSend=396.2ms maxSend=497.9ms minSend=294.4ms avgBytes=59 failed=0 t=138816
+2026-08-18T23:13:07.925Z [Perf][Frame] render=35.1ms send=2121.0ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=1 aborted=0 text=1 input=FOCUS_MOVE#73 inputAge=2084.8ms t=136660
+2026-08-18T23:13:07.925Z [Perf][Sched] runs=2 avgDelay=1866.4ms maxDelay=2084.8ms avgRun=2320.4ms maxRun=2484.7ms coalesced=1 t=138816
+2026-08-18T23:13:08.821Z [Perf][Event] kind=sys type=none t=139712
+2026-08-18T23:13:10.272Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=141163
+2026-08-18T23:13:10.351Z [Perf][ImgSend] tile=3 bytes=1203 ms=2024.6 result=success t=139217
+2026-08-18T23:13:10.351Z [Perf][Frame] render=0.3ms send=2024.9ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#73 inputAge=4641.4ms t=139217
+2026-08-18T23:13:10.986Z [Perf][TextSend] container=4 chars=64 ms=604.3 ok=1 t=141273
+2026-08-18T23:13:10.986Z [Perf][Frame] render=30.4ms send=604.6ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#75 inputAge=79.2ms t=141242
+2026-08-18T23:13:11.973Z [Perf][Event] kind=sys type=DOUBLE_CLICK_EVENT t=142864
+2026-08-18T23:13:13.292Z [Perf][ImgSend] tile=3 bytes=1213 ms=2269.2 result=success t=141913
+2026-08-18T23:13:13.292Z [Perf][BridgeImg] sends=2 avgSend=2146.9ms maxSend=2269.2ms minSend=2024.6ms avgBytes=1208 failed=0 t=144183
+2026-08-18T23:13:13.292Z [Perf][BridgeText] sends=1 avgSend=604.3ms maxSend=604.3ms minSend=604.3ms avgBytes=64 failed=0 t=144183
+2026-08-18T23:13:13.292Z [Perf][Frame] render=0.1ms send=2269.8ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#75 inputAge=750.3ms t=141913
+2026-08-18T23:13:13.292Z [Perf][Sched] runs=3 avgDelay=510.1ms maxDelay=1530.3ms avgRun=1643.4ms maxRun=2269.9ms coalesced=3 t=144183
+2026-08-18T23:13:13.332Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=29.7ms toBlob=2.2ms read=5.9ms encode=8.1ms total=37.8ms bytes=1203 pend=2->1
+2026-08-18T23:13:13.333Z [Perf][PngEncodeSummary] n=20 avgBytes=1090 avgQwait=9.7ms avgBlob=8.4ms avgRead=7.4ms avgEncode=15.8ms avgTotal=25.5ms maxQwait=30.1ms maxBlob=23.5ms maxRead=13.0ms maxEncode=29.9ms maxTotal=45.6ms slow=4 maxPend=2 labels=crop:tile-3-bottom-right:9,crop:tile-3-bottom-left:8,crop:tile-3-top:3
+2026-08-18T23:13:14.236Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=145127
+2026-08-18T23:13:14.583Z [Perf][TextSend] container=4 chars=62 ms=1250.2 ok=1 t=144224
+2026-08-18T23:13:14.583Z [Perf][Frame] render=40.3ms send=1250.5ms images=1 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=1 text=1 input=CANCEL_SELECTION#76 inputAge=1319.5ms t=144183
+2026-08-18T23:13:15.125Z [Perf][TextSend] container=4 chars=56 ms=490.2 ok=1 t=145525
+2026-08-18T23:13:15.125Z [Perf][Frame] render=50.9ms send=490.4ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#77 inputAge=347.4ms t=145474
+2026-08-18T23:13:17.196Z [Perf][ImgSend] tile=1 bytes=801 ms=2070.9 result=success t=146016
+2026-08-18T23:13:17.196Z [Perf][Frame] render=0.1ms send=2071.4ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=1 aborted=0 text=0 input=FOCUS_MOVE#77 inputAge=888.7ms t=146016
+2026-08-18T23:13:19.859Z [Perf][ImgSend] tile=3 bytes=1145 ms=2261.9 result=success t=148488
+2026-08-18T23:13:19.859Z [Perf][BridgeImg] sends=2 avgSend=2166.4ms maxSend=2261.9ms minSend=2070.9ms avgBytes=973 failed=0 t=150750
+2026-08-18T23:13:19.859Z [Perf][BridgeText] sends=2 avgSend=870.2ms maxSend=1250.2ms minSend=490.2ms avgBytes=59 failed=0 t=150750
+2026-08-18T23:13:19.859Z [Perf][Frame] render=0.2ms send=2262.5ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#77 inputAge=3360.8ms t=148488
+2026-08-18T23:13:19.859Z [Perf][Sched] runs=4 avgDelay=451.3ms maxDelay=1319.5ms avgRun=1541.7ms maxRun=2262.9ms coalesced=0 t=150751
+2026-08-18T23:13:19.981Z [Perf][Event] kind=sys type=none t=150872
+2026-08-18T23:13:20.521Z [Perf][TextSend] container=4 chars=56 ms=513.7 ok=1 t=150898
+2026-08-18T23:13:22.146Z [Perf][ImgSend] tile=1 bytes=784 ms=1624.4 result=success t=151412
+2026-08-18T23:13:22.146Z [Perf][Frame] render=26.1ms send=2138.9ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DRAW_STOCK#78 inputAge=0.1ms t=150872
+2026-08-18T23:13:25.035Z [Perf][Event] kind=sys type=none t=155926
+2026-08-18T23:13:25.658Z [Perf][TextSend] container=4 chars=56 ms=585.3 ok=1 t=155963
+2026-08-18T23:13:25.658Z [Perf][BridgeImg] sends=1 avgSend=1624.4ms maxSend=1624.4ms minSend=1624.4ms avgBytes=784 failed=0 t=156549
+2026-08-18T23:13:25.658Z [Perf][BridgeText] sends=2 avgSend=549.5ms maxSend=585.3ms minSend=513.7ms avgBytes=56 failed=0 t=156549
+2026-08-18T23:13:26.926Z [Perf][ImgSend] tile=1 bytes=780 ms=1268.0 result=success t=156549
+2026-08-18T23:13:26.926Z [Perf][Frame] render=35.3ms send=1854.2ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DRAW_STOCK#79 inputAge=1.2ms t=155928
+2026-08-18T23:13:26.926Z [Perf][Sched] runs=2 avgDelay=0.0ms maxDelay=0.0ms avgRun=2027.3ms maxRun=2165.0ms coalesced=0 t=157817
+2026-08-18T23:13:28.451Z [Perf][Event] kind=sys type=none t=159342
+2026-08-18T23:13:28.708Z [Perf][TextSend] container=4 chars=56 ms=222.1 ok=1 t=159377
+2026-08-18T23:13:30.429Z [Perf][ImgSend] tile=1 bytes=777 ms=1720.5 result=success t=159599
+2026-08-18T23:13:30.429Z [Perf][BridgeImg] sends=2 avgSend=1494.3ms maxSend=1720.5ms minSend=1268.0ms avgBytes=779 failed=0 t=161320
+2026-08-18T23:13:30.429Z [Perf][BridgeText] sends=1 avgSend=222.1ms maxSend=222.1ms minSend=222.1ms avgBytes=56 failed=0 t=161320
+2026-08-18T23:13:30.429Z [Perf][Frame] render=33.3ms send=1943.1ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=DRAW_STOCK#80 inputAge=1.0ms t=159343
+2026-08-18T23:13:32.147Z [Perf][Event] kind=text type=SCROLL_TOP_EVENT t=163038
+2026-08-18T23:13:32.491Z [Perf][TextSend] container=4 chars=50 ms=309.8 ok=1 t=163072
+2026-08-18T23:13:32.491Z [Perf][Frame] render=34.0ms send=310.1ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#81 inputAge=0.0ms t=163038
+2026-08-18T23:13:32.491Z [Perf][Sched] runs=2 avgDelay=0.0ms maxDelay=0.0ms avgRun=1160.3ms maxRun=1976.4ms coalesced=0 t=163382
+2026-08-18T23:13:34.202Z [Perf][Event] kind=sys type=none t=165093
+2026-08-18T23:13:34.294Z [Perf][ImgSend] tile=1 bytes=745 ms=1393.9 result=success t=163791
+2026-08-18T23:13:34.294Z [Perf][Frame] render=0.2ms send=1394.2ms images=1 tiles=1 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#81 inputAge=752.3ms t=163790
+2026-08-18T23:13:34.565Z [Perf][TextSend] container=4 chars=88 ms=236.4 ok=1 t=165220
+2026-08-18T23:13:34.565Z [Perf][BridgeImg] sends=1 avgSend=1393.9ms maxSend=1393.9ms minSend=1393.9ms avgBytes=745 failed=0 t=165456
+2026-08-18T23:13:34.565Z [Perf][BridgeText] sends=2 avgSend=273.1ms maxSend=309.8ms minSend=236.4ms avgBytes=69 failed=0 t=165456
+2026-08-18T23:13:34.565Z [Perf][Frame] render=34.9ms send=236.7ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=SOURCE_SELECT#82 inputAge=91.8ms t=165185
+2026-08-18T23:13:36.903Z [Perf][ImgSend] tile=1 bytes=785 ms=1941.4 result=success t=165852
+2026-08-18T23:13:36.903Z [Perf][Frame] render=0.2ms send=1941.8ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=1 aborted=0 text=0 input=SOURCE_SELECT#82 inputAge=759.0ms t=165852
+2026-08-18T23:13:36.903Z [Perf][Sched] runs=3 avgDelay=30.5ms maxDelay=91.6ms avgRun=1202.7ms maxRun=1942.1ms coalesced=0 t=167794
+2026-08-18T23:13:38.886Z [Perf][ImgSend] tile=3 bytes=1207 ms=1582.4 result=success t=168195
+2026-08-18T23:13:38.886Z [Perf][BridgeImg] sends=2 avgSend=1761.9ms maxSend=1941.4ms minSend=1582.4ms avgBytes=996 failed=0 t=169777
+2026-08-18T23:13:38.886Z [Perf][Frame] render=0.2ms send=1582.7ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=SOURCE_SELECT#82 inputAge=3101.5ms t=168195
+2026-08-18T23:13:40.227Z [Perf][Event] kind=sys type=none t=171118
+2026-08-18T23:13:40.505Z [Perf][TextSend] container=4 chars=85 ms=218.5 ok=1 t=171177
+2026-08-18T23:13:42.130Z [Perf][ImgSend] tile=1 bytes=716 ms=1624.4 result=success t=171396
+2026-08-18T23:13:42.130Z [Perf][Frame] render=58.6ms send=1844.0ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=1 aborted=0 text=1 input=DEST_SELECT#83 inputAge=0.3ms t=171119
+2026-08-18T23:13:42.130Z [Perf][Sched] runs=2 avgDelay=0.0ms maxDelay=0.0ms avgRun=1742.9ms maxRun=1902.8ms coalesced=0 t=173021
+2026-08-18T23:13:44.646Z [Perf][ImgSend] tile=3 bytes=1189 ms=2114.8 result=success t=173422
+2026-08-18T23:13:44.646Z [Perf][BridgeImg] sends=2 avgSend=1869.6ms maxSend=2114.8ms minSend=1624.4ms avgBytes=953 failed=0 t=175537
+2026-08-18T23:13:44.646Z [Perf][BridgeText] sends=1 avgSend=218.5ms maxSend=218.5ms minSend=218.5ms avgBytes=85 failed=0 t=175537
+2026-08-18T23:13:44.646Z [Perf][Frame] render=0.1ms send=2115.5ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=DEST_SELECT#83 inputAge=2303.2ms t=173421
+2026-08-18T23:13:59.581Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=190472
+2026-08-18T23:13:59.627Z [Perf][PngEncode] label=crop:tile-3-bottom-left size=200x100 qwait=0.3ms toBlob=24.4ms read=16.9ms encode=41.3ms total=41.6ms bytes=1108 pend=1->2
+2026-08-18T23:13:59.641Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=41.7ms toBlob=3.4ms read=10.6ms encode=14.1ms total=55.8ms bytes=1147 pend=2->1
+2026-08-18T23:14:00.030Z [Perf][TextSend] container=4 chars=53 ms=389.2 ok=1 t=190532
+2026-08-18T23:14:00.031Z [Perf][BridgeText] sends=1 avgSend=389.2ms maxSend=389.2ms minSend=389.2ms avgBytes=53 failed=0 t=190922
+2026-08-18T23:14:00.031Z [Perf][Frame] render=59.2ms send=389.6ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#84 inputAge=0.3ms t=190473
+2026-08-18T23:14:00.031Z [Perf][Sched] runs=2 avgDelay=0.0ms maxDelay=0.0ms avgRun=1282.3ms maxRun=2115.6ms coalesced=0 t=190922
+2026-08-18T23:14:01.293Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=192184
+2026-08-18T23:14:02.469Z [Perf][ImgSend] tile=2 bytes=1108 ms=2132.8 result=success t=191227
+2026-08-18T23:14:02.469Z [Perf][Frame] render=0.3ms send=2133.1ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#84 inputAge=754.1ms t=191227
+2026-08-18T23:14:02.733Z [Perf][TextSend] container=4 chars=55 ms=229.6 ok=1 t=193394
+2026-08-18T23:14:04.806Z [Perf][ImgSend] tile=2 bytes=1150 ms=2072.5 result=success t=193624
+2026-08-18T23:14:04.806Z [Perf][BridgeImg] sends=2 avgSend=2102.6ms maxSend=2132.8ms minSend=2072.5ms avgBytes=1129 failed=0 t=195697
+2026-08-18T23:14:04.806Z [Perf][BridgeText] sends=1 avgSend=229.6ms maxSend=229.6ms minSend=229.6ms avgBytes=55 failed=0 t=195697
+2026-08-18T23:14:04.806Z [Perf][Frame] render=34.4ms send=2302.8ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=1 aborted=0 text=1 input=FOCUS_MOVE#85 inputAge=1175.9ms t=193360
+2026-08-18T23:14:04.806Z [Perf][Sched] runs=2 avgDelay=587.9ms maxDelay=1175.9ms avgRun=2235.3ms maxRun=2337.2ms coalesced=1 t=195697
+2026-08-18T23:14:07.146Z [Perf][ImgSend] tile=3 bytes=1119 ms=1938.4 result=success t=196098
+2026-08-18T23:14:07.146Z [Perf][Frame] render=0.4ms send=1938.7ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=0 input=FOCUS_MOVE#85 inputAge=3913.4ms t=196098
+2026-08-18T23:14:15.253Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=206143
+2026-08-18T23:14:15.292Z [Perf][PngEncode] label=crop:tile-3-bottom-left size=200x100 qwait=0.6ms toBlob=25.4ms read=9.8ms encode=35.2ms total=35.8ms bytes=1156 pend=1->2
+2026-08-18T23:14:15.304Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=36.1ms toBlob=3.2ms read=8.7ms encode=11.9ms total=48.0ms bytes=1119 pend=2->1
+2026-08-18T23:14:15.962Z [Perf][TextSend] container=4 chars=63 ms=658.0 ok=1 t=206195
+2026-08-18T23:14:15.962Z [Perf][BridgeImg] sends=1 avgSend=1938.4ms maxSend=1938.4ms minSend=1938.4ms avgBytes=1119 failed=0 t=206853
+2026-08-18T23:14:15.962Z [Perf][BridgeText] sends=1 avgSend=658.0ms maxSend=658.0ms minSend=658.0ms avgBytes=63 failed=0 t=206853
+2026-08-18T23:14:15.962Z [Perf][Frame] render=51.5ms send=658.3ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#86 inputAge=0.0ms t=206144
+2026-08-18T23:14:15.962Z [Perf][Sched] runs=2 avgDelay=0.0ms maxDelay=0.0ms avgRun=1324.5ms maxRun=1939.2ms coalesced=0 t=206854
+2026-08-18T23:14:16.951Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=207842
+2026-08-18T23:14:17.764Z [Perf][ImgSend] tile=2 bytes=1156 ms=1751.8 result=success t=206903
+2026-08-18T23:14:17.764Z [Perf][Frame] render=0.1ms send=1752.1ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#86 inputAge=759.2ms t=206903
+2026-08-18T23:14:17.791Z [Perf][PngEncodeSummary] n=20 avgBytes=1007 avgQwait=6.8ms avgBlob=11.2ms avgRead=9.6ms avgEncode=20.9ms avgTotal=27.6ms maxQwait=41.7ms maxBlob=25.4ms maxRead=16.9ms maxEncode=41.3ms maxTotal=55.8ms slow=4 maxPend=2 labels=crop:tile-3-top:7,crop:tile-3-bottom-left:7,crop:tile-3-bottom-right:6
+2026-08-18T23:14:17.805Z [Perf][PngEncode] label=crop:tile-3-bottom-right size=200x100 qwait=25.3ms toBlob=3.2ms read=10.6ms encode=13.9ms total=39.2ms bytes=1119 pend=2->1
+2026-08-18T23:14:18.033Z [Perf][TextSend] container=4 chars=57 ms=228.2 ok=1 t=208696
+2026-08-18T23:14:20.118Z [Perf][ImgSend] tile=2 bytes=1165 ms=2084.7 result=success t=208924
+2026-08-18T23:14:20.118Z [Perf][BridgeImg] sends=2 avgSend=1918.3ms maxSend=2084.7ms minSend=1751.8ms avgBytes=1161 failed=0 t=211009
+2026-08-18T23:14:20.118Z [Perf][BridgeText] sends=1 avgSend=228.2ms maxSend=228.2ms minSend=228.2ms avgBytes=57 failed=0 t=211009
+2026-08-18T23:14:20.118Z [Perf][Frame] render=40.7ms send=2313.3ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#87 inputAge=812.9ms t=208655
+2026-08-18T23:14:20.118Z [Perf][Sched] runs=2 avgDelay=406.4ms maxDelay=812.8ms avgRun=2053.2ms maxRun=2354.1ms coalesced=1 t=211009
+2026-08-18T23:14:23.533Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=214424
+2026-08-18T23:14:24.507Z [Perf][TextSend] container=4 chars=54 ms=940.2 ok=1 t=214458
+2026-08-18T23:14:24.507Z [Perf][BridgeText] sends=1 avgSend=940.2ms maxSend=940.2ms minSend=940.2ms avgBytes=54 failed=0 t=215398
+2026-08-18T23:14:24.507Z [Perf][Frame] render=33.7ms send=940.5ms images=0 tiles=0 failed=0 skipMemo=0 skipInactive=0 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#88 inputAge=0.1ms t=214424
+2026-08-18T23:14:24.507Z [Perf][Sched] runs=1 avgDelay=0.0ms maxDelay=0.0ms avgRun=974.4ms maxRun=974.4ms coalesced=0 t=215398
+2026-08-18T23:14:25.947Z [Perf][ImgSend] tile=1 bytes=785 ms=1438.7 result=success t=215399
+2026-08-18T23:14:25.947Z [Perf][Frame] render=0.2ms send=1439.1ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=1 aborted=0 text=0 input=FOCUS_MOVE#88 inputAge=974.4ms t=215398
+2026-08-18T23:14:26.575Z [Perf][Event] kind=text type=SCROLL_BOTTOM_EVENT t=217466
+2026-08-18T23:14:28.377Z [Perf][ImgSend] tile=2 bytes=1081 ms=2029.0 result=success t=217238
+2026-08-18T23:14:28.377Z [Perf][Frame] render=0.2ms send=2029.3ms images=1 tiles=1 failed=0 skipMemo=1 skipInactive=2 skipEmpty=0 remaining=0 aborted=1 text=0 input=FOCUS_MOVE#88 inputAge=2814.0ms t=217238
+2026-08-18T23:14:29.364Z [Perf][TextSend] container=4 chars=56 ms=962.1 ok=1 t=219292
+2026-08-18T23:14:29.364Z [Perf][BridgeImg] sends=2 avgSend=1733.8ms maxSend=2029.0ms minSend=1438.7ms avgBytes=933 failed=0 t=220255
+2026-08-18T23:14:29.364Z [Perf][BridgeText] sends=1 avgSend=962.1ms maxSend=962.1ms minSend=962.1ms avgBytes=56 failed=0 t=220255
+2026-08-18T23:14:30.092Z [Perf][ImgSend] tile=1 bytes=812 ms=727.6 result=success t=220255
+2026-08-18T23:14:30.092Z [Perf][Frame] render=24.8ms send=1690.4ms images=1 tiles=1 failed=0 skipMemo=2 skipInactive=2 skipEmpty=0 remaining=0 aborted=0 text=1 input=FOCUS_MOVE#89 inputAge=1801.7ms t=219268
+2026-08-18T23:14:30.092Z [Perf][Sched] runs=3 avgDelay=674.8ms maxDelay=1801.6ms avgRun=1728.1ms maxRun=2029.6ms coalesced=1 t=220983

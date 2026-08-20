@@ -24,7 +24,16 @@ import {
   composeInputModePage,
   composeWinAnimationPage,
 } from "../render/page";
-import { sendFrame, resetSendMemo } from "../render/send";
+import { sendFrame, resetSendMemo, type SendFrameStats } from "../render/send";
+import {
+  isPerfLoggingEnabled,
+  markPerfSessionStart,
+  perfLogLazy,
+  perfNowMs,
+  getLastInputTrace,
+  recordInput,
+} from "../perf/log";
+import { isLinkCongested } from "../evenhub/congestion";
 import { renderFrame, resetFrameMemo } from "../render/frame";
 import { createScheduler } from "./scheduler";
 import { createEventGuard } from "./event-guard";
@@ -40,8 +49,36 @@ import { WIN_ANIMATION_TICK_MS, WIN_BOARD_HOLD_MS } from "../state/constants";
 const AUTOSAVE_DEBOUNCE_MS = 500;
 const MESSAGE_DISMISS_MS = 1500;
 const IMAGE_COOLDOWN_MS = 250;
+/** Navigation image cooldown while the BLE link is congested (see congestion.ts). */
+const CONGESTED_IMAGE_COOLDOWN_MS = 750;
+/** Delay before flushing tiles a congested (maxTiles-capped) frame left unsent. */
+const CONGESTED_REFLUSH_DELAY_MS = 400;
+
+/** Resolve an OsEventTypeList value to its enum name for log lines. */
+function eventTypeName(et: number | undefined): string {
+  if (et === undefined || et === null) return "none";
+  return (OsEventTypeList as unknown as Record<number, string>)[et] ?? String(et);
+}
+
+/** One-line descriptor of a host event, for perf-log correlation. */
+function describeEvenHubEvent(event: EvenHubEvent): string {
+  if (!event) return "kind=null";
+  if (event.sysEvent) return `kind=sys type=${eventTypeName(event.sysEvent.eventType)}`;
+  if (event.listEvent) {
+    const item = event.listEvent.currentSelectItemIndex ?? -1;
+    return `kind=list type=${eventTypeName(event.listEvent.eventType)} item=${item}`;
+  }
+  if (event.textEvent) return `kind=text type=${eventTypeName(event.textEvent.eventType)}`;
+  if (event.audioEvent) return "kind=audio";
+  const keys = Object.keys(event);
+  return `kind=other keys=${keys.length > 0 ? keys.join(",") : "-"}`;
+}
 
 export async function initApp(): Promise<void> {
+  // Pre-warm the perf sinks and stamp the session boundary before any
+  // instrumented path can log (no-op when perf logging is disabled).
+  markPerfSessionStart();
+
   const hub = new EvenHubBridge();
   await hub.init();
 
@@ -71,9 +108,14 @@ export async function initApp(): Promise<void> {
   // navigation (spam-swipe) we push text every change for live feedback but
   // suppress image tiles, then flush one image once input stops for
   // IMAGE_COOLDOWN_MS. Material changes (a move/draw/setting) bypass this.
+  //
+  // renderSeq is the "latest board wins" sequence: EVERY state-driven schedule
+  // bumps it, and an in-flight frame aborts its remaining image tiles when it
+  // observes a newer sequence — a move must not queue behind a stale flush
+  // (during link congestion a 3-tile flush can take many seconds).
   let suppressImages = false;
   let imageDeferred = false;
-  let inputSeq = 0;
+  let renderSeq = 0;
   let imageCooldownTimer: ReturnType<typeof setTimeout> | null = null;
 
   const scheduler = createScheduler(async () => {
@@ -88,16 +130,56 @@ export async function initApp(): Promise<void> {
   });
 
   async function renderAndSendOnce(): Promise<void> {
-    const startSeq = inputSeq;
+    const perfEnabled = isPerfLoggingEnabled();
+    const frameStartMs = perfEnabled ? perfNowMs() : 0;
+    const inputTrace = perfEnabled ? getLastInputTrace() : null;
+    const imagesOn = !suppressImages;
+    const startSeq = renderSeq;
     const frame = await renderFrame(store.getState());
+    const renderDoneMs = perfEnabled ? perfNowMs() : 0;
+    let stats: SendFrameStats;
     if (suppressImages) {
       imageDeferred = true;
-      await sendFrame(hub, frame, { images: false });
+      stats = await sendFrame(hub, frame, { images: false });
     } else {
-      // Abort the image flush if fresh navigation arrives mid-send, so the
-      // next text update isn't stuck behind a whole frame of image tiles.
-      await sendFrame(hub, frame, { shouldAbortImages: () => inputSeq !== startSeq });
-      imageDeferred = inputSeq !== startSeq;
+      // Abort the image flush if any newer state arrives mid-send (navigation
+      // or a move), so fresh updates aren't stuck behind stale image tiles.
+      // While the link is congested, cap the frame at one tile: a full flush
+      // can take many seconds at degraded send rates, and the remaining tiles
+      // are re-flushed below once the tile in flight lands.
+      stats = await sendFrame(hub, frame, {
+        shouldAbortImages: () => renderSeq !== startSeq,
+        maxTiles: isLinkCongested() ? 1 : undefined,
+      });
+      imageDeferred = renderSeq !== startSeq || stats.tilesRemaining > 0;
+      if (stats.tilesRemaining > 0 && !imageCooldownTimer) {
+        // Congested partial flush with the user possibly idle: nothing else
+        // would push the remaining tiles, so arm a delayed follow-up. Each
+        // partial flush re-arms until the frame is fully on the glasses.
+        imageCooldownTimer = setTimeout(() => {
+          imageCooldownTimer = null;
+          suppressImages = false;
+          if (imageDeferred) scheduler.schedule();
+        }, CONGESTED_REFLUSH_DELAY_MS);
+      }
+    }
+    if (perfEnabled) {
+      const endMs = perfNowMs();
+      perfLogLazy(() => {
+        // inputAge is only meaningful when this frame was input-triggered;
+        // the analyzer filters stale traces by age.
+        const inputPart = inputTrace
+          ? ` input=${inputTrace.name}#${inputTrace.seq} inputAge=${(frameStartMs - inputTrace.tMs).toFixed(1)}ms`
+          : "";
+        return (
+          `[Perf][Frame] render=${(renderDoneMs - frameStartMs).toFixed(1)}ms ` +
+          `send=${(endMs - renderDoneMs).toFixed(1)}ms images=${imagesOn ? 1 : 0} ` +
+          `tiles=${stats.tilesSent} failed=${stats.tilesFailed} skipMemo=${stats.tilesSkippedMemo} ` +
+          `skipInactive=${stats.tilesSkippedInactive} skipEmpty=${stats.tilesSkippedEmpty} ` +
+          `remaining=${stats.tilesRemaining} aborted=${stats.aborted ? 1 : 0} ` +
+          `text=${stats.textSent ? 1 : 0}${inputPart} t=${frameStartMs.toFixed(0)}`
+        );
+      });
     }
   }
 
@@ -109,8 +191,11 @@ export async function initApp(): Promise<void> {
   }
 
   // Force an image-inclusive render+send now (first paint, asset-ready,
-  // page rebuild, and material game/settings changes).
+  // page rebuild, and material game/settings changes). Bumping renderSeq
+  // aborts any in-flight frame's remaining tiles — the follow-up run renders
+  // the newest state instead of finishing a stale flush.
   function scheduleWithImages(): void {
+    renderSeq += 1;
     suppressImages = false;
     clearImageCooldownTimer();
     scheduler.schedule();
@@ -176,6 +261,7 @@ export async function initApp(): Promise<void> {
     handleSystemSysEvent(event);
     const action = mapEvenHubEvent(event, store.getState());
     if (!action) return;
+    if (isPerfLoggingEnabled()) recordInput(action.type);
     if (action.type === "NEW_GAME") resetTapCooldown();
     if (action.type === "OPEN_EXIT_APP_UI") {
       armExitDialog();
@@ -186,8 +272,20 @@ export async function initApp(): Promise<void> {
     store.dispatch(action);
   });
   const unsubscribeEvents = hub.onEvent((event: EvenHubEvent) => {
+    // Log EVERY incoming host event before any guard/mapping: correlating
+    // send slowdowns with what the host delivers (foreground swaps, system
+    // events — or nothing at all) is the point of this capture.
+    perfLogLazy(() => `[Perf][Event] ${describeEvenHubEvent(event)} t=${perfNowMs().toFixed(0)}`);
     guardedEventHandler(event);
   });
+
+  // Webview visibility flips (notification overlays, app backgrounding) are a
+  // prime suspect for Chromium timer throttling — stamp every change.
+  if (isPerfLoggingEnabled() && typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      perfLogLazy(() => `[Perf][Vis] state=${document.visibilityState} t=${perfNowMs().toFixed(0)}`);
+    });
+  }
 
   function handleSystemSysEvent(event: EvenHubEvent): void {
     const et = event.sysEvent?.eventType;
@@ -336,8 +434,10 @@ export async function initApp(): Promise<void> {
     } else {
       // Navigation/selection-only (spam-swipe): push text immediately for
       // live feedback, defer the image until the user pauses. Bumping the
-      // sequence also aborts any image flush already in flight.
-      inputSeq += 1;
+      // sequence also aborts any image flush already in flight. A congested
+      // link gets a longer cooldown so image frames queue less often while
+      // per-tile sends run seconds long.
+      renderSeq += 1;
       suppressImages = true;
       scheduler.schedule();
       clearImageCooldownTimer();
@@ -345,7 +445,7 @@ export async function initApp(): Promise<void> {
         imageCooldownTimer = null;
         suppressImages = false;
         if (imageDeferred) scheduler.schedule();
-      }, IMAGE_COOLDOWN_MS);
+      }, isLinkCongested() ? CONGESTED_IMAGE_COOLDOWN_MS : IMAGE_COOLDOWN_MS);
     }
 
     // Auto-play the cascade on a win, after holding the finished board so the

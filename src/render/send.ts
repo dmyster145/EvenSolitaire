@@ -91,6 +91,19 @@ function bytesEqual(a: Uint8Array, b: Uint8Array | undefined): boolean {
   return true;
 }
 
+/** Per-frame transport counters. tilesRemaining drives deferred re-flushes. */
+export interface SendFrameStats {
+  textSent: boolean;
+  tilesSent: number;
+  tilesFailed: number;
+  tilesSkippedMemo: number;
+  tilesSkippedInactive: number;
+  tilesSkippedEmpty: number;
+  /** Changed tiles NOT sent because options.maxTiles capped this frame. */
+  tilesRemaining: number;
+  aborted: boolean;
+}
+
 /**
  * Send a frame. Text goes out FIRST (cheap) so the panel stays live even when
  * the slow image tiles that follow are skipped. Image tiles can be suppressed
@@ -104,12 +117,29 @@ function bytesEqual(a: Uint8Array, b: Uint8Array | undefined): boolean {
  * the top tile a whole send before the bottom tile catches up, which reads as
  * the card jumping ahead of itself. `frame.tileOrder` lets the caller sequence
  * tiles along the direction of travel so the trail extends smoothly instead.
+ *
+ * `options.maxTiles` caps how many tiles this frame may SEND (skips don't
+ * count). Used while the BLE link is congested: one tile per flush keeps
+ * frames short; changed-but-unsent tiles are reported via `tilesRemaining` so
+ * the caller can schedule a follow-up flush.
  */
 export async function sendFrame(
   hub: SendBridge,
   frame: Frame,
-  options: { images?: boolean; shouldAbortImages?: () => boolean } = {}
-): Promise<void> {
+  options: { images?: boolean; shouldAbortImages?: () => boolean; maxTiles?: number } = {}
+): Promise<SendFrameStats> {
+  const stats: SendFrameStats = {
+    textSent: false,
+    tilesSent: 0,
+    tilesFailed: 0,
+    tilesSkippedMemo: 0,
+    tilesSkippedInactive: 0,
+    tilesSkippedEmpty: 0,
+    tilesRemaining: 0,
+    aborted: false,
+  };
+  const maxTiles = options.maxTiles ?? Number.POSITIVE_INFINITY;
+
   if (isActive(INFO_TEXT_CONTAINER.id) && frame.infoText !== lastInfoTextSent) {
     const ok = await hub.updateText(
       INFO_TEXT_CONTAINER.id,
@@ -117,9 +147,10 @@ export async function sendFrame(
       frame.infoText
     );
     if (ok) lastInfoTextSent = frame.infoText;
+    stats.textSent = ok;
   }
 
-  if (options.images === false) return;
+  if (options.images === false) return stats;
   const aborted = options.shouldAbortImages ?? (() => false);
 
   // Caller-supplied order first, then anything it did not mention.
@@ -128,19 +159,44 @@ export async function sendFrame(
     : DEFAULT_TILE_ORDER;
 
   for (const id of order) {
-    if (aborted()) return;
+    if (aborted()) {
+      stats.aborted = true;
+      return stats;
+    }
     const tile = TILE_BY_ID.get(id);
-    if (!tile || !isActive(id)) continue;
+    if (!tile || !isActive(id)) {
+      stats.tilesSkippedInactive += 1;
+      continue;
+    }
     const png = pngForTile(frame, id);
-    if (!png || png.length === 0) continue;
-    if (bytesEqual(png, lastSentByTile.get(id))) continue;
+    if (!png || png.length === 0) {
+      stats.tilesSkippedEmpty += 1;
+      continue;
+    }
+    if (bytesEqual(png, lastSentByTile.get(id))) {
+      stats.tilesSkippedMemo += 1;
+      continue;
+    }
+    if (stats.tilesSent + stats.tilesFailed >= maxTiles) {
+      // Cap reached: count the tile as pending instead of sending it, so the
+      // caller knows a follow-up flush is needed. The memo stays untouched —
+      // the tile still differs from what the glasses show.
+      stats.tilesRemaining += 1;
+      continue;
+    }
     // Only memoize a tile the glasses actually took. The bridge returns null when the SDK
     // call threw, and a non-success result when the write failed; recording either would
     // mark stale pixels as current, and nothing retries until that tile's bytes change --
     // so a failed last write would leave the wrong board up indefinitely.
     const result = await hub.updateImage(packImage(tile.id, tile.name, png));
-    if (result === ImageRawDataUpdateResult.success) lastSentByTile.set(id, png);
+    if (result === ImageRawDataUpdateResult.success) {
+      lastSentByTile.set(id, png);
+      stats.tilesSent += 1;
+    } else {
+      stats.tilesFailed += 1;
+    }
   }
+  return stats;
 }
 
 function packImage(containerID: number, containerName: string, imageData: Uint8Array): ImageRawDataUpdate {

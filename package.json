@@ -10,10 +10,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "node scripts/run-coverage.mjs"
+    "test:coverage": "node scripts/run-coverage.mjs",
+    "perf:analyze": "node scripts/perf/analyze-log.cjs",
+    "perf:compare": "node scripts/perf/compare-summaries.cjs"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "^0.0.12",
+    "pako": "^1.0.11",
     "upng-js": "^2.1.0"
   },
   "devDependencies": {

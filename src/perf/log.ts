@@ -51,12 +51,71 @@ let domFlushTimer: ReturnType<typeof setTimeout> | null = null;
 /** When true, perfLog does not append to DOM or capture (stop/start button). */
 let recordingPaused = false;
 
+let perfNowProvider: (() => number) | null = null;
+
 export function perfNowMs(): number {
+  if (perfNowProvider) return perfNowProvider();
   return typeof performance !== "undefined" ? performance.now() : Date.now();
 }
 
+/** TEST HOOK: inject a deterministic clock. Pass null to restore production behavior. */
+export function setPerfNowProvider(provider: (() => number) | null): void {
+  perfNowProvider = provider;
+}
+
+/**
+ * TEST HOOK: force perf logging on/off regardless of the compile-time flags,
+ * so instrumentation tests keep passing when the shipping flags are toggled
+ * between diagnostic and release builds. Pass null to restore flag behavior.
+ * When forced on, only the console sink emits (capture/DOM stay flag-gated) —
+ * tests observe lines via a console.log spy.
+ */
+let perfEnabledOverride: boolean | null = null;
+
+export function setPerfLoggingEnabledForTests(enabled: boolean | null): void {
+  perfEnabledOverride = enabled;
+}
+
 export function isPerfLoggingEnabled(): boolean {
+  if (perfEnabledOverride !== null) return perfEnabledOverride;
   return PERF_LOG_CONSOLE_ENABLED || PERF_LOG_CAPTURE_ENABLED || PERF_LOG_DOM_ENABLED;
+}
+
+// ---------------------------------------------------------------------------
+// Input traces: stamp the latest input action so the render/send path can
+// report input->frame latency without threading context through callers.
+// ---------------------------------------------------------------------------
+
+export interface InputPerfTrace {
+  /** Action name as dispatched (e.g. FOCUS_MOVE). */
+  name: string;
+  /** Monotonically-incrementing sequence number, 1-based per page load. */
+  seq: number;
+  /** perfNowMs() timestamp when the input was recorded. */
+  tMs: number;
+}
+
+let inputSeqCounter = 0;
+let lastInputTrace: InputPerfTrace | null = null;
+
+/** Stamp the latest input action. Returns the trace so callers can store it. */
+export function recordInput(name: string): InputPerfTrace {
+  inputSeqCounter += 1;
+  lastInputTrace = { name, seq: inputSeqCounter, tMs: perfNowMs() };
+  return lastInputTrace;
+}
+
+/** Read the latest input trace without mutating state. */
+export function getLastInputTrace(): InputPerfTrace | null {
+  return lastInputTrace;
+}
+
+/** TEST HOOK: reset accumulated input state and hooks between tests. */
+export function resetPerfLogState(): void {
+  inputSeqCounter = 0;
+  lastInputTrace = null;
+  perfNowProvider = null;
+  perfEnabledOverride = null;
 }
 
 function safeNow(): number {
@@ -323,8 +382,20 @@ function ensureInitialized(): void {
   window.addEventListener("beforeunload", flushEntriesForced);
 }
 
+/**
+ * Call once at app boot, BEFORE the first instrumented hot path runs.
+ * Pre-warms the capture sink (the lazy localStorage load of up to MAX_ENTRIES
+ * persisted entries would otherwise run inside whichever hot path logs first —
+ * an observer-effect spike in the very numbers being measured) and stamps a
+ * session marker so multi-session dumps can be split: t= restarts every page
+ * load, so mixing sessions without a marker corrupts timeline analysis.
+ */
+export function markPerfSessionStart(): void {
+  perfLog(`[Perf][Session] start wall=${new Date(safeNow()).toISOString()} t=${perfNowMs().toFixed(0)}`);
+}
+
 export function perfLog(msg: string): void {
-  if (!PERF_LOG_CONSOLE_ENABLED && !PERF_LOG_CAPTURE_ENABLED && !PERF_LOG_DOM_ENABLED) return;
+  if (!isPerfLoggingEnabled()) return;
   if (recordingPaused) return;
 
   if (PERF_LOG_CAPTURE_ENABLED) {
@@ -333,7 +404,7 @@ export function perfLog(msg: string): void {
     ensureDomInitialized();
   }
 
-  if (PERF_LOG_CONSOLE_ENABLED) {
+  if (PERF_LOG_CONSOLE_ENABLED || perfEnabledOverride === true) {
     console.log(msg);
   }
 

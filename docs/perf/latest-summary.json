@@ -1,0 +1,482 @@
+{
+  "meta": {
+    "totalLines": 595,
+    "perfLines": 581,
+    "sessions": 1,
+    "firstT": 308,
+    "lastT": 220255,
+    "durationMs": 219947
+  },
+  "startup": {
+    "setupMs": 76.2,
+    "setupOk": true,
+    "rebuilds": 0,
+    "avgRebuildMs": null
+  },
+  "imageSend": {
+    "n": 126,
+    "p50": 303.4,
+    "p95": 2081.6,
+    "min": 145.5,
+    "max": 2269.2,
+    "avg": 567.3,
+    "avgBytes": 1017,
+    "failed": 0
+  },
+  "imageSendByTile": {
+    "1": {
+      "n": 38,
+      "p50": 211.6,
+      "p95": 1960.8,
+      "min": 145.5,
+      "max": 2162.5,
+      "avg": 601.5,
+      "avgBytes": 745,
+      "failed": 0
+    },
+    "2": {
+      "n": 45,
+      "p50": 306.6,
+      "p95": 2082.3,
+      "min": 244.6,
+      "max": 2209.1,
+      "avg": 548.4,
+      "avgBytes": 1138,
+      "failed": 0
+    },
+    "3": {
+      "n": 43,
+      "p50": 324.2,
+      "p95": 2105.8,
+      "min": 232.2,
+      "max": 2269.2,
+      "avg": 556.8,
+      "avgBytes": 1131,
+      "failed": 0
+    }
+  },
+  "imageWindows": {
+    "windows": 36,
+    "sends": 125,
+    "weightedAvg": 566,
+    "max": 2269.2,
+    "min": 145.5,
+    "failed": 0
+  },
+  "textSend": {
+    "windows": 37,
+    "sends": 86,
+    "weightedAvg": 161.7,
+    "max": 1250.2,
+    "min": 43.2,
+    "failed": 0
+  },
+  "textSlowTraces": 67,
+  "encode": {
+    "slowTraces": 15,
+    "summaries": 9,
+    "lastAvgTotalMs": 27.6,
+    "lastMaxTotalMs": 55.8
+  },
+  "sched": {
+    "windows": 37,
+    "runs": 160,
+    "maxDelay": 2084.8,
+    "coalesced": 11
+  },
+  "frames": {
+    "n": 160,
+    "withImages": 96,
+    "aborted": 14,
+    "avgRender": 18.5,
+    "maxRender": 61.1,
+    "maxSend": 2561.4
+  },
+  "input": {
+    "tracedFrames": 149,
+    "p50InputAge": 180.5,
+    "p95InputAge": 753.4
+  },
+  "events": {
+    "n": 89,
+    "byLabel": {
+      "text:SCROLL_TOP_EVENT": 23,
+      "sys:none": 29,
+      "text:SCROLL_BOTTOM_EVENT": 31,
+      "sys:DOUBLE_CLICK_EVENT": 6
+    }
+  },
+  "webview": {
+    "hiddenCount": 0,
+    "visibleCount": 0,
+    "suspendedCount": 0
+  },
+  "congestion": {
+    "transitions": 1,
+    "on": 1,
+    "off": 0,
+    "framesCapped": 6
+  },
+  "episodes": {
+    "threshold": 530.9,
+    "list": [
+      {
+        "startT": 694,
+        "endT": 694,
+        "durationMs": 0,
+        "slowSends": 1,
+        "sendsInRange": 1,
+        "avgSlowMs": 541.6,
+        "peakMs": 541.6,
+        "precedingEvent": null,
+        "eventsNearby": [],
+        "recoveredAfterMs": 541
+      },
+      {
+        "startT": 131964,
+        "endT": 151412,
+        "durationMs": 19448,
+        "slowSends": 8,
+        "sendsInRange": 8,
+        "avgSlowMs": 2030.6,
+        "peakMs": 2269.2,
+        "precedingEvent": {
+          "label": "text:SCROLL_BOTTOM_EVENT",
+          "t": 131361,
+          "gapMs": 603
+        },
+        "eventsNearby": [
+          {
+            "label": "text:SCROLL_TOP_EVENT",
+            "t": 102157
+          },
+          {
+            "label": "sys:none",
+            "t": 103788
+          },
+          {
+            "label": "sys:none",
+            "t": 105787
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 107161
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 107760
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 108440
+          },
+          {
+            "label": "sys:none",
+            "t": 115652
+          },
+          {
+            "label": "sys:none",
+            "t": 117799
+          },
+          {
+            "label": "sys:DOUBLE_CLICK_EVENT",
+            "t": 119180
+          },
+          {
+            "label": "text:SCROLL_TOP_EVENT",
+            "t": 119854
+          },
+          {
+            "label": "sys:none",
+            "t": 121551
+          },
+          {
+            "label": "sys:none",
+            "t": 123742
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 126664
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 127173
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 127747
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 129024
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 129848
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 130597
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 131361
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 132527
+          },
+          {
+            "label": "congest:on",
+            "t": 134174
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 134575
+          },
+          {
+            "label": "sys:none",
+            "t": 139712
+          },
+          {
+            "label": "text:SCROLL_TOP_EVENT",
+            "t": 141163
+          },
+          {
+            "label": "sys:DOUBLE_CLICK_EVENT",
+            "t": 142864
+          },
+          {
+            "label": "text:SCROLL_TOP_EVENT",
+            "t": 145127
+          },
+          {
+            "label": "sys:none",
+            "t": 150872
+          }
+        ],
+        "recoveredAfterMs": null
+      },
+      {
+        "startT": 156549,
+        "endT": 173422,
+        "durationMs": 16873,
+        "slowSends": 7,
+        "sendsInRange": 7,
+        "avgSlowMs": 1663.6,
+        "peakMs": 2114.8,
+        "precedingEvent": {
+          "label": "sys:none",
+          "t": 155926,
+          "gapMs": 623
+        },
+        "eventsNearby": [
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 126664
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 127173
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 127747
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 129024
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 129848
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 130597
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 131361
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 132527
+          },
+          {
+            "label": "congest:on",
+            "t": 134174
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 134575
+          },
+          {
+            "label": "sys:none",
+            "t": 139712
+          },
+          {
+            "label": "text:SCROLL_TOP_EVENT",
+            "t": 141163
+          },
+          {
+            "label": "sys:DOUBLE_CLICK_EVENT",
+            "t": 142864
+          },
+          {
+            "label": "text:SCROLL_TOP_EVENT",
+            "t": 145127
+          },
+          {
+            "label": "sys:none",
+            "t": 150872
+          },
+          {
+            "label": "sys:none",
+            "t": 155926
+          },
+          {
+            "label": "sys:none",
+            "t": 159342
+          },
+          {
+            "label": "text:SCROLL_TOP_EVENT",
+            "t": 163038
+          },
+          {
+            "label": "sys:none",
+            "t": 165093
+          },
+          {
+            "label": "sys:none",
+            "t": 171118
+          }
+        ],
+        "recoveredAfterMs": null
+      },
+      {
+        "startT": 191227,
+        "endT": 196098,
+        "durationMs": 4871,
+        "slowSends": 3,
+        "sendsInRange": 3,
+        "avgSlowMs": 2047.9,
+        "peakMs": 2132.8,
+        "precedingEvent": {
+          "label": "text:SCROLL_BOTTOM_EVENT",
+          "t": 190472,
+          "gapMs": 755
+        },
+        "eventsNearby": [
+          {
+            "label": "text:SCROLL_TOP_EVENT",
+            "t": 163038
+          },
+          {
+            "label": "sys:none",
+            "t": 165093
+          },
+          {
+            "label": "sys:none",
+            "t": 171118
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 190472
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 192184
+          }
+        ],
+        "recoveredAfterMs": null
+      },
+      {
+        "startT": 206903,
+        "endT": 208924,
+        "durationMs": 2021,
+        "slowSends": 2,
+        "sendsInRange": 2,
+        "avgSlowMs": 1918.3,
+        "peakMs": 2084.7,
+        "precedingEvent": {
+          "label": "text:SCROLL_BOTTOM_EVENT",
+          "t": 206143,
+          "gapMs": 760
+        },
+        "eventsNearby": [
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 190472
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 192184
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 206143
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 207842
+          }
+        ],
+        "recoveredAfterMs": null
+      },
+      {
+        "startT": 215399,
+        "endT": 220255,
+        "durationMs": 4856,
+        "slowSends": 3,
+        "sendsInRange": 3,
+        "avgSlowMs": 1398.4,
+        "peakMs": 2029,
+        "precedingEvent": {
+          "label": "text:SCROLL_BOTTOM_EVENT",
+          "t": 214424,
+          "gapMs": 975
+        },
+        "eventsNearby": [
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 190472
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 192184
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 206143
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 207842
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 214424
+          },
+          {
+            "label": "text:SCROLL_BOTTOM_EVENT",
+            "t": 217466
+          }
+        ],
+        "recoveredAfterMs": null
+      }
+    ]
+  },
+  "issues": [
+    {
+      "code": "IMG_SEND_DEGRADED",
+      "severity": "risk",
+      "message": "6 slowdown episode(s) detected (threshold 530.9ms); worst peak 2269.2ms; 5 of them preceded by a logged host event within 30s."
+    },
+    {
+      "code": "SCHED_BACKPRESSURE",
+      "severity": "risk",
+      "message": "Scheduler queue delay peaked at 2084.8ms — renders are backing up behind sends."
+    }
+  ]
+}

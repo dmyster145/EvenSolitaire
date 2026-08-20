@@ -1,5 +1,11 @@
 /// <reference types="vite/client" />
 
+declare module "pako" {
+  /** zlib-wrapped DEFLATE, as required by PNG IDAT. */
+  export function deflate(data: Uint8Array, options?: { level?: number }): Uint8Array;
+  export function inflate(data: Uint8Array): Uint8Array;
+}
+
 declare module "upng-js" {
   /** Encode RGBA or indexed image data as PNG. */
   function encode(

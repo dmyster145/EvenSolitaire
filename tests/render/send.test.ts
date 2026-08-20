@@ -168,4 +168,48 @@ describe("sendFrame", () => {
     await sendFrame(hub, f);
     expect(hub.updateImage).toHaveBeenCalledTimes(2);
   });
+
+  describe("maxTiles cap (congested mode)", () => {
+    it("sends only the first changed tile and reports the rest as remaining", async () => {
+      const hub = makeBridge();
+      const stats = await sendFrame(hub, frame(), { maxTiles: 1 });
+      // Without the cap this frame sends 3 tiles (first test above).
+      expect(hub.updateImage).toHaveBeenCalledTimes(1);
+      expect(stats.tilesSent).toBe(1);
+      expect(stats.tilesRemaining).toBe(2);
+      expect(stats.textSent).toBe(true);
+    });
+
+    it("capped-out tiles stay unmemoized: successive capped frames drain the backlog", async () => {
+      const hub = makeBridge();
+      await sendFrame(hub, frame(), { maxTiles: 1 }); // sends top
+      const second = await sendFrame(hub, frame(), { maxTiles: 1 }); // top memo-skipped, sends bottom-left
+      expect(second.tilesSkippedMemo).toBe(1);
+      expect(second.tilesSent).toBe(1);
+      expect(second.tilesRemaining).toBe(1);
+      const third = await sendFrame(hub, frame(), { maxTiles: 1 });
+      expect(third.tilesSent).toBe(1);
+      expect(third.tilesRemaining).toBe(0);
+      expect(hub.updateImage).toHaveBeenCalledTimes(3);
+    });
+
+    it("memo-skips do not consume the cap", async () => {
+      const hub = makeBridge();
+      await sendFrame(hub, frame()); // everything on the glasses
+      const f = frame();
+      f.bottomRightPng = new Uint8Array([9, 9]); // only one tile changed
+      const stats = await sendFrame(hub, f, { maxTiles: 1 });
+      // The two unchanged tiles are memo-skips; the changed one must still send.
+      expect(stats.tilesSent).toBe(1);
+      expect(stats.tilesSkippedMemo).toBe(2);
+      expect(stats.tilesRemaining).toBe(0);
+    });
+
+    it("no cap means unlimited (default behavior unchanged)", async () => {
+      const hub = makeBridge();
+      const stats = await sendFrame(hub, frame());
+      expect(stats.tilesSent).toBe(3);
+      expect(stats.tilesRemaining).toBe(0);
+    });
+  });
 });
