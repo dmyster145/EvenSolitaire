@@ -107,16 +107,37 @@ function imagePayloadBytes(data: ImageRawDataUpdate): number {
 }
 
 /**
- * @evenrealities/even_hub_sdk@0.0.12 workaround.
+ * EXPERIMENT TOGGLE — whether to apply the compressMode workaround below.
  *
- * 0.0.12's ImageRawDataUpdate.toJson unconditionally tags payloads with
- * compressMode:2 (LZ4), but the bundle ships no LZ4 code — bytes go out raw.
- * The host receives uncompressed data labeled as LZ4 and returns sendFailed
- * for every image, so text renders but images don't.
+ * `true` (default, release-safe) = current shipped behavior: strip compressMode
+ * so the host treats the bytes as uncompressed.
  *
- * Wrap toJson once at init to strip compressMode, restoring the pre-0.0.12
- * wire shape. Remove once the SDK either ships real compression or stops
- * tagging uncompressed data.
+ * `false` = leave compressMode:2 on the payload, to test what the Even App does
+ * with it. The SDK JS never compresses (0.0.12/0.0.13/0.0.14 all hardcode
+ * compressMode:2 and emit raw bytes — verified), so any real LZ4 must be
+ * host-side in the Even App (>=2.2.6, which SDK 0.0.13 began requiring). If the
+ * host does host-side LZ4, this patch has been DISABLING it. The A/B test:
+ *   - patch ON  (default): [Perf][ImgSend] result=success, note bytes/ms
+ *   - patch OFF (this=false): do images still render?
+ *       success  -> host handles compressMode:2; patch is unnecessary and may
+ *                   have been suppressing host-side BLE compression. Compare ms.
+ *       sendFailed -> host still rejects it; patch stays required.
+ * Fully restart between runs (the patch monkeypatches a module-level static).
+ * Committed default MUST stay `true`.
+ */
+const COMPRESS_MODE_PATCH_ENABLED = true;
+
+/**
+ * @evenrealities/even_hub_sdk compressMode workaround (see COMPRESS_MODE_PATCH_ENABLED).
+ *
+ * ImageRawDataUpdate.toJson unconditionally tags payloads with compressMode:2
+ * (LZ4) but the SDK JS ships no compression code — bytes go out raw. On the
+ * Even App this shipped against, the host received uncompressed data labeled as
+ * LZ4 and returned sendFailed for every image (text rendered, images didn't).
+ * Stripping compressMode restores the pre-0.0.12 wire shape.
+ *
+ * OPEN QUESTION (this toggle exists to answer): on Even App >=2.2.6 the LZ4 may
+ * be performed host-side, in which case stripping compressMode disables it.
  */
 function patchImageCompressModeBug(): void {
   const cls = ImageRawDataUpdate as unknown as {
@@ -159,7 +180,9 @@ export class EvenHubBridge {
   private bridge: EvenAppBridgeType | null = null;
 
   async init(): Promise<void> {
-    patchImageCompressModeBug();
+    if (COMPRESS_MODE_PATCH_ENABLED) patchImageCompressModeBug();
+    // Self-label the capture so an A/B pair is unambiguous in the perf console.
+    perfLog(`[Perf][CompressPatch] enabled=${COMPRESS_MODE_PATCH_ENABLED ? 1 : 0}`);
     try {
       this.bridge = await withTimeout(
         waitForEvenAppBridge(),
