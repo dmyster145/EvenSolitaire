@@ -44,7 +44,7 @@ import { whenCardAssetsReady, whenCardSuitAssetsReady } from "../render/card-can
 import { activateKeepAlive, isKeepAliveActive } from "../utils/keep-alive";
 import { error as logError } from "../utils/logger";
 import type { GameState } from "../game/types";
-import { WIN_ANIMATION_TICK_MS, WIN_BOARD_HOLD_MS, NATIVE_MENU_ENABLED } from "../state/constants";
+import { WIN_ANIMATION_TICK_MS, WIN_BOARD_HOLD_MS } from "../state/constants";
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 const MESSAGE_DISMISS_MS = 1500;
@@ -276,16 +276,12 @@ export async function initApp(): Promise<void> {
     // Log EVERY incoming host event before any guard/mapping: correlating
     // send slowdowns with what the host delivers (foreground swaps, system
     // events — or nothing at all) is the point of this capture.
+    // Logs EVERY host event through the on-screen perf console (the retrieval
+    // path on hardware). describeEvenHubEvent names menu clicks as `kind=menu
+    // itemID=N`, so the native-menu experiment reads out here: enable perf DOM
+    // logging alongside NATIVE_MENU_ENABLED and the whole event stream — swipes,
+    // presses, any menu-open sysEvent, and the click — is captured and Copy-able.
     perfLogLazy(() => `[Perf][Event] ${describeEvenHubEvent(event)} t=${perfNowMs().toFixed(0)}`);
-    // Native-menu experiment: with the one flag on, surface EVERY incoming host
-    // event on-device (unconditional of the perf flag) so a single hardware pass
-    // answers the open questions the docs don't — does the OS swallow touchpad
-    // input while its menu is open (no scroll/click lines appear then), does the
-    // dismiss double-tap reach us (a DOUBLE_CLICK line after close), and does
-    // opening the menu fire any sysEvent. Dead code when the flag is off.
-    if (NATIVE_MENU_ENABLED) {
-      console.log(`[Solitaire][NativeMenu] event ${describeEvenHubEvent(event)}`);
-    }
     guardedEventHandler(event);
   });
 
