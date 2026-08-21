@@ -193,22 +193,81 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
     // Fall through to execCommand fallback.
   }
 
+  // execCommand fallback, tuned for mobile WebViews (the glasses run a Flutter
+  // WebView where the async clipboard API is often blocked): the textarea must
+  // be on-screen, editable, and explicitly range-selected or the copy is a
+  // silent no-op on iOS/Android engines.
   try {
     const textarea = document.createElement("textarea");
     textarea.value = text;
-    textarea.setAttribute("readonly", "true");
+    textarea.contentEditable = "true";
+    textarea.readOnly = false;
     textarea.style.position = "fixed";
-    textarea.style.top = "-9999px";
-    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    textarea.style.left = "0";
+    textarea.style.width = "1px";
+    textarea.style.height = "1px";
+    textarea.style.padding = "0";
+    textarea.style.border = "none";
+    textarea.style.opacity = "0";
     document.body.appendChild(textarea);
     textarea.focus();
     textarea.select();
+    if (typeof textarea.setSelectionRange === "function") {
+      textarea.setSelectionRange(0, text.length);
+    }
     const ok = document.execCommand("copy");
     textarea.remove();
     return ok;
   } catch {
     return false;
   }
+}
+
+/** Select an element's text so the user can copy it by hand when clipboard writes fail. */
+function selectElementText(el: HTMLElement): void {
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  } catch {
+    // Best effort only.
+  }
+}
+
+/**
+ * The text the "Copy All" button copies. Prefer the capture buffer (up to
+ * MAX_ENTRIES, and it survives reloads via localStorage) when capture is on,
+ * since the DOM only keeps the last DOM_MAX_LINES on-screen. Fall back to the
+ * visible <pre> so copy still works in DOM-only sessions — where the capture
+ * buffer and the __solitairePerf API don't exist at all.
+ */
+function getFullLogText(): string {
+  if (PERF_LOG_CAPTURE_ENABLED && entries.length > 0) {
+    return formatDumpLines(entries);
+  }
+  const output = getDomOutput();
+  return output ? (output.textContent ?? "") : "";
+}
+
+/** Copy the full log and give on-panel feedback; select the text as a manual fallback. */
+async function copyLogFromButton(btn: HTMLButtonElement): Promise<void> {
+  const restore = btn.getAttribute("data-label") ?? btn.textContent ?? "Copy All";
+  btn.setAttribute("data-label", restore);
+  const text = getFullLogText();
+  const ok = await copyTextToClipboard(text);
+  if (!ok) {
+    const output = getDomOutput();
+    if (output) selectElementText(output);
+  }
+  btn.textContent = ok ? "Copied!" : "Select + copy";
+  setTimeout(() => {
+    btn.textContent = btn.getAttribute("data-label") ?? "Copy All";
+  }, 1600);
 }
 
 function getDomPanel(): HTMLElement | null {
@@ -309,12 +368,13 @@ function wireDomControls(): void {
   }
 
   if (copyBtn instanceof HTMLButtonElement) {
-    copyBtn.addEventListener("click", () => {
-      const api = (window as Window & { __solitairePerf?: { copyAll: () => Promise<boolean> } })
-        .__solitairePerf;
-      if (api) {
-        void api.copyAll();
-      }
+    const btn = copyBtn;
+    btn.addEventListener("click", () => {
+      // Copy the visible log directly — do NOT depend on __solitairePerf.copyAll,
+      // which only exists when PERF_LOG_CAPTURE_ENABLED is on. In a DOM-only
+      // session (the menu experiment's setup) that API is absent, which is why
+      // the button did nothing. copyLogFromButton reads the fuller source available.
+      void copyLogFromButton(btn);
     });
   }
 
