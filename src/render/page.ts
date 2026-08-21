@@ -18,7 +18,7 @@ import {
   MenuContainerProperty,
   MenuItemProperty,
 } from "@evenrealities/even_hub_sdk";
-import { MENU_OPTIONS, NATIVE_MENU_ENABLED, nativeMenuItemID } from "../state/constants";
+import { NATIVE_MENU_OPTIONS, NATIVE_MENU_ENABLED, nativeMenuItemID } from "../state/constants";
 import {
   IMAGE_TILE_TOP,
   IMAGE_TILE_TOP_LEFT,
@@ -111,7 +111,7 @@ function nativeMenuField(): { menuObject: MenuContainerProperty } | Record<strin
   if (!NATIVE_MENU_ENABLED) return {};
   return {
     menuObject: new MenuContainerProperty({
-      menuItems: MENU_OPTIONS.map(
+      menuItems: NATIVE_MENU_OPTIONS.map(
         (opt) => new MenuItemProperty({ itemName: opt, itemID: nativeMenuItemID(opt) })
       ),
     }),

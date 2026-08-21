@@ -5,7 +5,7 @@ import { extendTapCooldown, recordTap, resetTapCooldown } from "../../src/input/
 import { resetScrollDebounce } from "../../src/input/debounce";
 import { initialState } from "../../src/state/reducer";
 import { focusIndexToTarget } from "../../src/state/ui-mode";
-import { FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, MENU_OPTIONS } from "../../src/state/constants";
+import { FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, MENU_OPTIONS, NATIVE_MENU_ENABLED } from "../../src/state/constants";
 import type { AppState } from "../../src/state/types";
 
 function withUi(ui: Partial<AppState["ui"]>): AppState {
@@ -67,13 +67,15 @@ describe("input action map (menu exit behavior)", () => {
     expect(action).toEqual({ type: "NEW_GAME" });
   });
 
-  it("double tap on win opens the menu", () => {
+  it("double tap on win opens the hand-rolled menu, or no-ops under the native menu", () => {
     const state: AppState = {
       ...withUi({}),
       game: { ...initialState.game, won: true },
     };
     const action = mapEvenHubEvent(listClick(OsEventTypeList.DOUBLE_CLICK_EVENT), state);
-    expect(action).toEqual({ type: "TOGGLE_MENU" });
+    // With the native menu on, the OS owns menu invocation, so our double-tap goes
+    // quiet (null); with it off, double-tap opens the hand-rolled menu.
+    expect(action).toEqual(NATIVE_MENU_ENABLED ? null : { type: "TOGGLE_MENU" });
   });
 
   it("tap with menu open on win still selects the menu item", () => {

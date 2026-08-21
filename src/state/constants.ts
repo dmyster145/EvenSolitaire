@@ -37,6 +37,23 @@ export function menuOptionForItemID(itemID: number): MenuOption | undefined {
 }
 
 /**
+ * Options intentionally NOT registered in the OS-native menu. "Exit" is dropped
+ * because the OS system menu already carries a built-in "close" that exits the
+ * app, so our own Exit item is redundant there. The code that handles an Exit
+ * click stays in place (see mapMenuClick) — in case the ER review process wants
+ * it back, re-enabling is just removing it from this list. Excluded options keep
+ * their hand-rolled menu behavior and their stable itemID; they're only omitted
+ * from the native registration, so remaining itemIDs are unchanged (non-contiguous
+ * is fine — firmware only requires non-zero and unique).
+ */
+export const NATIVE_MENU_EXCLUDED_OPTIONS: readonly MenuOption[] = ["Exit"];
+
+/** Options actually registered in the native menu, in MENU_OPTIONS order. */
+export const NATIVE_MENU_OPTIONS: readonly MenuOption[] = MENU_OPTIONS.filter(
+  (option) => !NATIVE_MENU_EXCLUDED_OPTIONS.includes(option)
+);
+
+/**
  * Win-animation tick interval. ~31fps is an upper bound, not a promise: the
  * render scheduler is single-in-flight, so ticks the BLE link can't keep up
  * with are coalesced rather than queued.

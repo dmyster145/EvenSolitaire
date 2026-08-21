@@ -9,7 +9,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MenuItemClickEvent } from "@evenrealities/even_hub_sdk";
 import { rootReducer, initialState } from "../../src/state/reducer";
 import { clearUndo } from "../../src/features/undo";
-import { MENU_OPTIONS, nativeMenuItemID, menuOptionForItemID } from "../../src/state/constants";
+import {
+  MENU_OPTIONS,
+  NATIVE_MENU_OPTIONS,
+  NATIVE_MENU_EXCLUDED_OPTIONS,
+  nativeMenuItemID,
+  menuOptionForItemID,
+} from "../../src/state/constants";
 import { mapMenuClick } from "../../src/input/action-map";
 import type { AppState } from "../../src/state/types";
 import type { Card, GameState } from "../../src/game/types";
@@ -72,6 +78,31 @@ describe("native menu itemID mapping", () => {
   it("returns undefined for an itemID outside the menu", () => {
     expect(menuOptionForItemID(0)).toBeUndefined();
     expect(menuOptionForItemID(MENU_OPTIONS.length + 1)).toBeUndefined();
+  });
+});
+
+describe("native menu registration excludes Exit", () => {
+  it("omits Exit from the registered native options", () => {
+    // The OS system menu already has a built-in 'close' that exits; our Exit item
+    // is redundant there. Falsifiable: emptying NATIVE_MENU_EXCLUDED_OPTIONS puts
+    // Exit back in and fails this.
+    expect(NATIVE_MENU_EXCLUDED_OPTIONS).toContain("Exit");
+    expect(NATIVE_MENU_OPTIONS).not.toContain("Exit");
+  });
+
+  it("still registers the other four options in MENU_OPTIONS order", () => {
+    expect([...NATIVE_MENU_OPTIONS]).toEqual(["Move Assist", "Draw Card", "Play Animation", "Reset"]);
+  });
+
+  it("keeps stable itemIDs for the registered options (Exit's ID is just never sent)", () => {
+    // itemIDs derive from MENU_OPTIONS index, so excluding Exit leaves the others
+    // unchanged and non-contiguous IDs are fine (firmware wants non-zero + unique).
+    expect(NATIVE_MENU_OPTIONS.map((o) => nativeMenuItemID(o))).toEqual([1, 2, 3, 4]);
+  });
+
+  it("still routes an Exit click defensively (handler retained even though unregistered)", () => {
+    // mapMenuClick keeps Exit handling so a stray Exit itemID still exits cleanly.
+    expect(mapMenuClick(menuClick(nativeMenuItemID("Exit")))).toEqual({ type: "OPEN_EXIT_APP_UI" });
   });
 });
 
