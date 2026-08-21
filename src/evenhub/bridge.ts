@@ -107,37 +107,37 @@ function imagePayloadBytes(data: ImageRawDataUpdate): number {
 }
 
 /**
- * EXPERIMENT TOGGLE — whether to apply the compressMode workaround below.
+ * Whether to apply the legacy compressMode workaround below. Escape hatch, off
+ * by default.
  *
- * `true` (default, release-safe) = current shipped behavior: strip compressMode
- * so the host treats the bytes as uncompressed.
+ * `false` (default) — leave `compressMode:2` on the payload; the Even App handles
+ * it host-side. VALIDATED 2026-08-21 on Even App >=2.2.9: every image renders
+ * `result=success` with the patch off. Our `min_app_version` is 2.2.9, so every
+ * real install has a host that accepts `compressMode:2`. This is the SDK-intended
+ * path.
  *
- * `false` = leave compressMode:2 on the payload, to test what the Even App does
- * with it. The SDK JS never compresses (0.0.12/0.0.13/0.0.14 all hardcode
- * compressMode:2 and emit raw bytes — verified), so any real LZ4 must be
- * host-side in the Even App (>=2.2.6, which SDK 0.0.13 began requiring). If the
- * host does host-side LZ4, this patch has been DISABLING it. The A/B test:
- *   - patch ON  (default): [Perf][ImgSend] result=success, note bytes/ms
- *   - patch OFF (this=false): do images still render?
- *       success  -> host handles compressMode:2; patch is unnecessary and may
- *                   have been suppressing host-side BLE compression. Compare ms.
- *       sendFailed -> host still rejects it; patch stays required.
- * Fully restart between runs (the patch monkeypatches a module-level static).
- * Committed default MUST stay `true`.
+ * `true` — restore the old workaround: strip `compressMode` so the host treats
+ * the bytes as uncompressed. Only needed on Even App <2.2.6, where
+ * `compressMode:2` + uncompressed data returns `sendFailed` for every image.
+ *
+ * Background: the SDK JS never compresses (0.0.12/0.0.13/0.0.14 hardcode
+ * `compressMode:2` and emit raw bytes — verified); any real LZ4 is host-side in
+ * the Even App (>=2.2.6, which SDK 0.0.13 began requiring). So the old strip
+ * actively disabled the host path on modern apps. (No measurable send-latency
+ * change either way, but the two A/B runs had different payloads so that was
+ * inconclusive — and payload size is irrelevant to the notification-congestion
+ * issue regardless.)
  */
-const COMPRESS_MODE_PATCH_ENABLED = true;
+const COMPRESS_MODE_PATCH_ENABLED = false;
 
 /**
- * @evenrealities/even_hub_sdk compressMode workaround (see COMPRESS_MODE_PATCH_ENABLED).
+ * Legacy @evenrealities/even_hub_sdk compressMode workaround for Even App <2.2.6
+ * (see COMPRESS_MODE_PATCH_ENABLED — off by default).
  *
  * ImageRawDataUpdate.toJson unconditionally tags payloads with compressMode:2
- * (LZ4) but the SDK JS ships no compression code — bytes go out raw. On the
- * Even App this shipped against, the host received uncompressed data labeled as
- * LZ4 and returned sendFailed for every image (text rendered, images didn't).
- * Stripping compressMode restores the pre-0.0.12 wire shape.
- *
- * OPEN QUESTION (this toggle exists to answer): on Even App >=2.2.6 the LZ4 may
- * be performed host-side, in which case stripping compressMode disables it.
+ * (LZ4) but the SDK JS ships no compression code. On Even App <2.2.6 the host
+ * returned sendFailed for every image; stripping compressMode restored rendering.
+ * On >=2.2.6 the host handles compressMode:2 itself, so the strip is unnecessary.
  */
 function patchImageCompressModeBug(): void {
   const cls = ImageRawDataUpdate as unknown as {
