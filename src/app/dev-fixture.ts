@@ -68,21 +68,21 @@ function runsFixture(): GameState {
 function endgameFixture(): GameState {
   return {
     stock: [],
-    // A lingering waste card — the common real end of a draw-3 deal. Its presence must NOT
-    // disable the tableau tap-through (the bug this fixture reproduces).
-    waste: [card(13, "D")],
+    waste: [],
     foundations: [
       { cards: [card(1, "S"), card(2, "S")] }, // spades at 2
       { cards: [card(1, "H")] }, // hearts at A
       { cards: [card(1, "D")] }, // diamonds at A
       { cards: [card(1, "C")] }, // clubs at A
     ],
+    // Two still-face-down tableau cards (faceDown=2, as seen on hardware): these must NOT disable
+    // the tap-through. Stock and waste are empty, so this is the endgame playout.
     tableau: [
-      pile([], [card(13, "H"), card(3, "S")]), // T1: play 3S; then K H (not legal)
+      pile([card(9, "C")], [card(13, "H"), card(3, "S")]), // T1: play 3S; then K H (not legal); 1 hidden
       pile([], [card(2, "H")]), // T2: 2H legal
       pile([], [card(2, "D")]), // T3: 2D legal
       pile([], [card(2, "C")]), // T4: 2C legal
-      pile([], [card(4, "S")]), // T5: 4S legal after 3S
+      pile([card(9, "S")], [card(4, "S")]), // T5: 4S legal after 3S; 1 hidden
       pile([], []),
       pile([], []),
     ],

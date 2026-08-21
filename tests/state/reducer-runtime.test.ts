@@ -207,7 +207,10 @@ describe("state reducer runtime flows", () => {
     expect(s.game.foundations[1].cards).toHaveLength(2);
   });
 
-  it("assist focus advance does not apply before the endgame", () => {
+  it("assist focus advance applies once the stock is exhausted, even with a face-down card", () => {
+    // Stock empty = endgame playout. A still-face-down card in T1 must NOT disable the advance:
+    // focus should skip T1 (9D, not home-bound) and land on T2 (AS, which can go home), not merely
+    // fall forward to the next pile with any card.
     const game = emptyGame();
     game.tableau[0].visible = [card("tah", 1, "H")];
     game.tableau[1].visible = [card("t9d", 9, "D")];
@@ -229,7 +232,7 @@ describe("state reducer runtime flows", () => {
     const next = rootReducer(selected, { type: "DEST_SELECT", dest: { area: "foundation", index: 0 } });
 
     expect(next.game.foundations[0].cards).toHaveLength(1);
-    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU + 1);
+    expect(focusTargetToIndex(next.ui.focus)).toBe(FOCUS_INDEX_FIRST_TABLEAU + 2);
   });
 
   function assistBrowse(build: (game: GameState) => void, focusIndex: number): AppState {
