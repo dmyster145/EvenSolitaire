@@ -60,10 +60,42 @@ function runsFixture(): GameState {
   };
 }
 
+/**
+ * Endgame spread (stock/waste empty, all face-up) for reproducing the tap-through
+ * finish. T1's top goes home then its next card is NOT immediately playable, so
+ * focus should hop to the next playable pile; several single-card piles follow.
+ */
+function endgameFixture(): GameState {
+  return {
+    stock: [],
+    // A lingering waste card — the common real end of a draw-3 deal. Its presence must NOT
+    // disable the tableau tap-through (the bug this fixture reproduces).
+    waste: [card(13, "D")],
+    foundations: [
+      { cards: [card(1, "S"), card(2, "S")] }, // spades at 2
+      { cards: [card(1, "H")] }, // hearts at A
+      { cards: [card(1, "D")] }, // diamonds at A
+      { cards: [card(1, "C")] }, // clubs at A
+    ],
+    tableau: [
+      pile([], [card(13, "H"), card(3, "S")]), // T1: play 3S; then K H (not legal)
+      pile([], [card(2, "H")]), // T2: 2H legal
+      pile([], [card(2, "D")]), // T3: 2D legal
+      pile([], [card(2, "C")]), // T4: 2C legal
+      pile([], [card(4, "S")]), // T5: 4S legal after 3S
+      pile([], []),
+      pile([], []),
+    ],
+    moves: 30,
+    won: false,
+  };
+}
+
 /** Seed the saved game from the `fixture` URL param; no-op for unknown names. */
 export async function applyDevFixtureFromUrl(): Promise<void> {
   const name = new URLSearchParams(window.location.search).get("fixture");
-  if (name !== "runs") return;
-  await setStored(SAVE_KEY, serializeSave({ game: runsFixture(), moveAssist: true }));
+  const game = name === "runs" ? runsFixture() : name === "endgame" ? endgameFixture() : null;
+  if (!game) return;
+  await setStored(SAVE_KEY, serializeSave({ game, moveAssist: true }));
   console.log("[Solitaire] Dev fixture applied:", name);
 }

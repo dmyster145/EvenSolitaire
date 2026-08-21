@@ -95,11 +95,11 @@ function nextFocusWithFoundationMove(state: AppState, startIndex: number): AppSt
 
 function resolveFocusAfterFoundationMove(state: AppState, sourceFocus: AppState["ui"]["focus"]): AppState["ui"]["focus"] {
   const sourceIndex = focusTargetToIndex(sourceFocus);
-  // Move Assist, endgame only: every remaining card is bound for a foundation, so advance to
-  // the next pile that can actually go home instead of the next pile that merely has a card.
-  // That turns the finish into tap, tap, tap. Swiping still reaches every pile, so a card that
-  // needs parking on another tableau first is unaffected -- and with assist off nothing moves.
-  if (state.ui.moveAssist && isEndgameAutoMoveState(state.game)) {
+  // Move Assist, tableau-cascade only: from here tableau cards only go home (or shuffle), so
+  // advance to the next pile that can actually go home instead of the next pile that merely has
+  // a card. That turns the finish into tap, tap, tap. Swiping still reaches every pile, so a card
+  // that needs parking on another tableau first is unaffected -- and with assist off nothing moves.
+  if (state.ui.moveAssist && isTableauCascadeState(state.game)) {
     const nextPlayable = nextFocusWithFoundationMove(state, sourceIndex);
     if (nextPlayable) return nextPlayable;
   }
@@ -108,13 +108,24 @@ function resolveFocusAfterFoundationMove(state: AppState, sourceFocus: AppState[
 }
 
 /**
- * True once the deal is fully resolved: stock and waste empty and no face-down tableau cards.
- * From here every remaining card is bound for a foundation, which is what lets the focus walk
- * pile to pile by what can go home. Without assist it also collapses the move to a single tap.
+ * Stock exhausted and every tableau card face-up. From here tableau cards only go home or
+ * shuffle between piles, which is what lets Move Assist walk focus pile to pile by what can go
+ * home. Deliberately IGNORES the waste: a few residual waste cards are common at the real end of
+ * a draw-3 deal, and they should not disable the tableau tap-through.
+ */
+function isTableauCascadeState(game: AppState["game"]): boolean {
+  if (game.stock.length > 0) return false;
+  return game.tableau.every((pile) => pile.hidden.length === 0);
+}
+
+/**
+ * The stricter finish: stock AND waste empty and no face-down tableau cards. Gates the
+ * assist-off single-tap-straight-home, which should not fire while there are still waste cards
+ * to place by hand.
  */
 function isEndgameAutoMoveState(game: AppState["game"]): boolean {
-  if (game.stock.length > 0 || game.waste.length > 0) return false;
-  return game.tableau.every((pile) => pile.hidden.length === 0);
+  if (game.waste.length > 0) return false;
+  return isTableauCascadeState(game);
 }
 
 function applyLegalMoveAndReturnBrowseState(

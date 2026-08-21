@@ -80,6 +80,33 @@ describe("foundation move focus behavior", () => {
     expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU));
   });
 
+  it("advances to another playable pile even with a residual waste card (stock exhausted)", () => {
+    // Real end of a draw-3 deal: stock empty, all tableau face-up, but a card lingers in the
+    // waste. The tableau tap-through must still hop to the next playable pile, not stick.
+    const game = emptyGame();
+    game.waste = [card("wkd", 13, "D")]; // one card left in the waste
+    game.foundations[0].cards = [card("f5c", 5, "C")]; // clubs at 5 -> 6C legal
+    game.foundations[1].cards = [card("f1s", 1, "S")]; // spades ace -> 2S legal
+    game.tableau[0].visible = [card("t7h", 7, "H"), card("t6c", 6, "C")]; // play 6C; then 7H (not legal)
+    game.tableau[2].visible = [card("t2s", 2, "S")]; // 2S can go home
+
+    const state: AppState = {
+      ...withGame(game),
+      ui: {
+        ...initialState.ui,
+        moveAssist: true,
+        mode: "select_destination",
+        focus: focusIndexToTarget(FOCUS_INDEX_FIRST_FOUNDATION),
+        selection: { source: focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU), selectedCardCount: 1 },
+      },
+    };
+
+    const next = rootReducer(state, { type: "DEST_SELECT", dest: { area: "foundation", index: 0 } });
+
+    // Falsifiable: with the old waste-must-be-empty gate, focus stayed on the source (tableau 0).
+    expect(next.ui.focus).toEqual(focusIndexToTarget(FOCUS_INDEX_FIRST_TABLEAU + 2));
+  });
+
   it("falls forward to the next pile with a top card when the source pile is empty", () => {
     const game = emptyGame();
     game.foundations[0].cards = [card("f5c", 5, "C")];
