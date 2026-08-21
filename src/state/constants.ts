@@ -8,18 +8,14 @@ export const FOCUS_INDEX_WASTE = 1;
 export const FOCUS_INDEX_FIRST_FOUNDATION = 2;
 export const FOCUS_INDEX_FIRST_TABLEAU = 6;
 
+/**
+ * The app's actions. The OS-native context menu is built from these (minus the
+ * NATIVE_MENU_EXCLUDED_OPTIONS below), and a click routes to MENU_ITEM_CLICK ->
+ * applyMenuOption. "Reset" opens the hand-rolled Yes/No confirm (the native menu
+ * is flat, so that one nested step stays ours).
+ */
 export const MENU_OPTIONS = ["Move Assist", "Draw Card", "Play Animation", "Reset", "Exit"] as const;
 export type MenuOption = (typeof MENU_OPTIONS)[number];
-
-/**
- * EXPERIMENT FLAG — register the OS-native context menu (`menuObject`) and route
- * clicks through `menuItemClickEvent`, instead of drawing and handling our own
- * hand-rolled menu. Default OFF: the hand-rolled menu is fully intact and every
- * release path is unchanged. Flip to `true` LOCALLY to try the native menu on
- * hardware — it's a clean switch, nothing to unwind. Once we've confirmed the
- * invocation gesture and input behavior on-device we can decide what to delete.
- */
-export const NATIVE_MENU_ENABLED = false;
 
 /**
  * Native-menu item IDs. Firmware requires each `itemID` be a non-zero uint32,

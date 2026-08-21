@@ -3,7 +3,6 @@ import { deal } from "../../src/game/deal";
 import { resetIdCounter } from "../../src/game/cards";
 import { clearUndo } from "../../src/features/undo";
 import { rootReducer, initialState } from "../../src/state/reducer";
-import { getMenuLines } from "../../src/state/selectors";
 import type { AppState } from "../../src/state/types";
 
 function withGame(game: AppState["game"]): AppState {
@@ -106,37 +105,19 @@ describe("draw-3 behavior (state layer)", () => {
     expect(undoneTwice.game.waste.map((c) => c.id)).toEqual(waste.map((c) => c.id));
   });
 
-  it("menu labels put Move Assist before Draw Card", () => {
-    const state: AppState = {
-      ...withGame(deal(12)),
-      // moveAssist pinned rather than inherited: this covers label order, not the default.
-      ui: { ...initialState.ui, menuOpen: true, menuSelectedIndex: 0, moveAssist: false },
-    };
+  it("menu Draw Card draws one card", () => {
+    const state = withGame(deal(13));
 
-    expect(getMenuLines(state)[0]).toBe("Move Assist: Off");
-    expect(getMenuLines(state)[1]).toBe("Draw Card");
-  });
+    const next = rootReducer(state, { type: "MENU_ITEM_CLICK", option: "Draw Card" });
 
-  it("menu draw option draws one card and closes the menu", () => {
-    const state: AppState = {
-      ...withGame(deal(13)),
-      ui: { ...initialState.ui, menuOpen: true, menuSelectedIndex: 1 },
-    };
-
-    const next = rootReducer(state, { type: "MENU_SELECT" });
-
-    expect(next.ui.menuOpen).toBe(false);
     expect(next.game.stock.length).toBe(state.game.stock.length - 1);
     expect(next.game.waste.length).toBe(1);
     expect(next.game.waste.every((c) => c.faceUp)).toBe(true);
   });
 
-  /** Dispatch MENU_SELECT on the Draw Card option (reopening the menu each time). */
+  /** The native menu's "Draw Card" effect. */
   function menuDraw(state: AppState): AppState {
-    return rootReducer(
-      { ...state, ui: { ...state.ui, menuOpen: true, menuSelectedIndex: 1 } },
-      { type: "MENU_SELECT" }
-    );
+    return rootReducer(state, { type: "MENU_ITEM_CLICK", option: "Draw Card" });
   }
 
   it("menu draw after exhausting the stock restarts the pass, not the last card", () => {

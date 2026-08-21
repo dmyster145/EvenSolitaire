@@ -50,11 +50,7 @@ describe("state reducer runtime flows", () => {
   it("move assist is on for a fresh install and survives a new game", () => {
     expect(initialState.ui.moveAssist).toBe(true);
 
-    const menu: AppState = {
-      ...initialState,
-      ui: { ...initialState.ui, menuOpen: true, menuSelectedIndex: 0 },
-    };
-    const off = rootReducer(menu, { type: "MENU_SELECT" });
+    const off = rootReducer(initialState, { type: "MENU_ITEM_CLICK", option: "Move Assist" });
     expect(off.ui.moveAssist).toBe(false);
 
     // NEW_GAME carries the player's own choice forward instead of reapplying the default.
@@ -454,13 +450,13 @@ describe("state reducer runtime flows", () => {
     expect(next.game.tableau[0].visible).toHaveLength(1);
   });
 
-  it("menu select toggles move assist when Move Assist option is selected", () => {
+  it("menu Move Assist option toggles move assist", () => {
     const state: AppState = {
       ...withGame(emptyGame()),
-      ui: { ...initialState.ui, menuOpen: true, menuSelectedIndex: 0, moveAssist: false },
+      ui: { ...initialState.ui, moveAssist: false },
     };
 
-    const next = rootReducer(state, { type: "MENU_SELECT" });
+    const next = rootReducer(state, { type: "MENU_ITEM_CLICK", option: "Move Assist" });
     expect(next.ui.moveAssist).toBe(true);
   });
 

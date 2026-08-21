@@ -374,25 +374,23 @@ describe("info panel text", () => {
     expect(text).toContain("6 Diamonds");
   });
 
-  it("renders menu in EvenChess-style HUD format", () => {
+  it("renders the reset-confirm overlay (the only menu overlay we still draw)", () => {
     const state: AppState = {
       ...withGame(deal(25)),
       ui: {
         ...initialState.ui,
         menuOpen: true,
+        pendingResetConfirm: true,
         menuSelectedIndex: 0,
-        // Pinned rather than inherited: this covers HUD formatting, not the default.
-        moveAssist: false,
       },
     };
 
     const text = getInfoPanelText(state);
 
-    expect(text).toContain("\n  MENU\n");
-    expect(text).toContain("> Move Assist: Off");
-    expect(text).toContain("  Draw Card");
-    expect(text).not.toContain("Tap: select");
-    expect(text).not.toContain("Double-tap: close menu");
+    expect(text).toContain("RESET GAME");
+    expect(text).toContain("Start a new game?");
+    expect(text).toContain("> Yes");
+    expect(text).toContain("  No");
   });
 
   describe("selected-pile section line budget", () => {

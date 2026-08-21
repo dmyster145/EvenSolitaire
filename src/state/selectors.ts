@@ -4,34 +4,22 @@ import { FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOC
 import type { Card, Suit, Rank } from "../game/types";
 import { getLegalDests } from "../game/validation";
 
-/** Menu lines for overlay: Move Assist: On/Off, Draw Card, Play Animation, Reset, Exit; or Reset confirmation Yes/No. */
+/**
+ * The Reset-confirm overlay's Yes/No lines. The action menu itself is drawn by
+ * the OS (native context menu), so the only overlay we render is this confirm.
+ */
 export function getMenuLines(state: AppState): string[] {
-  if (!state.ui.menuOpen) return [];
-  if (state.ui.pendingResetConfirm) return ["Yes", "No"];
-  const moveAssistLabel = state.ui.moveAssist ? "Move Assist: On" : "Move Assist: Off";
-  return [moveAssistLabel, "Draw Card", "Play Animation", "Reset", "Exit"];
+  if (state.ui.menuOpen && state.ui.pendingResetConfirm) return ["Yes", "No"];
+  return [];
 }
 
 function getMenuHudLines(state: AppState): string[] {
-  if (!state.ui.menuOpen) return [];
-
-  if (state.ui.pendingResetConfirm) {
-    const confirmLines = getMenuLines(state);
-    const lines: string[] = ["", "RESET GAME", ""];
-    lines.push("Start a new game?");
-    lines.push("");
-    for (let i = 0; i < confirmLines.length; i++) {
-      const prefix = i === state.ui.menuSelectedIndex ? "> " : "  ";
-      lines.push(`${prefix}${confirmLines[i]}`);
-    }
-    return lines;
-  }
-
-  const menuLines = getMenuLines(state);
-  const lines: string[] = ["", "  MENU", ""];
-  for (let i = 0; i < menuLines.length; i++) {
+  if (!state.ui.menuOpen || !state.ui.pendingResetConfirm) return [];
+  const confirmLines = getMenuLines(state);
+  const lines: string[] = ["", "RESET GAME", "", "Start a new game?", ""];
+  for (let i = 0; i < confirmLines.length; i++) {
     const prefix = i === state.ui.menuSelectedIndex ? "> " : "  ";
-    lines.push(`${prefix}${menuLines[i]}`);
+    lines.push(`${prefix}${confirmLines[i]}`);
   }
   return lines;
 }
@@ -130,7 +118,7 @@ export function getInfoPanelText(state: AppState): string {
   // an "Invalid move" toast push the focused pile's top card off the bottom of the container.
   const showsMessage = !!state.ui.message && !state.ui.menuOpen && !g.won;
 
-  if (state.ui.menuOpen) {
+  if (state.ui.menuOpen && state.ui.pendingResetConfirm) {
     lines.push(...getMenuHudLines(state));
   } else if (state.ui.winAnimation?.phase === "playing") {
     // Keep the panel quiet during the cascade; pile detail is noise here. fromWin separates a

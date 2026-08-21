@@ -1,6 +1,6 @@
 import type { AppState } from "./types";
 import { FOCUS_COUNT, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU } from "./constants";
-import { MENU_OPTIONS, CONFIRM_RESET_OPTIONS, FINAL_PASS_CYCLE_CARDS, type MenuOption } from "./constants";
+import { CONFIRM_RESET_OPTIONS, FINAL_PASS_CYCLE_CARDS, type MenuOption } from "./constants";
 import { deal } from "../game/deal";
 import {
   drawFromStock,
@@ -311,11 +311,9 @@ export const initialState: AppState = {
 };
 
 /**
- * Effect of choosing a top-level menu option, independent of how it was chosen:
- * the hand-rolled path (MENU_SELECT, keyed on menuSelectedIndex) and the native
- * path (MENU_ITEM_CLICK, carrying the option directly) share it. "Reset" opens
- * the Yes/No confirm overlay — the native menu is flat with no submenus, so the
- * one nested case still borrows the hand-rolled confirm rather than a native one.
+ * Effect of choosing a top-level menu option (via MENU_ITEM_CLICK from the native
+ * menu). "Reset" opens the Yes/No confirm overlay — the native menu is flat with
+ * no submenus, so that one nested step is drawn by us rather than natively.
  */
 function applyMenuOption(state: AppState, opt: MenuOption): AppState {
   if (opt === "Draw Card") {
@@ -528,33 +526,32 @@ export function rootReducer(
       return { ...state, game: prev };
     }
 
+    // menuOpen now only ever backs the reset-confirm overlay (the OS draws the
+    // action menu); TOGGLE_MENU dismisses that confirm.
     case "TOGGLE_MENU":
       return { ...state, ui: { ...state.ui, menuOpen: !state.ui.menuOpen, pendingResetConfirm: false } };
 
     case "MENU_MOVE": {
       if (!state.ui.menuOpen) return state;
-      const n = state.ui.pendingResetConfirm ? CONFIRM_RESET_OPTIONS.length : MENU_OPTIONS.length;
+      const n = CONFIRM_RESET_OPTIONS.length;
       const i = (state.ui.menuSelectedIndex + (action.direction === "next" ? 1 : -1) + n) % n;
       return { ...state, ui: { ...state.ui, menuSelectedIndex: i } };
     }
 
     case "MENU_SELECT": {
-      if (!state.ui.menuOpen) return state;
-      if (state.ui.pendingResetConfirm) {
-        const confirmOpt = CONFIRM_RESET_OPTIONS[state.ui.menuSelectedIndex];
-        if (confirmOpt === "Yes") {
-          return rootReducer(
-            { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } },
-            { type: "NEW_GAME" }
-          );
-        }
-        return { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } };
+      if (!state.ui.menuOpen || !state.ui.pendingResetConfirm) return state;
+      const confirmOpt = CONFIRM_RESET_OPTIONS[state.ui.menuSelectedIndex];
+      if (confirmOpt === "Yes") {
+        return rootReducer(
+          { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } },
+          { type: "NEW_GAME" }
+        );
       }
-      return applyMenuOption(state, MENU_OPTIONS[state.ui.menuSelectedIndex]);
+      return { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } };
     }
 
-    // Native menu (NATIVE_MENU_ENABLED): the OS already drew and dismissed the
-    // menu, so we get the chosen option outright with no open-menu state.
+    // Native menu: the OS drew and dismissed the menu, so we get the chosen option
+    // outright. applyMenuOption performs the effect (Reset opens the confirm above).
     case "MENU_ITEM_CLICK":
       return applyMenuOption(state, action.option);
 

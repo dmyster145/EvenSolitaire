@@ -18,7 +18,7 @@ import {
   MenuContainerProperty,
   MenuItemProperty,
 } from "@evenrealities/even_hub_sdk";
-import { NATIVE_MENU_OPTIONS, NATIVE_MENU_ENABLED, nativeMenuItemID } from "../state/constants";
+import { NATIVE_MENU_OPTIONS, nativeMenuItemID } from "../state/constants";
 import {
   IMAGE_TILE_TOP,
   IMAGE_TILE_TOP_LEFT,
@@ -101,14 +101,8 @@ export function composeWinAnimationPage(): RebuildPageContainer {
   });
 }
 
-/**
- * The OS-native context menu, registered on every page while NATIVE_MENU_ENABLED.
- * Spread into the container so that when the flag is off the `menuObject` key is
- * absent entirely — matching the SDK contract where an omitted menuObject on
- * rebuild clears any custom menu and restores the default registration.
- */
-function nativeMenuField(): { menuObject: MenuContainerProperty } | Record<string, never> {
-  if (!NATIVE_MENU_ENABLED) return {};
+/** The OS-native context menu, registered on every page. */
+function nativeMenuField(): { menuObject: MenuContainerProperty } {
   return {
     menuObject: new MenuContainerProperty({
       menuItems: NATIVE_MENU_OPTIONS.map(

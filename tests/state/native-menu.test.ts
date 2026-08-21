@@ -1,9 +1,7 @@
 /**
- * Native context-menu (NATIVE_MENU_ENABLED) logic. These cover the pieces that
- * are NOT behind the compile-time flag — the itemID mapping, the click router,
- * and the MENU_ITEM_CLICK reducer effects — so they run regardless of the flag's
- * value. Each is falsifiable: it asserts a behavior that the pre-native code
- * (or an off-by-one / missing branch) would get wrong.
+ * Native context-menu logic: the itemID mapping, the click router, and the
+ * MENU_ITEM_CLICK reducer effects. Each is falsifiable — it asserts a behavior
+ * an off-by-one or missing branch would get wrong.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { MenuItemClickEvent } from "@evenrealities/even_hub_sdk";
@@ -159,13 +157,4 @@ describe("MENU_ITEM_CLICK reducer effects (no open menu required)", () => {
     expect(next.ui.menuSelectedIndex).toBe(0);
   });
 
-  it("matches MENU_SELECT for the same option (parity of the shared helper)", () => {
-    const openAtMoveAssist: AppState = {
-      ...closedMenuState(),
-      ui: { ...closedMenuState().ui, menuOpen: true, menuSelectedIndex: MENU_OPTIONS.indexOf("Move Assist"), moveAssist: false },
-    };
-    const viaSelect = rootReducer(openAtMoveAssist, { type: "MENU_SELECT" });
-    const viaClick = rootReducer({ ...openAtMoveAssist, ui: { ...openAtMoveAssist.ui, moveAssist: false } }, { type: "MENU_ITEM_CLICK", option: "Move Assist" });
-    expect(viaClick.ui.moveAssist).toBe(viaSelect.ui.moveAssist);
-  });
 });

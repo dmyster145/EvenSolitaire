@@ -11,8 +11,7 @@ import {
 import { resetIdCounter } from "../../src/game/cards";
 import { CARD_TOP_W } from "../../src/render/layout";
 import { rootReducer, initialState } from "../../src/state/reducer";
-import { MENU_OPTIONS } from "../../src/state/constants";
-import { getMenuLines, getInfoPanelText } from "../../src/state/selectors";
+import { getInfoPanelText } from "../../src/state/selectors";
 import { mapEvenHubEvent } from "../../src/input/action-map";
 import { OsEventTypeList } from "@evenrealities/even_hub_sdk";
 import { resetTapCooldown } from "../../src/input/gestures";
@@ -40,6 +39,14 @@ function emptyGame(): GameState {
     moves: 0,
     won: false,
   };
+}
+
+/** Fire the native menu's "Play Animation" on a fresh empty game (preview cascade). */
+function startPreview(): AppState {
+  return rootReducer(
+    { ...initialState, game: emptyGame() },
+    { type: "MENU_ITEM_CLICK", option: "Play Animation" }
+  );
 }
 
 /** Deterministic rng so launch velocities are reproducible. */
@@ -200,23 +207,14 @@ describe("win animation physics", () => {
 describe("win animation reducer wiring", () => {
   beforeEach(() => resetIdCounter());
 
-  function menuOpenAt(option: (typeof MENU_OPTIONS)[number]): AppState {
-    return {
-      ...initialState,
-      game: emptyGame(),
-      ui: { ...initialState.ui, menuOpen: true, menuSelectedIndex: MENU_OPTIONS.indexOf(option) },
-    };
-  }
+  it("starts the animation from the Play Animation menu option", () => {
+    const next = startPreview();
 
-  it("starts the animation from the Play Animation menu option and closes the menu", () => {
-    const next = rootReducer(menuOpenAt("Play Animation"), { type: "MENU_SELECT" });
-
-    expect(next.ui.menuOpen).toBe(false);
     expect(next.ui.winAnimation?.phase).toBe("playing");
   });
 
   it("ignores a second start while already playing", () => {
-    const started = rootReducer(menuOpenAt("Play Animation"), { type: "MENU_SELECT" });
+    const started = startPreview();
     const ticked = rootReducer(started, { type: "WIN_ANIMATION_TICK" });
     const restarted = rootReducer(ticked, { type: "WIN_ANIMATION_START" });
 
@@ -224,7 +222,7 @@ describe("win animation reducer wiring", () => {
   });
 
   it("ticks advance the animation and skip ends it", () => {
-    const started = rootReducer(menuOpenAt("Play Animation"), { type: "MENU_SELECT" });
+    const started = startPreview();
     const ticked = rootReducer(started, { type: "WIN_ANIMATION_TICK" });
 
     expect(ticked.ui.winAnimation).not.toBe(started.ui.winAnimation);
@@ -242,7 +240,7 @@ describe("win animation reducer wiring", () => {
   });
 
   it("a new game clears a running animation", () => {
-    const started = rootReducer(menuOpenAt("Play Animation"), { type: "MENU_SELECT" });
+    const started = startPreview();
 
     const fresh = rootReducer(started, { type: "NEW_GAME" });
 
@@ -258,26 +256,8 @@ describe("win animation presentation", () => {
   });
 
   function playingState(): AppState {
-    const started = rootReducer(
-      {
-        ...initialState,
-        game: emptyGame(),
-        ui: { ...initialState.ui, menuOpen: true, menuSelectedIndex: MENU_OPTIONS.indexOf("Play Animation") },
-      },
-      { type: "MENU_SELECT" }
-    );
-    return started;
+    return startPreview();
   }
-
-  it("offers Play Animation in the menu", () => {
-    const state: AppState = {
-      ...initialState,
-      game: emptyGame(),
-      ui: { ...initialState.ui, menuOpen: true },
-    };
-
-    expect(getMenuLines(state)).toContain("Play Animation");
-  });
 
   it("calls the menu-launched cascade a preview, not a win", () => {
     // playingState() goes through the "Play Animation" menu item on an unfinished game, so
@@ -430,14 +410,7 @@ describe("win animation provenance", () => {
   beforeEach(() => resetIdCounter());
 
   function menuPreview(): AppState {
-    return rootReducer(
-      {
-        ...initialState,
-        game: emptyGame(),
-        ui: { ...initialState.ui, menuOpen: true, menuSelectedIndex: MENU_OPTIONS.indexOf("Play Animation") },
-      },
-      { type: "MENU_SELECT" }
-    );
+    return startPreview();
   }
 
   it("previews a FULL deck even when foundations already hold cards", () => {

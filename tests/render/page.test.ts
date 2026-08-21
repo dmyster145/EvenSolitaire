@@ -12,8 +12,8 @@ vi.mock("@evenrealities/even_hub_sdk", () => {
     RebuildPageContainer: BaseContainer,
     TextContainerProperty: BaseContainer,
     ImageContainerProperty: BaseContainer,
-    // Present so the page factories can build a menuObject when NATIVE_MENU_ENABLED
-    // is on; summarize() ignores menuObject, so these tests stay flag-agnostic.
+    // Present so the page factories can build their menuObject; summarize() ignores
+    // menuObject, so these layout assertions are unaffected by it.
     MenuContainerProperty: BaseContainer,
     MenuItemProperty: BaseContainer,
   };

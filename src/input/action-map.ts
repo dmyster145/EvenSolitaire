@@ -14,21 +14,12 @@ import { tryConsumeTap, isScrollSuppressed } from "./gestures";
 import type { Action } from "../state/actions";
 import type { AppState } from "../state/types";
 import { focusTargetToDest } from "../state/ui-mode";
-import { MENU_OPTIONS, NATIVE_MENU_ENABLED, menuOptionForItemID } from "../state/constants";
-
-/**
- * When the native menu is enabled the OS owns the menu's invocation and drawing,
- * so the touchpad gestures that used to open our hand-rolled menu must go quiet —
- * otherwise both menus fight for the same page. Returns null in that mode.
- */
-function openMenuAction(): Action | null {
-  return NATIVE_MENU_ENABLED ? null : { type: "TOGGLE_MENU" };
-}
+import { menuOptionForItemID } from "../state/constants";
 
 export function mapEvenHubEvent(event: EvenHubEvent, state: AppState): Action | null {
   if (!event) return null;
   try {
-    if (NATIVE_MENU_ENABLED && event.menuItemClickEvent) return mapMenuClick(event.menuItemClickEvent);
+    if (event.menuItemClickEvent) return mapMenuClick(event.menuItemClickEvent);
     if (event.listEvent) return mapListEvent(event.listEvent, state);
     if (event.textEvent) return mapTextEvent(event.textEvent, state);
     if (event.sysEvent) return mapSysEvent(event.sysEvent, state);
@@ -140,12 +131,9 @@ function tapAction(state: AppState): Action | null {
   if (state.ui.winAnimation?.phase === "playing" && !state.ui.menuOpen) {
     return { type: "WIN_ANIMATION_SKIP" };
   }
-  if (state.ui.menuOpen) {
-    if (state.ui.pendingResetConfirm) return { type: "MENU_SELECT" };
-    const opt = MENU_OPTIONS[state.ui.menuSelectedIndex];
-    if (opt === "Exit") return { type: "OPEN_EXIT_APP_UI" };
-    return { type: "MENU_SELECT" };
-  }
+  // menuOpen is now only ever the reset-confirm overlay (the OS draws the action
+  // menu itself); a tap confirms the highlighted Yes/No.
+  if (state.ui.menuOpen) return { type: "MENU_SELECT" };
   if (state.game.won) {
     return { type: "NEW_GAME" };
   }
@@ -159,16 +147,15 @@ function tapAction(state: AppState): Action | null {
   if (state.ui.focus.area === "waste" || state.ui.focus.area === "foundation" || state.ui.focus.area === "tableau") {
     return { type: "SOURCE_SELECT", target: state.ui.focus };
   }
-  return openMenuAction();
+  // The action menu is invoked by the OS gesture, so a plain tap on empty space
+  // no longer opens anything.
+  return null;
 }
 
 function doubleTapAction(state: AppState): Action | null {
-  // ER exit UI is now reached via the "Exit" option in the menu.
-  // Double-tap while the menu is open just closes it (hand-rolled path only; with
-  // the native menu the OS dismisses its own menu and menuOpen is only ever the
-  // reset-confirm overlay, which this still closes).
+  // The OS owns the action menu; the only overlay we still draw is the reset
+  // confirm, which a double-tap dismisses. Otherwise double-tap is a no-op.
   if (state.ui.menuOpen) return { type: "TOGGLE_MENU" };
-  if (state.game.won) return openMenuAction();
   if (state.ui.mode === "select_destination") return { type: "CANCEL_SELECTION" };
-  return openMenuAction();
+  return null;
 }
