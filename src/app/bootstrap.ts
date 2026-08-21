@@ -277,11 +277,14 @@ export async function initApp(): Promise<void> {
     // send slowdowns with what the host delivers (foreground swaps, system
     // events — or nothing at all) is the point of this capture.
     perfLogLazy(() => `[Perf][Event] ${describeEvenHubEvent(event)} t=${perfNowMs().toFixed(0)}`);
-    // Native-menu experiment: always surface the click on-device (unconditional of
-    // the perf flag) so the invocation gesture and delivery can be observed live.
-    // Dead code when the flag is off — the OS never sends menuItemClickEvent then.
-    if (NATIVE_MENU_ENABLED && event.menuItemClickEvent) {
-      console.log(`[Solitaire][NativeMenu] click itemID=${event.menuItemClickEvent.itemID ?? -1}`);
+    // Native-menu experiment: with the one flag on, surface EVERY incoming host
+    // event on-device (unconditional of the perf flag) so a single hardware pass
+    // answers the open questions the docs don't — does the OS swallow touchpad
+    // input while its menu is open (no scroll/click lines appear then), does the
+    // dismiss double-tap reach us (a DOUBLE_CLICK line after close), and does
+    // opening the menu fire any sysEvent. Dead code when the flag is off.
+    if (NATIVE_MENU_ENABLED) {
+      console.log(`[Solitaire][NativeMenu] event ${describeEvenHubEvent(event)}`);
     }
     guardedEventHandler(event);
   });
