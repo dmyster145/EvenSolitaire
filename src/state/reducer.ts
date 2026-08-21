@@ -13,6 +13,7 @@ import { getLegalDests, isLegalMove } from "../game/validation";
 import type { Source } from "../game/validation";
 import type { Dest } from "../game/validation";
 import { focusIndexToTarget, focusTargetToIndex, focusTargetToDest } from "./ui-mode";
+import { perfLog, isPerfLoggingEnabled } from "../perf/log";
 import { pushUndo, popUndo, clearUndo } from "../features/undo";
 import { startWinAnimation, stepWinAnimation, skipWinAnimation } from "../features/win-animation";
 
@@ -99,12 +100,26 @@ function resolveFocusAfterFoundationMove(state: AppState, sourceFocus: AppState[
   // advance to the next pile that can actually go home instead of the next pile that merely has
   // a card. That turns the finish into tap, tap, tap. Swiping still reaches every pile, so a card
   // that needs parking on another tableau first is unaffected -- and with assist off nothing moves.
-  if (state.ui.moveAssist && isTableauCascadeState(state.game)) {
-    const nextPlayable = nextFocusWithFoundationMove(state, sourceIndex);
-    if (nextPlayable) return nextPlayable;
+  const cascade = isTableauCascadeState(state.game);
+  const nextPlayable = state.ui.moveAssist && cascade ? nextFocusWithFoundationMove(state, sourceIndex) : null;
+  const result =
+    nextPlayable ?? (hasTopCardAtFocusIndex(state, sourceIndex) ? sourceFocus : nextFocusWithTopCard(state, sourceIndex));
+
+  // DEBUG instrumentation (only when perf logging is enabled): why the endgame tap-through does
+  // or does not advance focus. cascade=0 means the advance branch was skipped (stock not empty,
+  // or a face-down tableau card remains). nextPlayable=- with cascade=1 means no pile currently
+  // has a card that can go home.
+  if (isPerfLoggingEnabled()) {
+    const g = state.game;
+    const faceDown = g.tableau.reduce((n, p) => n + p.hidden.length, 0);
+    const tops = g.tableau.map((p) => (p.visible.length ? p.visible[p.visible.length - 1]!.rank + p.visible[p.visible.length - 1]!.suit : "_")).join(",");
+    perfLog(
+      `[Perf][EndgameFocus] src=${sourceIndex} assist=${state.ui.moveAssist ? 1 : 0} cascade=${cascade ? 1 : 0} ` +
+        `stock=${g.stock.length} waste=${g.waste.length} faceDown=${faceDown} ` +
+        `nextPlayable=${nextPlayable ? focusTargetToIndex(nextPlayable) : "-"} result=${focusTargetToIndex(result)} tops=[${tops}]`
+    );
   }
-  if (hasTopCardAtFocusIndex(state, sourceIndex)) return sourceFocus;
-  return nextFocusWithTopCard(state, sourceIndex);
+  return result;
 }
 
 /**
@@ -147,6 +162,14 @@ function applyLegalMoveAndReturnBrowseState(
     },
   };
   const focus = dest.area === "foundation" ? resolveFocusAfterFoundationMove(baseAfterMove, sourceFocus) : state.ui.focus;
+  // DEBUG: every completed move. destArea=tableau means the foundation-advance path is skipped
+  // entirely (focus stays where it was) — a clue if the endgame play isn't going to a foundation.
+  if (isPerfLoggingEnabled()) {
+    perfLog(
+      `[Perf][Move] srcArea=${source.area}${source.area === "tableau" ? source.pileIndex : ""} ` +
+        `destArea=${dest.area}${"index" in dest ? dest.index : ""} won=${nextGame.won ? 1 : 0} focus=${focusTargetToIndex(focus)}`
+    );
+  }
   return {
     ...baseAfterMove,
     ui: {
@@ -457,6 +480,17 @@ export function rootReducer(
       let autoDestinationFocus: AppState["ui"]["focus"] | null = null;
       if (state.ui.moveAssist) {
         autoDestinationFocus = getAutoDestinationFocusTarget(state.game, source, dests);
+      }
+      // DEBUG: the first tap. autoDest=- means Move Assist did NOT pre-focus a destination, so
+      // focus stays on the source pile and the user must swipe to the foundation — a likely
+      // cause of "selection stays on the active pile". dests lists every legal drop (f#/t#).
+      if (isPerfLoggingEnabled()) {
+        perfLog(
+          `[Perf][Select] src=${focusTargetToIndex(action.target)} assist=${state.ui.moveAssist ? 1 : 0} ` +
+            `visible=${source.area === "tableau" ? state.game.tableau[source.pileIndex].visible.length : "-"} ` +
+            `autoDest=${autoDestinationFocus ? focusTargetToIndex(autoDestinationFocus) : "-"} ` +
+            `dests=[${dests.map((d) => (d.area === "foundation" ? "f" : "t") + d.index).join(",")}]`
+        );
       }
       return {
         ...state,
