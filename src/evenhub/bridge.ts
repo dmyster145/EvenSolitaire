@@ -156,6 +156,36 @@ function patchImageCompressModeBug(): void {
   cls.__compressModePatched = true;
 }
 
+// ---------------------------------------------------------------------------
+// compressMode A/B control (dev harness only — src/app/compress-ab.ts).
+// Installs a conditional wrapper on ImageRawDataUpdate.toJson whose strip
+// behavior follows a runtime override, so the harness can interleave strip vs
+// no-strip within ONE session on IDENTICAL payloads (cancels device drift).
+// A null override falls back to the shipped COMPRESS_MODE_PATCH_ENABLED default,
+// so leaving it null after the test restores normal behavior.
+// ---------------------------------------------------------------------------
+let compressModeStripAbOverride: boolean | null = null;
+let compressModeAbWrapperInstalled = false;
+
+export function setCompressModeStripForAb(strip: boolean | null): void {
+  compressModeStripAbOverride = strip;
+  if (strip === null || compressModeAbWrapperInstalled) return;
+  const cls = ImageRawDataUpdate as unknown as {
+    toJson?: (model?: unknown) => Record<string, unknown>;
+  };
+  if (typeof cls.toJson !== "function") return;
+  const orig = cls.toJson.bind(ImageRawDataUpdate);
+  cls.toJson = (model?: unknown) => {
+    const json = orig(model);
+    const shouldStrip = compressModeStripAbOverride ?? COMPRESS_MODE_PATCH_ENABLED;
+    if (shouldStrip && json && typeof json === "object" && "compressMode" in json) {
+      delete (json as Record<string, unknown>).compressMode;
+    }
+    return json;
+  };
+  compressModeAbWrapperInstalled = true;
+}
+
 export type EvenHubEventHandler = (event: EvenHubEvent) => void;
 
 const BRIDGE_INIT_TIMEOUT_MS = 6000;

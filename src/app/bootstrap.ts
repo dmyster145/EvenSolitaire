@@ -47,6 +47,14 @@ import type { GameState } from "../game/types";
 import { WIN_ANIMATION_TICK_MS, WIN_BOARD_HOLD_MS } from "../state/constants";
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
+
+/**
+ * DEV EXPERIMENT — run the compressMode A/B harness instead of the game. Flip to
+ * true LOCALLY (with PERF_LOG_DOM_ENABLED on), rebuild, read the [Perf][CompressAB]
+ * [Summary] lines on-device, then flip back. Default false; the harness module is
+ * only imported when this is on, so it stays out of normal builds.
+ */
+const COMPRESS_AB_TEST_ENABLED = false;
 const MESSAGE_DISMISS_MS = 1500;
 const IMAGE_COOLDOWN_MS = 250;
 /** Navigation image cooldown while the BLE link is congested (see congestion.ts). */
@@ -228,6 +236,14 @@ export async function initApp(): Promise<void> {
     resetFrameMemo();
   } else {
     logError("[Solitaire] setupPage failed — display will not update until next launch.");
+  }
+
+  // Dev compressMode A/B: take over the session as a dedicated send-latency rig
+  // and skip the normal game loop. Runs after setupPage so a live container exists.
+  if (COMPRESS_AB_TEST_ENABLED) {
+    const { runCompressAbTest } = await import("./compress-ab");
+    await runCompressAbTest(hub);
+    return;
   }
 
   // First paint (will await assets if needed via scheduler).
