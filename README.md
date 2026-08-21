@@ -46,7 +46,7 @@ Solitaire/
 
 ## Prerequisites
 
-- **Even Realities:** G2 glasses and the [Even App](https://www.evenrealities.com/), so you can open the widget and see Solitaire on your glasses.
+- **Even Realities:** G2 glasses and the [Even App](https://www.evenrealities.com/) **version 2.2.9 or newer**, so you can open the widget and see Solitaire on your glasses. (The options menu uses the OS-native context menu, which requires Even App ≥ 2.2.9.)
 - **Node.js:** v20 or newer. [Download Node.js](https://nodejs.org/) if needed. The standard installer is enough.
 
 ## Setup
@@ -75,13 +75,14 @@ Solitaire/
 
 4. **Try it**
    - On your **phone:** Open the same URL in a browser to see the [help/docs page](index.html).
-   - On your **glasses:** Scroll to move focus, tap to draw/select/place, double-tap to open the menu (Move Assist, Draw Card, Play Animation, Reset, Exit).
+   - On your **glasses:** Scroll to move focus, tap to draw/select/place, double-tap to cancel a selection. Open the options menu with the G2 system-menu gesture — a short press, then a long press — for Move Assist, Draw Card, Play Animation, and Reset.
 
 ## Usage on the glasses
 
-- **Scroll:** Move focus across piles, move the menu selection, or move destination focus while carrying cards.
-- **Tap:** Draw from stock, pick a source pile, place cards, choose a menu item, or start a new game after a win.
-- **Double-tap:** Open or close the menu, cancel a selection while carrying cards, or open the menu on the win prompt.
+- **Scroll:** Move focus across piles, move destination focus while carrying cards, or move between the Reset confirm's `Yes`/`No`.
+- **Tap:** Draw from stock, pick a source pile, place cards, confirm the Reset prompt, or start a new game after a win.
+- **Double-tap:** Cancel a selection while carrying cards, or close the Reset confirm.
+- **Options menu:** The G2 **system menu** (opened with its own gesture: a short press, then a long press) hosts Move Assist, Draw Card, Play Animation, and Reset. It's drawn by the glasses OS; pick an option and Solitaire runs it.
 
 ## Scripts
 
@@ -113,10 +114,9 @@ Output is in `dist/`. Deploy that folder to any static host, then open the deplo
 - **Move Assist:** On by default. Destination scrolling skips illegal drops, and picking up a card jumps focus to a legal foundation when one exists, otherwise to the leftmost legal tableau pile. A pile with more face-up cards under its top card keeps focus instead, so the run-size tap stays available. Placement always needs a confirming tap.
 - **Tap-through endgame:** Once the stock and waste are empty and every tableau card is face-up, Move Assist moves focus to the next pile that can go home after each card lands, so the finish takes taps and no scrolling. Scrolling still reaches every pile if you want to reroute a card.
 - **Legal move count:** The info panel always shows how many legal moves the focused pile has, with or without Move Assist. `0 Legal Moves` is how you spot a dead pile.
-- **Menu in the info panel:** The menu renders as text in the left panel rather than a board overlay. Options are Move Assist, Draw Card, Play Animation, Reset, and Exit.
+- **System options menu:** The options menu is the G2 **system context menu** (opened with the system-menu gesture), drawn by the glasses OS. It lists Move Assist, Draw Card, Play Animation, and Reset. The only overlay this app still draws is the Reset `Yes`/`No` confirm in the info panel.
 - **Save & resume:** Autosaves game state and the Move Assist setting, and restores both on launch when valid data exists.
-- **Exit behavior:** **Exit** opens the Even Realities exit prompt. The game is already autosaved by then.
-- **Win prompt:** Shows `You win!` and `Tap for new game`. Tap starts a new game, double-tap opens the menu. Running the cascade from **Play Animation** instead labels it `Preview`, and a tap returns you to the game in progress.
+- **Win prompt:** Shows `You win!` and `Tap for new game`. Tap starts a new game. Running the cascade from **Play Animation** instead labels it `Preview`, and a tap returns you to the game in progress.
 
 Full behavior, controls, and app-specific rule notes are on the in-app help page ([index.html](index.html)).
 

@@ -465,7 +465,7 @@
               <li>Restores game state when a save exists</li>
               <li>Restores your <strong>Move Assist</strong> setting with the save</li>
               <li><strong>Move Assist is on by default</strong> for a new install. Turning it off sticks.</li>
-              <li>After a win, tap starts a new game; double-tap opens the menu</li>
+              <li>After a win, tap starts a new game</li>
             </ul>
 
             <h3>What This Covers</h3>
@@ -506,12 +506,12 @@
         <details>
           <summary>Controls</summary>
           <div class="section-content">
-            <p>Three gestures run the whole table:</p>
+            <p>Three touchpad gestures run the table. A fourth, the G2 <strong>system-menu gesture</strong>, opens the options menu.</p>
 
             <div class="gesture-grid">
               <div class="gesture-card">
                 <strong>Scroll</strong>
-                Navigate focus between piles, destinations, and menu items.
+                Navigate focus between piles and destinations (and the Yes/No of the Reset confirm).
               </div>
 
               <div class="gesture-card">
@@ -521,8 +521,17 @@
 
               <div class="gesture-card">
                 <strong>Double Tap</strong>
-                Open/close menu, or cancel an active selection. On win, it opens menu.
+                Cancel an active selection, or close the Reset confirmation.
               </div>
+
+              <div class="gesture-card">
+                <strong>Menu (system gesture)</strong>
+                A short press, then a long press opens the G2 system menu, where Solitaire lists Move Assist, Draw Card, Play Animation, and Reset.
+              </div>
+            </div>
+
+            <div class="tip">
+              <strong>Note:</strong> The options menu is the glasses' own system menu now, drawn by the OS. Pick an option there and Solitaire runs it. Double-tap no longer opens a menu.
             </div>
 
             <h3>Tap Behavior by Context</h3>
@@ -538,7 +547,7 @@
                 <tr><td>Waste</td><td>Select waste top as source. With Move Assist ON, focus auto-jumps to a legal foundation first; if none exists, it jumps to the leftmost legal tableau destination.</td></tr>
                 <tr><td>Tableau</td><td>Select as source, or place a carried run. With Move Assist ON, focus auto-jumps to a legal foundation first, then to the leftmost legal tableau pile. It stays put when the pile has more face-up cards below the top one, so you can still tap to grow the run. Placement always needs a second tap.</td></tr>
                 <tr><td>Foundation</td><td>While carrying cards, attempts placement to that foundation (legal moves only).</td></tr>
-                <tr><td>Menu Open</td><td>Activates the highlighted menu option. This holds during the win animation too.</td></tr>
+                <tr><td>Reset Confirm</td><td>Confirms the highlighted <code>Yes</code> / <code>No</code> of the Reset prompt.</td></tr>
                 <tr><td>Win State</td><td>Start a new game.</td></tr>
               </tbody>
             </table>
@@ -636,7 +645,7 @@
         <details>
           <summary>Menu Options</summary>
           <div class="section-content">
-            <p>Double-tap in normal play to open menu. Scroll to choose, tap to confirm, double-tap to close.</p>
+            <p>Open the G2 <strong>system menu</strong> with its gesture (a short press, then a long press). Solitaire adds these options to it; choose one and it runs.</p>
 
             <h3>Move Assist</h3>
             <p>On by default. Filters where focus can land while you are carrying a card.</p>
@@ -652,10 +661,7 @@
             <p>Replays the winning card cascade on demand. Started this way it runs over your game in progress, so the panel labels it <code>Preview</code> and a tap skips back to your game. Nothing about the board changes.</p>
 
             <h3>Reset</h3>
-            <p>Shows a <code>Yes</code>/<code>No</code> confirmation before starting a new game.</p>
-
-            <h3>Exit</h3>
-            <p>Opens the Even Realities exit prompt. Your game is already saved. Use double-tap if you only want to close the menu.</p>
+            <p>Shows a <code>Yes</code>/<code>No</code> confirmation in the info panel before starting a new game. Scroll to choose, tap to confirm, double-tap to cancel.</p>
           </div>
         </details>
       </section>
@@ -678,7 +684,7 @@
 
             <h3>Other States</h3>
             <ul>
-              <li>Menu: <code>MENU</code> with the selected option marked by <code>&gt;</code>. Reset swaps the options for a <code>Yes</code>/<code>No</code> prompt.</li>
+              <li>Reset confirm: <code>RESET GAME</code> with a <code>Yes</code>/<code>No</code> prompt, the choice marked by <code>&gt;</code>. (The options menu itself is drawn by the glasses' system UI, not this panel.)</li>
               <li>Win: <code>You win!</code> and <code>Tap for new game</code></li>
               <li>Animation started from the menu: <code>Preview</code> and <code>Tap to skip</code></li>
               <li>Brief messages such as <code>Invalid move</code> and <code>Stock reset</code> appear at the top for a moment</li>
