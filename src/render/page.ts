@@ -124,19 +124,6 @@ function createImageContainer(container: ImageContainerRect): ImageContainerProp
   });
 }
 
-/**
- * CALIBRATION KNOB — info-panel text brightness (SDK textColor, 0=dimmest .. 4=brightest).
- * 4 is the device default (unchanged look). Lower it to see how dim reads on hardware;
- * this is the pre-step to a real per-zone brightness design. Applies to the whole panel
- * (textColor is per-container), and set at create/rebuild time — text updates keep it.
- * Clamped so an out-of-range edit can't blank the page via SDK brightness validation.
- */
-const INFO_PANEL_BRIGHTNESS = 4;
-
-function infoPanelBrightness(): number {
-  return Math.max(0, Math.min(4, INFO_PANEL_BRIGHTNESS));
-}
-
 function createInfoPanelTextContainer(content = "Solitaire"): TextContainerProperty {
   return new TextContainerProperty({
     xPosition: INFO_TEXT_CONTAINER.x,
@@ -150,7 +137,6 @@ function createInfoPanelTextContainer(content = "Solitaire"): TextContainerPrope
     containerName: INFO_TEXT_CONTAINER.name,
     content,
     isEventCapture: 0,
-    textColor: infoPanelBrightness(),
   });
 }
 
