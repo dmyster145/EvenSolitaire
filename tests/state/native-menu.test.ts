@@ -143,6 +143,28 @@ describe("MENU_ITEM_CLICK reducer effects (no open menu required)", () => {
     expect(next.game.stock.length).toBe(1);
   });
 
+  it("Draw Card cancels a carried selection (returns to browse) before drawing", () => {
+    const game = emptyGame();
+    game.stock = [card("s1", 5, "S", false)];
+    game.waste = [card("w1", 9, "H")];
+    const carrying: AppState = {
+      ...closedMenuState(game),
+      ui: {
+        ...closedMenuState(game).ui,
+        mode: "select_destination",
+        selection: { source: { area: "waste", index: 0 }, selectedCardCount: 1 },
+      },
+    };
+    const next = rootReducer(carrying, { type: "MENU_ITEM_CLICK", option: "Draw Card" });
+    // Falsifiable: without the cancel-first fix, mode stays "select_destination" with a
+    // stale source floating over the now-changed waste.
+    expect(next.ui.mode).toBe("browse");
+    expect(next.ui.selection.source).toBeUndefined();
+    // And the draw still happens.
+    expect(next.game.stock.length).toBe(0);
+    expect(next.game.waste.length).toBe(2);
+  });
+
   it("starts the win animation with the menu closed", () => {
     const next = rootReducer(closedMenuState(), { type: "MENU_ITEM_CLICK", option: "Play Animation" });
     expect(next.ui.winAnimation?.phase).toBe("playing");

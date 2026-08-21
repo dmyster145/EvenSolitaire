@@ -317,9 +317,17 @@ export const initialState: AppState = {
  */
 function applyMenuOption(state: AppState, opt: MenuOption): AppState {
   if (opt === "Draw Card") {
-    let game = state.game;
+    // Drawing changes the board, so a card being carried (select_destination) would
+    // be left floating over a changed waste. Cancel the carry first — it returns
+    // focus to the source pile; the carry was only ever a marker, so no card
+    // actually left the pile.
+    const base =
+      state.ui.mode === "select_destination"
+        ? rootReducer(state, { type: "CANCEL_SELECTION" })
+        : state;
+    let game = base.game;
     let message: string | undefined;
-    if (!state.game.won) {
+    if (!base.game.won) {
       if (game.stock.length === 0 && game.waste.length > 0) {
         // Final pass for draw-1: with a single waste card, recycling and dealing on
         // the same action would land the identical card back on the waste. Give the
@@ -329,7 +337,7 @@ function applyMenuOption(state: AppState, opt: MenuOption): AppState {
         game = recycleWasteToStock(game);
         message = "Stock reset";
         if (isFinalPass) {
-          return { ...state, game, ui: { ...state.ui, menuOpen: false, message } };
+          return { ...base, game, ui: { ...base.ui, menuOpen: false, pendingResetConfirm: false, message } };
         }
       }
       if (game.stock.length > 0) {
@@ -338,25 +346,24 @@ function applyMenuOption(state: AppState, opt: MenuOption): AppState {
       }
       game = checkWin(game);
     }
-    return { ...state, game, ui: { ...state.ui, menuOpen: false, message } };
+    return { ...base, game, ui: { ...base.ui, menuOpen: false, pendingResetConfirm: false, message } };
   }
   if (opt === "Move Assist") {
     return { ...state, ui: { ...state.ui, moveAssist: !state.ui.moveAssist } };
   }
   if (opt === "Play Animation") {
     return rootReducer(
-      { ...state, ui: { ...state.ui, menuOpen: false } },
+      { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } },
       { type: "WIN_ANIMATION_START" }
     );
   }
   if (opt === "Reset") {
-    // menuOpen:true is a no-op on the hand-rolled path (already open) and is what
-    // renders the confirm overlay on the native path, where no menu was open.
+    // menuOpen:true + pendingResetConfirm:true renders the Yes/No confirm overlay.
     return { ...state, ui: { ...state.ui, menuOpen: true, pendingResetConfirm: true, menuSelectedIndex: 0 } };
   }
-  // "Exit": both paths route the actual exit through action-map (OPEN_EXIT_APP_UI
-  // straight to the bridge); the reducer just closes the menu defensively.
-  return { ...state, ui: { ...state.ui, menuOpen: false } };
+  // "Exit": routed through action-map (OPEN_EXIT_APP_UI to the bridge); the reducer
+  // just closes the overlay defensively. Clearing both flags keeps them in lockstep.
+  return { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } };
 }
 
 export function rootReducer(
@@ -527,9 +534,10 @@ export function rootReducer(
     }
 
     // menuOpen now only ever backs the reset-confirm overlay (the OS draws the
-    // action menu); TOGGLE_MENU dismisses that confirm.
+    // action menu); TOGGLE_MENU dismisses that confirm. Hard-close rather than
+    // toggle so it can never re-open into a menuOpen-without-overlay stuck state.
     case "TOGGLE_MENU":
-      return { ...state, ui: { ...state.ui, menuOpen: !state.ui.menuOpen, pendingResetConfirm: false } };
+      return { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } };
 
     case "MENU_MOVE": {
       if (!state.ui.menuOpen) return state;
