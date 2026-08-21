@@ -35,8 +35,10 @@ export interface FakeSdkBridgeOptions {
 
 export function createFakeSdkBridge(options: FakeSdkBridgeOptions = {}) {
   const sent: FakeSentRecord[] = [];
+  const pageCalls: Array<"create" | "rebuild"> = [];
   return {
     sent,
+    pageCalls,
     async updateImageRawData(data: ImageRawDataUpdate): Promise<ImageRawDataUpdateResult> {
       if (options.clock && options.imageDelayMs) options.clock.now += options.imageDelayMs;
       const payload = data.imageData;
@@ -59,9 +61,11 @@ export function createFakeSdkBridge(options: FakeSdkBridgeOptions = {}) {
       return options.textResult?.() ?? true;
     },
     async createStartUpPageContainer(): Promise<number> {
+      pageCalls.push("create");
       return 0;
     },
     async rebuildPageContainer(): Promise<boolean> {
+      pageCalls.push("rebuild");
       return true;
     },
     async shutDownPageContainer(): Promise<void> {

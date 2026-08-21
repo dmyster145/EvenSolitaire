@@ -13,6 +13,8 @@ import {
   TextContainerUpgrade,
   ImageRawDataUpdate,
   ImageRawDataUpdateResult,
+  validateEvenHubPageContainer,
+  formatEvenHubPageContainerValidationError,
   type EvenAppBridge as EvenAppBridgeType,
   type CreateStartUpPageContainer,
   type RebuildPageContainer,
@@ -175,11 +177,37 @@ export class EvenHubBridge {
     return this.bridge != null;
   }
 
+  /**
+   * Validate a page against the SDK's own rules (z-order, menu limits, text
+   * brightness) before it reaches the bridge. An invalid page would be rejected
+   * by the host anyway (createStartUpPageContainer returns invalid /
+   * rebuildPageContainer returns false), but that result is opaque and the SDK's
+   * internal warning isn't visible in our on-device perf console. Validating here
+   * surfaces the SPECIFIC reason through our logger and skips a doomed BLE send.
+   * A fault in the validator itself must never block rendering, so on throw we
+   * log and let the bridge proceed.
+   */
+  private validatePageContainer(
+    container: CreateStartUpPageContainer | RebuildPageContainer,
+    op: string
+  ): boolean {
+    try {
+      const result = validateEvenHubPageContainer(container);
+      if (result.valid) return true;
+      error(`[EvenHubBridge] ${op}: invalid page — ${formatEvenHubPageContainerValidationError(result)}`);
+      return false;
+    } catch (err) {
+      warn(`[EvenHubBridge] ${op}: page validation threw, proceeding anyway:`, err);
+      return true;
+    }
+  }
+
   async setupPage(container: CreateStartUpPageContainer): Promise<boolean> {
     if (!this.bridge) {
       log("[EvenHubBridge] No bridge — skipping setupPage.");
       return false;
     }
+    if (!this.validatePageContainer(container, "setupPage")) return false;
     const perfEnabled = isPerfLoggingEnabled();
     const startMs = perfEnabled ? perfNowMs() : 0;
     let success = false;
@@ -203,6 +231,7 @@ export class EvenHubBridge {
 
   async rebuildPage(container: RebuildPageContainer): Promise<boolean> {
     if (!this.bridge) return false;
+    if (!this.validatePageContainer(container, "rebuildPage")) return false;
     const perfEnabled = isPerfLoggingEnabled();
     const startMs = perfEnabled ? perfNowMs() : 0;
     let ok = false;
