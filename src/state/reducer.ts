@@ -1,6 +1,6 @@
 import type { AppState } from "./types";
 import { FOCUS_COUNT, FOCUS_INDEX_STOCK, FOCUS_INDEX_WASTE, FOCUS_INDEX_FIRST_FOUNDATION, FOCUS_INDEX_FIRST_TABLEAU } from "./constants";
-import { MENU_OPTIONS, CONFIRM_RESET_OPTIONS, FINAL_PASS_CYCLE_CARDS } from "./constants";
+import { MENU_OPTIONS, CONFIRM_RESET_OPTIONS, FINAL_PASS_CYCLE_CARDS, type MenuOption } from "./constants";
 import { deal } from "../game/deal";
 import {
   drawFromStock,
@@ -310,6 +310,57 @@ export const initialState: AppState = {
   },
 };
 
+/**
+ * Effect of choosing a top-level menu option, independent of how it was chosen:
+ * the hand-rolled path (MENU_SELECT, keyed on menuSelectedIndex) and the native
+ * path (MENU_ITEM_CLICK, carrying the option directly) share it. "Reset" opens
+ * the Yes/No confirm overlay — the native menu is flat with no submenus, so the
+ * one nested case still borrows the hand-rolled confirm rather than a native one.
+ */
+function applyMenuOption(state: AppState, opt: MenuOption): AppState {
+  if (opt === "Draw Card") {
+    let game = state.game;
+    let message: string | undefined;
+    if (!state.game.won) {
+      if (game.stock.length === 0 && game.waste.length > 0) {
+        // Final pass for draw-1: with a single waste card, recycling and dealing on
+        // the same action would land the identical card back on the waste. Give the
+        // recycle its own action, like DRAW_STOCK's final-pass tap.
+        const isFinalPass = game.waste.length <= 1;
+        pushUndo(game);
+        game = recycleWasteToStock(game);
+        message = "Stock reset";
+        if (isFinalPass) {
+          return { ...state, game, ui: { ...state.ui, menuOpen: false, message } };
+        }
+      }
+      if (game.stock.length > 0) {
+        pushUndo(game);
+        game = drawFromStock(game);
+      }
+      game = checkWin(game);
+    }
+    return { ...state, game, ui: { ...state.ui, menuOpen: false, message } };
+  }
+  if (opt === "Move Assist") {
+    return { ...state, ui: { ...state.ui, moveAssist: !state.ui.moveAssist } };
+  }
+  if (opt === "Play Animation") {
+    return rootReducer(
+      { ...state, ui: { ...state.ui, menuOpen: false } },
+      { type: "WIN_ANIMATION_START" }
+    );
+  }
+  if (opt === "Reset") {
+    // menuOpen:true is a no-op on the hand-rolled path (already open) and is what
+    // renders the confirm overlay on the native path, where no menu was open.
+    return { ...state, ui: { ...state.ui, menuOpen: true, pendingResetConfirm: true, menuSelectedIndex: 0 } };
+  }
+  // "Exit": both paths route the actual exit through action-map (OPEN_EXIT_APP_UI
+  // straight to the bridge); the reducer just closes the menu defensively.
+  return { ...state, ui: { ...state.ui, menuOpen: false } };
+}
+
 export function rootReducer(
   state: AppState | undefined,
   action: import("./actions").Action
@@ -499,54 +550,13 @@ export function rootReducer(
         }
         return { ...state, ui: { ...state.ui, menuOpen: false, pendingResetConfirm: false } };
       }
-      const opt = MENU_OPTIONS[state.ui.menuSelectedIndex];
-      if (opt === "Draw Card") {
-        let game = state.game;
-        let message: string | undefined;
-        if (!state.game.won) {
-          if (game.stock.length === 0 && game.waste.length > 0) {
-            // Final pass for draw-1: with a single waste card, recycling and dealing on
-            // the same action would land the identical card back on the waste. Give the
-            // recycle its own action, like DRAW_STOCK's final-pass tap.
-            const isFinalPass = game.waste.length <= 1;
-            pushUndo(game);
-            game = recycleWasteToStock(game);
-            message = "Stock reset";
-            if (isFinalPass) {
-              return { ...state, game, ui: { ...state.ui, menuOpen: false, message } };
-            }
-          }
-          if (game.stock.length > 0) {
-            pushUndo(game);
-            game = drawFromStock(game);
-          }
-          game = checkWin(game);
-        }
-        return {
-          ...state,
-          game,
-          ui: { ...state.ui, menuOpen: false, message },
-        };
-      }
-      if (opt === "Move Assist") {
-        return { ...state, ui: { ...state.ui, moveAssist: !state.ui.moveAssist } };
-      }
-      if (opt === "Play Animation") {
-        return rootReducer(
-          { ...state, ui: { ...state.ui, menuOpen: false } },
-          { type: "WIN_ANIMATION_START" }
-        );
-      }
-      if (opt === "Reset") {
-        return { ...state, ui: { ...state.ui, pendingResetConfirm: true, menuSelectedIndex: 0 } };
-      }
-      if (opt === "Exit") {
-        // Handled by action-map, which dispatches OPEN_EXIT_APP_UI directly to the
-        // bridge. Keep this branch as a defensive fallback that at least closes the menu.
-        return { ...state, ui: { ...state.ui, menuOpen: false } };
-      }
-      return { ...state, ui: { ...state.ui, menuOpen: false } };
+      return applyMenuOption(state, MENU_OPTIONS[state.ui.menuSelectedIndex]);
     }
+
+    // Native menu (NATIVE_MENU_ENABLED): the OS already drew and dismissed the
+    // menu, so we get the chosen option outright with no open-menu state.
+    case "MENU_ITEM_CLICK":
+      return applyMenuOption(state, action.option);
 
     case "WIN_BOARD_HOLD": {
       if ((state.ui.winBoardHold ?? false) === action.active) return state;

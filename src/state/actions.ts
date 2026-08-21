@@ -4,6 +4,7 @@
 import type { FocusTarget } from "./types";
 import type { GameState } from "./types";
 import type { Dest } from "../game/validation";
+import type { MenuOption } from "./constants";
 
 export type Action =
   | { type: "APP_INIT" }
@@ -19,6 +20,9 @@ export type Action =
   | { type: "TOGGLE_MENU" }
   | { type: "MENU_MOVE"; direction: "next" | "prev" }
   | { type: "MENU_SELECT" }
+  // Native-menu click (NATIVE_MENU_ENABLED): the OS drew and dismissed the menu,
+  // so this carries the chosen option directly — no menuOpen/menuSelectedIndex state.
+  | { type: "MENU_ITEM_CLICK"; option: MenuOption }
   | { type: "WIN_BOARD_HOLD"; active: boolean }
   | { type: "WIN_ANIMATION_START"; fromWin?: boolean }
   | { type: "WIN_ANIMATION_TICK" }

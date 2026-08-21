@@ -44,7 +44,7 @@ import { whenCardAssetsReady, whenCardSuitAssetsReady } from "../render/card-can
 import { activateKeepAlive, isKeepAliveActive } from "../utils/keep-alive";
 import { error as logError } from "../utils/logger";
 import type { GameState } from "../game/types";
-import { WIN_ANIMATION_TICK_MS, WIN_BOARD_HOLD_MS } from "../state/constants";
+import { WIN_ANIMATION_TICK_MS, WIN_BOARD_HOLD_MS, NATIVE_MENU_ENABLED } from "../state/constants";
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 const MESSAGE_DISMISS_MS = 1500;
@@ -69,6 +69,7 @@ function describeEvenHubEvent(event: EvenHubEvent): string {
     return `kind=list type=${eventTypeName(event.listEvent.eventType)} item=${item}`;
   }
   if (event.textEvent) return `kind=text type=${eventTypeName(event.textEvent.eventType)}`;
+  if (event.menuItemClickEvent) return `kind=menu itemID=${event.menuItemClickEvent.itemID ?? -1}`;
   if (event.audioEvent) return "kind=audio";
   const keys = Object.keys(event);
   return `kind=other keys=${keys.length > 0 ? keys.join(",") : "-"}`;
@@ -276,6 +277,12 @@ export async function initApp(): Promise<void> {
     // send slowdowns with what the host delivers (foreground swaps, system
     // events — or nothing at all) is the point of this capture.
     perfLogLazy(() => `[Perf][Event] ${describeEvenHubEvent(event)} t=${perfNowMs().toFixed(0)}`);
+    // Native-menu experiment: always surface the click on-device (unconditional of
+    // the perf flag) so the invocation gesture and delivery can be observed live.
+    // Dead code when the flag is off — the OS never sends menuItemClickEvent then.
+    if (NATIVE_MENU_ENABLED && event.menuItemClickEvent) {
+      console.log(`[Solitaire][NativeMenu] click itemID=${event.menuItemClickEvent.itemID ?? -1}`);
+    }
     guardedEventHandler(event);
   });
 

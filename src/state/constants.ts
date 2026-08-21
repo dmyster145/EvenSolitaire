@@ -12,6 +12,31 @@ export const MENU_OPTIONS = ["Move Assist", "Draw Card", "Play Animation", "Rese
 export type MenuOption = (typeof MENU_OPTIONS)[number];
 
 /**
+ * EXPERIMENT FLAG — register the OS-native context menu (`menuObject`) and route
+ * clicks through `menuItemClickEvent`, instead of drawing and handling our own
+ * hand-rolled menu. Default OFF: the hand-rolled menu is fully intact and every
+ * release path is unchanged. Flip to `true` LOCALLY to try the native menu on
+ * hardware — it's a clean switch, nothing to unwind. Once we've confirmed the
+ * invocation gesture and input behavior on-device we can decide what to delete.
+ */
+export const NATIVE_MENU_ENABLED = false;
+
+/**
+ * Native-menu item IDs. Firmware requires each `itemID` be a non-zero uint32,
+ * unique within the menu; we derive it from the MENU_OPTIONS index so 0 stays
+ * reserved and the mapping is stable both ways.
+ */
+const NATIVE_MENU_ITEM_ID_BASE = 1;
+
+export function nativeMenuItemID(option: MenuOption): number {
+  return MENU_OPTIONS.indexOf(option) + NATIVE_MENU_ITEM_ID_BASE;
+}
+
+export function menuOptionForItemID(itemID: number): MenuOption | undefined {
+  return MENU_OPTIONS[itemID - NATIVE_MENU_ITEM_ID_BASE];
+}
+
+/**
  * Win-animation tick interval. ~31fps is an upper bound, not a promise: the
  * render scheduler is single-in-flight, so ticks the BLE link can't keep up
  * with are coalesced rather than queued.
