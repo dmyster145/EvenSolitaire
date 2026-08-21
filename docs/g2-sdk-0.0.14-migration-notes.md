@@ -14,6 +14,8 @@ Handoff notes from the **EvenSolitaire** 0.0.14 work (Aug 2026). Apply these to 
 - [ ] Optionally adopt the **native menu** (`menuObject`) to replace hand-rolled menus (§3).
 - [ ] Optionally wire **page-container validation** before bridge calls (§4).
 - [ ] **Skip** zOrderIndex and per-line textColor unless you have a specific need (§5, §6).
+- [ ] **If you adopt the native menu, update your user docs / help page** — the menu is now opened by the OS system-menu gesture (not double-tap), lists your options minus Exit, and only a hand-rolled confirm (if any) still renders in-app. Remove Exit-option docs (§3).
+- [ ] **Re-capture any menu screenshots** — the simulator ≥0.9.0 renders the native menu, so shots of the old hand-rolled menu are stale (§9).
 - [ ] `npm test` + `tsc --noEmit` + `npm run build` green; confirm images render on hardware.
 
 ---
@@ -58,6 +60,12 @@ Omit `menuObject` on `rebuildPageContainer` to clear it. Click arrives as `event
 - Because the OS draws it, **menu frames leave your BLE pipeline** (small win — but note a hand-rolled menu rendered as *text* was already cheap; the real gain is UX + code deletion).
 
 **Gotcha that will waste your time:** dev-loading bypasses `min_app_version` enforcement. If your custom menu doesn't show (you see only the system "disable display / brightness / close"), **check the Even App version first** — it must be ≥2.2.9. The client code (serialize + validate) can be 100% correct and still fall back to the system menu on an older app. Confirm the payload is right with `validateEvenHubPageContainerMenu` (it will pass), then look at the app version, not your code.
+
+**Update your docs and screenshots when you adopt this** — the menu model changes for users, and any existing help page/README will be wrong:
+- It's opened by the **OS system-menu gesture** (a short press, then a long press), **not double-tap**. Stop documenting double-tap as opening a menu.
+- **Exit is gone** — exclude it (the OS menu's own "close" exits the app). Remove any Exit-option docs.
+- Any "the menu renders as text in the info panel / as a `MENU` overlay" wording is now false — the OS draws it. If you keep a hand-rolled confirm (e.g. a Reset Yes/No), that's the only overlay your app still renders.
+- **Screenshots of the old hand-rolled menu are stale.** Re-capture them from the updated simulator — see §9.
 
 ---
 
@@ -108,3 +116,8 @@ Front/back stacking for containers. **All-or-nothing per page** (set on every li
 - **Perf instrumentation rig:** structured `[App][Perf][Component] key=value` log lines; per-container send timing (min/avg/max/bytes/failed windows); EWMA congestion detector with hysteresis; an on-screen DOM console with a **Copy-All** button for hardware capture. Harden the clipboard for the Flutter WebView: on-screen editable `<textarea>` + `setSelectionRange`, with a manual-select fallback (the async clipboard API is often blocked). Copy from the **visible** log, not a capture-only buffer, so it works in DOM-only sessions.
 - **Controlled hardware A/B:** interleave the two conditions **within one session** on **identical payloads** to cancel device drift (separate runs are confounded by different content). To detect transport-level compression, compare **compressible vs incompressible payloads of identical size**.
 - **Falsifiable tests:** for each fix, prove the test fails without it (mutation-check) before trusting a green run.
+- **Re-capturing native-menu screenshots (simulator ≥0.9.1).** The `@evenrealities/evenhub-simulator` gained contextual-menu simulation in **0.9.0** (plus `textColor` and `zOrderIndex`), so it now renders the native menu for doc screenshots. Recipe:
+  1. `npm i -g @evenrealities/evenhub-simulator@latest` (get ≥0.9.1).
+  2. **Binary-shadow gotcha:** an old `evenhub-simulator` 0.1.0 may sit ahead of the npm one on `PATH` (e.g. `~/.gradle/nodejs/…/bin`) and won't know `--automation-port`. Invoke the npm build explicitly (`/opt/homebrew/bin/evenhub-simulator`) and verify `--version` → 0.9.1.
+  3. Launch against your dev server: `evenhub-simulator http://localhost:<port>/ --automation-port 9898` (flag **after** the URL).
+  4. Drive it over `http://127.0.0.1:9898`: `POST /api/input {"action":"context_menu"}` opens the menu (**not** `long_press` — that fires sys events), then `GET /api/screenshot/glasses` returns the 576×288 RGBA PNG. `GET /api/console?since_id=N` for logs.
